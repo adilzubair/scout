@@ -1,0 +1,7 @@
+{
+  "repository": "convaiinnovations/laya",
+  "revision": "5e7b2b1b8ca2ecdd3f2322d94069c9b6ce7e844b",
+  "checkpoints": {"english": "", "multilingual": "multilingual", "typed-decisions": "typed-decisions"},
+  "default": "english",
+  "experimental": true
+}

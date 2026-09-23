@@ -1,0 +1,17 @@
+global using System.IO;
+global using System.Net.Http;
+global using Application = System.Windows.Application;
+global using MessageBox = System.Windows.MessageBox;
+global using Clipboard = System.Windows.Clipboard;
+global using KeyEventArgs = System.Windows.Input.KeyEventArgs;
+global using Button = System.Windows.Controls.Button;
+global using TextBox = System.Windows.Controls.TextBox;
+global using CheckBox = System.Windows.Controls.CheckBox;
+global using Control = System.Windows.Controls.Control;
+global using Orientation = System.Windows.Controls.Orientation;
+global using Color = System.Windows.Media.Color;
+global using ColorConverter = System.Windows.Media.ColorConverter;
+global using ComboBox = System.Windows.Controls.ComboBox;
+global using ContextMenu = System.Windows.Controls.ContextMenu;
+global using MenuItem = System.Windows.Controls.MenuItem;
+global using HorizontalAlignment = System.Windows.HorizontalAlignment;

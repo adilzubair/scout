@@ -1,0 +1,10 @@
+**/bin/
+**/obj/
+.venv/
+.runtime/
+artifacts/
+__pycache__/
+*.user
+*.log
+.vs/
+.reference/
