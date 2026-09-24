@@ -1,5 +1,6 @@
 """Authenticated loopback sidecar. The model is loaded once, from local pinned weights."""
 import asyncio
+import atexit
 import ctypes
 import json
 import os
@@ -24,7 +25,7 @@ def load_agent(model, root, device='cpu', threads=4):
         raise RuntimeError('Checkpoint not downloaded. Run setup-laya.ps1.')
     return laya.load(str(path), device=device)
 
-def create_app(agent, secret):
+def create_app(agent, secret, helper=None, helper_status='off'):
     from fastapi import FastAPI, HTTPException, Request
     from ranking import rank
     app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
@@ -55,7 +56,7 @@ def create_app(agent, secret):
 
     @app.get('/health')
     async def health():
-        return {'status': 'ok', 'model': os.environ.get('LAYA_MODEL', 'english'), 'device': str(agent.device), 'busy': lock.locked()}
+        return {'status': 'ok', 'model': os.environ.get('LAYA_MODEL', 'english'), 'device': str(agent.device), 'busy': lock.locked(), 'helper': helper_status}
 
     @app.post('/rank')
     async def ranking(request: Request):
@@ -77,7 +78,7 @@ def create_app(agent, secret):
         if not isinstance(body.get('context', {}), dict):
             raise HTTPException(422, 'Invalid context')
         try:
-            return await execute(lambda: rank(agent, body['query'], candidates, bool(body.get('plural', False)), context=body.get('context')))
+            return await execute(lambda: rank(agent, body['query'], candidates, bool(body.get('plural', False)), context=body.get('context'), helper=helper))
         except ValueError as error:
             raise HTTPException(422, str(error)) from error
 
@@ -115,14 +116,32 @@ def main():
     # first real query pays the cold GPU pass despite successful model loading.
     from ranking import rank
     rank(agent, 'notepad', [{'id': 'warmup', 'kind': 'app', 'title': 'Notepad'}])
+    helper, helper_status = None, 'off'
+    if os.environ.get('SCOUT_SEMANTIC_HELPER') == '1':
+        try:
+            from semantic_helper import SemanticHelper
+            helper = SemanticHelper(os.environ['SCOUT_MODELS_DIR'])
+            atexit.register(helper.close)
+            warmed = helper.rank('pdf proving I paid for a purchase', [{'id': 'warmup', 'kind': 'file', 'title': 'Purchase receipt.pdf'}], deadline_seconds=30)
+            if warmed.get('reason'):
+                raise RuntimeError('Helper warmup failed')
+            helper_status = 'ready'
+        except (OSError, ValueError, RuntimeError):
+            if helper:
+                helper.close()
+            helper, helper_status = None, 'unavailable'
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.bind(('127.0.0.1', 0))
     ready = Path(os.environ['SCOUT_READY_FILE'])
     temp = ready.with_suffix('.tmp')
     temp.write_text(json.dumps({'port': sock.getsockname()[1]}))
     temp.replace(ready)
-    server = uvicorn.Server(uvicorn.Config(create_app(agent, secret), log_level='error', access_log=False))
-    server.run(sockets=[sock])
+    server = uvicorn.Server(uvicorn.Config(create_app(agent, secret, helper, helper_status), log_level='error', access_log=False))
+    try:
+        server.run(sockets=[sock])
+    finally:
+        if helper:
+            helper.close()
 
 if __name__ == '__main__':
     main()

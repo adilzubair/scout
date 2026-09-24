@@ -20,6 +20,7 @@ def main():
     parser.add_argument('--ranker', type=Path, default=Path(__file__).with_name('ranking.py'))
     parser.add_argument('--device', default='cuda')
     parser.add_argument('--checkpoint', choices=['english', 'multilingual', 'typed-decisions'], default='english')
+    parser.add_argument('--helper', action='store_true')
     args = parser.parse_args()
     if args.output.exists():
         raise SystemExit('Refusing to overwrite predictions.')
@@ -30,11 +31,18 @@ def main():
     started = time.perf_counter()
     agent = load_agent(args.checkpoint, args.models, args.device)
     cold = time.perf_counter() - started
+    helper = None
+    if args.helper:
+        from semantic_helper import SemanticHelper
+        helper = SemanticHelper(args.models)
+        import atexit
+        atexit.register(helper.close)
+        helper.rank('pdf proving I paid for a purchase', [{'id': 'warmup', 'kind': 'file', 'title': 'Purchase receipt.pdf'}], deadline_seconds=30)
     if cases:
         module.rank(agent, cases[0].get('modelQuery', cases[0]['Query']), cases[0]['candidates'])
     values, times = {}, []
     for index, case in enumerate(cases):
-        answer = module.rank(agent, case.get('modelQuery', case['Query']), case['candidates'], case['Intent']['Plural'], context=case.get('context', {}))
+        answer = module.rank(agent, case.get('modelQuery', case['Query']), case['candidates'], case['Intent']['Plural'], context=case.get('context', {}), **({'helper': helper} if helper else {}))
         if answer.get('elapsed_ms', 0) > 2000:
             answer = {**answer, 'scores': {}, 'members': [], 'reason': 'deadline'}
         values[case['Id']] = answer
@@ -44,9 +52,11 @@ def main():
     metrics = dict(requests=len(cases), coldSeconds=cold, p50Ms=statistics.median(times) if times else 0,
                    p95Ms=sorted(times)[min(len(times)-1, int(len(times)*.95))] if times else 0,
                    timeouts=sum(a.get('reason') == 'deadline' for a in values.values()))
-    report = dict(checkpoint=args.checkpoint, rankerHash=hashlib.sha256(args.ranker.read_bytes()).hexdigest(), fixtureHash=hashlib.sha256(args.fixtures.read_bytes()).hexdigest(), device=str(agent.device), metrics=metrics, answers=values)
+    report = dict(checkpoint=args.checkpoint, helper=args.helper, helperHash=hashlib.sha256(Path(__file__).with_name('semantic_helper.py').read_bytes()).hexdigest() if helper else None, rankerHash=hashlib.sha256(args.ranker.read_bytes()).hexdigest(), fixtureHash=hashlib.sha256(args.fixtures.read_bytes()).hexdigest(), device=str(agent.device), metrics=metrics, answers=values)
     args.output.write_text(json.dumps(report, indent=2), encoding='utf-8')
     print(json.dumps(metrics, indent=2), flush=True)
+    if helper:
+        helper.close()
 
 
 if __name__ == '__main__':

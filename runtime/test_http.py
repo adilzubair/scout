@@ -1,5 +1,6 @@
 """Real socket contract test, with an isolated server and the downloaded English checkpoint."""
 import json
+import argparse
 import os
 from pathlib import Path
 import secrets
@@ -10,6 +11,9 @@ import urllib.error
 import urllib.request
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--helper', action='store_true')
+    args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
     temporary_root = root / 'artifacts' / 'test-tmp'
     temporary_root.mkdir(parents=True, exist_ok=True)
@@ -17,6 +21,9 @@ def main():
         ready = Path(folder) / 'ready.json'
         secret = secrets.token_hex(32)
         env = {**os.environ, 'SCOUT_READY_FILE': str(ready), 'SCOUT_MODELS_DIR': str(root / '.runtime/models'), 'LAYA_API_KEY': secret, 'LAYA_DEVICE': 'cpu', 'SCOUT_PARENT_PID': str(os.getpid())}
+        env['SCOUT_SEMANTIC_HELPER'] = '1' if args.helper else '0'
+        if args.helper:
+            env['LAYA_DEVICE'] = 'cuda'
         process = subprocess.Popen([os.sys.executable, str(root / 'runtime/server.py')], env=env, creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0), stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
         try:
             for _ in range(600):
@@ -48,6 +55,10 @@ def main():
             assert request('health', auth=False)[0] == 401
             assert request('health', origin='https://example.com')[0] == 403
             assert request('health')[1]['status'] == 'ok'
+            if args.helper:
+                assert request('health')[1]['helper'] == 'ready'
+                code, body = request('rank', {'query': 'pdf proving I paid for a purchase', 'candidates': [{'id':'receipt','title':'Purchase receipt.pdf','kind':'file'},{'id':'invoice','title':'Invoice.pdf','kind':'file'}]})
+                assert code == 200 and body.get('engine') == 'laya+qwen3-4b' and max(body['scores'],key=body['scores'].get) == 'receipt', (code,body)
             code, body = request('rank', {'query': 'notepad', 'candidates': [{'id': 'notepad', 'title': 'Notepad', 'kind': 'app'}, {'id': 'calc', 'title': 'Calculator', 'kind': 'app'}]})
             assert code == 200 and 'notepad' in body['scores'], (code, body)
             code, body = request('rank', {'query': 'project folder', 'candidates': [{'id': 'folder', 'title': 'Project', 'kind': 'folder'}]})

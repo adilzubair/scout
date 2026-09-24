@@ -1,4 +1,4 @@
-param([ValidateSet('english','multilingual','typed-decisions','all')][string]$Model = 'english', [switch]$Cuda, [switch]$SkipModels)
+param([ValidateSet('english','multilingual','typed-decisions','all')][string]$Model = 'english', [switch]$Cuda, [switch]$SkipModels, [switch]$SemanticHelper)
 $ErrorActionPreference = 'Stop'
 $scoutRoot = Split-Path -Parent $PSScriptRoot
 $runtimeRoot = Join-Path $scoutRoot '.runtime'
@@ -36,3 +36,7 @@ if (-not $SkipModels) {
     if ($LASTEXITCODE -ne 0) { throw 'Model download failed. Re-run setup to resume.' }
 }
 Write-Output "Laya Python executable for Scout Settings: $python"
+if ($SemanticHelper) {
+    & $python (Join-Path $scoutRoot 'runtime/download_semantic.py') --output (Join-Path $runtimeRoot 'models')
+    if ($LASTEXITCODE -ne 0) { throw 'Semantic helper setup failed. Re-run setup to resume.' }
+}

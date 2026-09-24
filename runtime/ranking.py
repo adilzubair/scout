@@ -35,7 +35,7 @@ def distribution(answer, question):
     return {key: value / total for key, value in values.items()}
 
 
-def rank(agent, query, candidates, plural=False, deadline_seconds=2.0, context=None):
+def _rank_laya(agent, query, candidates, plural=False, deadline_seconds=2.0, context=None):
     from batching import predict_many
     if len(query) > 512 or not candidates or len(candidates) > 32:
         return {'scores': {}, 'members': [], 'reason': 'budget'}
@@ -171,3 +171,22 @@ def rank(agent, query, candidates, plural=False, deadline_seconds=2.0, context=N
             'none': none, 'all': all_probability, 'ready': ready,
             'action': max(actions, key=actions.get) if actions else 'unclear',
             'elapsed_ms': (time.monotonic() - started) * 1000}
+
+
+def rank(agent, query, candidates, plural=False, deadline_seconds=2.0, context=None, helper=None):
+    started = time.monotonic()
+    result = _rank_laya(agent, query, candidates, plural, deadline_seconds, context)
+    # Exact names and chronology are already protected by the C# caller. Keep
+    # short keyword searches and non-file typed decisions on the Laya path.
+    eligible = helper is not None and candidates and all(c['kind'] == 'file' for c in candidates) and len(query.split()) >= 4
+    remaining = deadline_seconds - (time.monotonic() - started)
+    if eligible and remaining > .2:
+        answer = helper.rank(query, candidates, deadline_seconds=remaining)
+        if not answer.get('reason'):
+            result = {**result, 'scores': answer['scores'], 'none': answer['none'], 'relevance': {}, 'engine': 'laya+qwen3-4b'}
+        else:
+            result = {**result, 'helper_reason': answer['reason']}
+    result['elapsed_ms'] = (time.monotonic() - started) * 1000
+    if result['elapsed_ms'] >= deadline_seconds * 1000:
+        return {**result, 'scores': {}, 'relevance': {}, 'members': [], 'reason': 'deadline'}
+    return result

@@ -16,9 +16,17 @@ def main():
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--device', default='cuda')
     parser.add_argument('--checkpoints', nargs='+', default=['english', 'multilingual', 'typed-decisions'])
+    parser.add_argument('--helper', action='store_true')
     args = parser.parse_args()
     cases = json.loads(args.fixtures.read_text(encoding='utf-8'))['cases']
     report = {'models': {}, 'note': 'Hand-authored challenge corpus, not a live comparison with Jev.'}
+    helper = None
+    if args.helper:
+        from semantic_helper import SemanticHelper
+        import atexit
+        helper = SemanticHelper(args.models)
+        atexit.register(helper.close)
+        helper.rank('pdf proving I paid for a purchase', [{'id':'warmup','title':'Purchase receipt.pdf','kind':'file'}],deadline_seconds=30)
     for checkpoint in args.checkpoints:
         started = time.perf_counter()
         agent = load_agent(checkpoint, args.models, args.device)
@@ -27,7 +35,7 @@ def main():
         rank(agent, first['query'], first['candidates'])
         values, times = {}, []
         for index, case in enumerate(cases):
-            output = rank(agent, case['query'], case['candidates'], case['plural']) if case['candidates'] else {'scores': {}, 'members': []}
+            output = rank(agent, case['query'], case['candidates'], case['plural'],helper=helper) if case['candidates'] else {'scores': {}, 'members': []}
             if output.get('elapsed_ms', 0) > 2000:
                 output['scores'], output['members'] = {}, []
             values[case['id']] = output
@@ -44,6 +52,8 @@ def main():
         import torch
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
+    if helper:
+        helper.close()
 
 
 if __name__ == '__main__':

@@ -79,6 +79,7 @@ public sealed class LayaRanker(HttpClient http, IReadOnlyDictionary<string, stri
         var action = body.TryGetProperty("action", out var actionValue) ? actionValue.GetString() ?? "unclear" : "unclear";
         if (action is not ("open" or "preview" or "reveal" or "copy" or "unclear")) throw new JsonException("Invalid action");
         var elapsed = body.TryGetProperty("elapsed_ms", out var elapsedValue) && elapsedValue.TryGetDouble(out var ms) && double.IsFinite(ms) && ms >= 0 ? ms : 0;
-        return new(scores, members, scores.Count == 0 ? "Local results · Laya abstained" : $"Laya · {elapsed:0} ms") { Relevance = relevance, Ready = Probability("ready"), All = Probability("all"), None = Probability("none"), Action = action, ElapsedMs = elapsed };
+        var engine = body.TryGetProperty("engine", out var engineValue) && engineValue.GetString() == "laya+qwen3-4b" ? "Laya + local helper" : "Laya";
+        return new(scores, members, scores.Count == 0 ? $"Local results · {engine} abstained" : $"{engine} · {elapsed:0} ms") { Relevance = relevance, Ready = Probability("ready"), All = Probability("all"), None = Probability("none"), Action = action, ElapsedMs = elapsed };
     }
 }

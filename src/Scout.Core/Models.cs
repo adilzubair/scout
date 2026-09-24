@@ -85,6 +85,7 @@ public sealed class ScoutSettings
     public bool WebFallback { get; set; } = true;
     public string[] AutomationFolders { get; set; } = [];
     public bool AiEnabled { get; set; }
+    public bool SemanticHelper { get; set; }
     public string PythonPath { get; set; } = "";
     public string Model { get; set; } = "english";
     public string Device { get; set; } = "cpu";

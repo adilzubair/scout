@@ -147,9 +147,9 @@ try
     });
     Test("Settings roundtrip and opt-in defaults", () =>
     {
-        Assert(!store.Settings.AiEnabled && !store.Settings.ChromeHistory && !store.Settings.EdgeHistory);
-        store.SaveSettings(new() { ChromeHistory = true, ExtraFolders = ["C:\\Project"] });
-        Assert(store.Settings.ChromeHistory && store.Settings.ExtraFolders.Length == 1);
+        Assert(!store.Settings.AiEnabled && !store.Settings.SemanticHelper && !store.Settings.ChromeHistory && !store.Settings.EdgeHistory);
+        store.SaveSettings(new() { ChromeHistory = true, SemanticHelper = true, ExtraFolders = ["C:\\Project"] });
+        Assert(store.Settings.ChromeHistory && store.Settings.SemanticHelper && store.Settings.ExtraFolders.Length == 1);
     });
     Test("Index replacement is persistent", () =>
     {

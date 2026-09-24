@@ -66,7 +66,7 @@ internal sealed class ModelHost : IDisposable
         await startGate.WaitAsync(token);
         try
         {
-            var key = $"{settings.PythonPath}|{settings.Model}|{settings.Device}|{settings.CpuThreads}";
+            var key = $"{settings.PythonPath}|{settings.Model}|{settings.Device}|{settings.CpuThreads}|{settings.SemanticHelper}";
             if (process is { HasExited: false } && configuration == key && client != null) return;
             StopProcess();
             if (!File.Exists(settings.PythonPath)) { Status = "Set up Laya in Settings"; return; }
@@ -82,6 +82,7 @@ internal sealed class ModelHost : IDisposable
             start.Environment["LAYA_MODEL"] = settings.Model;
             start.Environment["LAYA_DEVICE"] = settings.Device;
             start.Environment["LAYA_THREADS"] = settings.CpuThreads.ToString();
+            start.Environment["SCOUT_SEMANTIC_HELPER"] = settings.SemanticHelper ? "1" : "0";
             start.Environment["USE_TF"] = "0";
             start.Environment["HF_HUB_OFFLINE"] = "1";
             start.Environment["SCOUT_MODELS_DIR"] = Path.Combine(Path.GetDirectoryName(Path.GetDirectoryName(settings.PythonPath))!, "..", "models");
@@ -102,10 +103,16 @@ internal sealed class ModelHost : IDisposable
                 client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", secret);
                 for (var attempt = 0; ; attempt++)
                 {
-                    try { using var health = await client.GetAsync("health", deadline.Token); health.EnsureSuccessStatusCode(); break; }
+                    try
+                    {
+                        using var health = await client.GetAsync("health", deadline.Token); health.EnsureSuccessStatusCode();
+                        using var info = JsonDocument.Parse(await health.Content.ReadAsStringAsync(deadline.Token));
+                        Status = settings.SemanticHelper && info.RootElement.TryGetProperty("helper", out var helper) && helper.GetString() == "ready"
+                            ? "Laya + local helper ready" : settings.SemanticHelper ? "Laya ready · helper unavailable" : "Laya · experimental";
+                        break;
+                    }
                     catch (HttpRequestException) when (attempt < 20) { await Task.Delay(100, deadline.Token); }
                 }
-                Status = "Laya · experimental";
             }
             catch { StopProcess(); throw; }
         }

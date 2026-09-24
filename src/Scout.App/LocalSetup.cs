@@ -14,13 +14,14 @@ internal static class LocalSetup
         }
         return "";
     }
-    public static async Task<string> InstallAsync(bool cuda, IProgress<string> progress, CancellationToken token)
+    public static async Task<string> InstallAsync(bool cuda, IProgress<string> progress, CancellationToken token, bool semanticHelper = false)
     {
         var script = Path.Combine(AppContext.BaseDirectory, "scripts", "setup-laya.ps1");
         if (!File.Exists(script)) throw new IOException("Use the packaged Scout build to install local AI.");
         var start = new ProcessStartInfo("powershell.exe") { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true };
         foreach (var arg in new[] { "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", script, "-Model", "english" }) start.ArgumentList.Add(arg);
         if (cuda) start.ArgumentList.Add("-Cuda");
+        if (semanticHelper) start.ArgumentList.Add("-SemanticHelper");
         using var process = Process.Start(start) ?? throw new IOException("Could not start setup.");
         using var stop = token.Register(() => { try { if (!process.HasExited) process.Kill(true); } catch (Exception e) when (e is InvalidOperationException or System.ComponentModel.Win32Exception) { } });
         async Task Read(StreamReader reader) { while (await reader.ReadLineAsync(token) is { } line) if (!string.IsNullOrWhiteSpace(line)) progress.Report(line); }
