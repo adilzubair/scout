@@ -11,9 +11,14 @@ public static class RankingPolicy
         var confidence = judgment.Scores.Values.Max();
         var weight = Math.Clamp((confidence - .45) / .5, 0, 1);
         bool Confirmed(SearchHit h) => judgment.None < .25 && judgment.Scores.GetValueOrDefault(h.Candidate.Id) > judgment.None && judgment.Relevance.GetValueOrDefault(h.Candidate.Id) >= .85;
+        var winner = judgment.Scores.MaxBy(p => p.Value).Key;
+        // A supported comparative winner must not lose all influence merely
+        // because choice mass is shared by several plausible candidates.
+        var supportedWinner = local.ModelShortlist.FirstOrDefault(h => h.Candidate.Id == winner) is { } best && Confirmed(best);
         var accepted = local.Recall.Where(h => judgment.None < .25 && (judgment.Scores.GetValueOrDefault(h.Candidate.Id) >= .50 || Confirmed(h)));
         var ordered = local.Hits.Concat(accepted).DistinctBy(h => h.Candidate.Id).Select((h, i) => (Hit: h, Position: i))
             .OrderByDescending(x => x.Hit.Score >= 1000 ? 1 : 0)
+            .ThenByDescending(x => supportedWinner && x.Hit.Candidate.Id == winner ? 1 : 0)
             .ThenByDescending(x => judgment.Scores.TryGetValue(x.Hit.Candidate.Id, out var score)
                 ? weight * score + (1 - weight * .65) * Math.Clamp(x.Hit.Score / 400, 0, 1)
                 : -x.Position - 1)
