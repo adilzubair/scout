@@ -12,12 +12,15 @@ public static class FolderQuery
     private static readonly Regex Following = new(@"\s+(?=(?:(?:that\s+)?(?:i\s+)?(?:created|made|modified|edited|changed|opened|used|downloaded|added|saved)\b|today\b|yesterday\b|(?:last|this|past)\s+(?:week|month|year|hour|minute|day|morning|night)|(?:in|from|during)\s+(?:the\s+)?(?:last|past|this)\b))", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     public static (string Text, FolderFilter? Folder) Extract(string text)
     {
-        foreach (Match match in Preposition.Matches(text))
+        // A quoted location or absolute path is stronger evidence than an
+        // earlier descriptive phrase such as "notes from the team discussion".
+        bool Explicit(Match match) => Regex.IsMatch(text[(match.Index + match.Length)..], @"^(?:[""']|[a-z]:[\\/]|\\\\)", RegexOptions.IgnoreCase);
+        foreach (Match match in Preposition.Matches(text).OrderByDescending(Explicit))
         {
             var tail = text[(match.Index + match.Length)..].Trim();
             if (tail.Length == 0 || TimeStart.IsMatch(tail)) continue;
             var before = text[..match.Index];
-            if (Regex.IsMatch(before, @"\b(?:links?|pages?|websites?|apps?|applications?)\b", RegexOptions.IgnoreCase) && !Regex.IsMatch(tail, @"\b(?:folder|directory)\b", RegexOptions.IgnoreCase)) continue;
+            if (!Explicit(match) && Regex.IsMatch(before, @"\b(?:links?|pages?|websites?|apps?|applications?)\b", RegexOptions.IgnoreCase) && !Regex.IsMatch(tail, @"\b(?:folder|directory)\b", RegexOptions.IgnoreCase)) continue;
             string location, after;
             var quoted = tail[0] is '"' or '\'';
             if (quoted)

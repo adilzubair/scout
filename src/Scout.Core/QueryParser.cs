@@ -82,6 +82,9 @@ public static partial class QueryParser
         var appIntent = scope == Scope.Apps || (Has("app", "apps", "application", "applications") || appRole) && location.Folder == null;
         bool DescribedOfficeFile(string name) => Has(name) && (scope == Scope.Files || Has("file", "files", "document", "documents", "created", "made", "opened", "used", "edited", "modified", "downloaded") || words.Any(w => !Filler.Contains(w) && w != name && w != "microsoft"));
         string? extension = appIntent ? null : Has("pdf", "pdfs") ? ".pdf" : Has("deck", "decks", "slide", "slides", "presentation", "presentations") || DescribedOfficeFile("powerpoint") ? ".pptx" : Has("spreadsheet", "spreadsheets") || DescribedOfficeFile("excel") ? ".xlsx" : DescribedOfficeFile("word") ? ".docx" : Has("image", "images", "photo", "photos", "picture", "pictures", "screenshot", "screenshots") ? "image" : Has("video", "videos", "movie", "movies", "recording", "recordings") ? "video" : Has("music", "audio", "song", "songs") ? "audio" : Has("archive", "archives", "zip") ? "archive" : null;
+        // In a document description, "recording what was discussed" is a verb,
+        // and "about video" is a topic. Neither requests a media file.
+        if (Regex.IsMatch(q, @"^(?:(?:open|find|show|preview|reveal)\s+)?(?:(?:the|a|my)\s+)?documents?\b") && extension is "image" or "video" or "audio" or "archive") extension = null;
         var typed = appIntent ? Match.Empty : Regex.Match(q, @"(?<![\p{L}\p{N}])\.?(pdf|pptx?|pptm|ppsx|xlsx?|xlsm|csv|tsv|docx?|docm|odt|ods|odp|rtf|txt|md|json|ya?ml|xml|html|png|jpe?g|gif|webp|svg|bmp|tiff?|heic|mp4|mkv|mov|avi|webm|mp3|wav|m4a|flac|zip|7z|rar|tar|gz)\b");
         if (!appIntent && typed.Success) extension = "." + typed.Groups[1].Value;
         if (!appIntent && extension == null && Has("markdown", "md")) extension = ".md";
