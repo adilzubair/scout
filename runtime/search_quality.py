@@ -19,6 +19,7 @@ def main():
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--ranker', type=Path, default=Path(__file__).with_name('ranking.py'))
     parser.add_argument('--device', default='cuda')
+    parser.add_argument('--checkpoint', choices=['english', 'multilingual', 'typed-decisions'], default='english')
     args = parser.parse_args()
     if args.output.exists():
         raise SystemExit('Refusing to overwrite predictions.')
@@ -27,7 +28,7 @@ def main():
     spec.loader.exec_module(module)
     cases = [c for c in json.loads(args.fixtures.read_text(encoding='utf-8'))['cases'] if c['needsModel']]
     started = time.perf_counter()
-    agent = load_agent('english', args.models, args.device)
+    agent = load_agent(args.checkpoint, args.models, args.device)
     cold = time.perf_counter() - started
     if cases:
         module.rank(agent, cases[0].get('modelQuery', cases[0]['Query']), cases[0]['candidates'])
@@ -43,7 +44,7 @@ def main():
     metrics = dict(requests=len(cases), coldSeconds=cold, p50Ms=statistics.median(times) if times else 0,
                    p95Ms=sorted(times)[min(len(times)-1, int(len(times)*.95))] if times else 0,
                    timeouts=sum(a.get('reason') == 'deadline' for a in values.values()))
-    report = dict(rankerHash=hashlib.sha256(args.ranker.read_bytes()).hexdigest(), fixtureHash=hashlib.sha256(args.fixtures.read_bytes()).hexdigest(), device=str(agent.device), metrics=metrics, answers=values)
+    report = dict(checkpoint=args.checkpoint, rankerHash=hashlib.sha256(args.ranker.read_bytes()).hexdigest(), fixtureHash=hashlib.sha256(args.fixtures.read_bytes()).hexdigest(), device=str(agent.device), metrics=metrics, answers=values)
     args.output.write_text(json.dumps(report, indent=2), encoding='utf-8')
     print(json.dumps(metrics, indent=2), flush=True)
 

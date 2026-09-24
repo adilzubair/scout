@@ -1,10 +1,14 @@
 # Validation
 
-Latest search upgrade (2026-09-24): **259/271** final validation cases, compared
-with **213/271** for the saved baseline; **176 C# checks** and **13 Python adapter
-checks** pass. See [the search evaluation](SEARCH_EVALUATION.md) for the frozen
-metadata corpus, prompt experiments, current latency, remaining descriptive
-misses and reproduction instructions. Earlier measurements are retained below.
+Latest descriptive-search follow-up (2026-09-24): **484/504** prior regression
+cases pass, versus 482/504 at the start of this phase. The broader semantic
+evaluation exposes substantial remaining model limitations: **32/44** development
+and **17/46** reserved validation cases pass, versus 27/44 and 16/46 at `33459c4`.
+Both folder-scope leaks are fixed; two near-neighbor false matches remain across
+16 new negative cases. The **180 C# checks**, **13 adapter contracts** and HTTP
+checks pass. See [SEMANTIC_SEARCH.md](SEMANTIC_SEARCH.md) for the methodology,
+model experiments and limitations. Earlier results below describe their original
+corpora and should not be read as general semantic-search accuracy.
 
 Reference: Intern commit `c0bedee4b374b5f177b670016f5ff2b8e5bcf7eb`. Windows 11, .NET 10.0.400, Python 3.12.13, Laya 0.3.7, Transformers 4.57.6, PyTorch 2.8.0+cu128, NVIDIA RTX 5060 Laptop GPU (8 GB). Checkpoints are pinned to `5e7b2b1b8ca2ecdd3f2322d94069c9b6ce7e844b`.
 
