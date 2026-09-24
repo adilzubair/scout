@@ -1,5 +1,10 @@
 # Descriptive search audit — 2026-09-24
 
+Follow-up: an optional stronger local model now improves the fresh descriptive
+benchmark from 38/64 to 56/64. See [LOCAL_SEMANTIC_HELPER.md](LOCAL_SEMANTIC_HELPER.md)
+for the current architecture, tests, latency and remaining errors. The audit
+below documents the preceding Laya-only phase.
+
 The previous 20-case metadata-description validation set is now a development
 diagnostic, since its failures are being inspected. Its 12 misses were six wrong
 comparative choices, three abstentions, and three admission/blending failures.

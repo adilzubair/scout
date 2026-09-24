@@ -1,5 +1,12 @@
 # Validation
 
+Latest optional local helper: **56/64** fresh semantic validation cases versus
+38/64 with Laya alone; **497/504** prior real-metadata regressions versus 484/504.
+Four fresh false matches and two older presentation-query regressions remain.
+See [LOCAL_SEMANTIC_HELPER.md](LOCAL_SEMANTIC_HELPER.md) for the full comparison
+and reproduction. The 181 C# checks, 13 adapter contracts, 10 helper contracts,
+helper process-lifecycle check and both HTTP modes pass.
+
 Latest descriptive-search follow-up (2026-09-24): **484/504** prior regression
 cases pass, versus 482/504 at the start of this phase. The broader semantic
 evaluation exposes substantial remaining model limitations: **32/44** development

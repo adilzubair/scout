@@ -31,6 +31,7 @@ public partial class MainWindow
             var name = scenario.GetProperty("Name").GetString()!;
             var expected = scenario.GetProperty("expected").EnumerateArray().Select(e => e.GetString()!).ToArray();
             var mode = scenario.GetProperty("mode").GetString();
+            var semanticScenario = scenario.TryGetProperty("semantic", out var isSemantic) && isSemantic.GetBoolean();
             var folder = scenario.GetProperty("Folder").GetString();
             bool Correct(IEnumerable<SearchHit> hits)
             {
@@ -40,6 +41,7 @@ public partial class MainWindow
                 {
                     "title" => items.Length > 0 && items.All(h => h.Candidate.Title.Equals(query, StringComparison.OrdinalIgnoreCase)) && expected.All(e => paths.Contains(e, StringComparer.OrdinalIgnoreCase)),
                     "set" => paths.ToHashSet(StringComparer.OrdinalIgnoreCase).SetEquals(expected),
+                    "any" => paths.Length > 0 && expected.Contains(paths[0], StringComparer.OrdinalIgnoreCase),
                     _ => paths.FirstOrDefault()?.Equals(expected.FirstOrDefault(), StringComparison.OrdinalIgnoreCase) == true
                 };
             }
@@ -52,7 +54,7 @@ public partial class MainWindow
             var finalCorrect = current?.Query == query && Correct(displayedHits);
             var selectionCorrect = displayedHits.Count == 0 ? Selected == null || Selected.Kind == ItemKind.WebSearch : Selected?.Kind == ItemKind.Group ? group.Count >= 2 && group.Values.All(c => displayedHits.Any(h => h.Candidate.Id == c.Id)) : Selected?.Id == displayedHits.FirstOrDefault()?.Candidate.Id;
             var actionCorrect = current?.Intent.Action == ItemAction.Open;
-            var passed = localCorrect && finalCorrect && selectionCorrect && actionCorrect;
+            var passed = (semanticScenario || localCorrect) && finalCorrect && selectionCorrect && actionCorrect;
             if (!passed) failures.Add(name);
             checks.Add(new { name, query, passed, localCorrect, finalCorrect, selectionCorrect, actionCorrect, localMs, searchMs, settledMs = timer.Elapsed.TotalMilliseconds, top = displayedHits.FirstOrDefault()?.Candidate.Target, count = displayedHits.Count, selected = Selected?.Title, status = Status.Text, modelNeeded = current != null && RankingPolicy.NeedsModel(current) });
         }
