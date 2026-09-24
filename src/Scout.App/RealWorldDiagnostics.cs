@@ -46,6 +46,7 @@ public partial class MainWindow
             groupEdited = false; ClearGroup(); scope = Scope.All; UpdateScopes();
             var timer = Stopwatch.StartNew(); Query.Text = query; await WaitForSearch();
             var localMs = timer.Elapsed.TotalMilliseconds;
+            var searchMs = current?.ElapsedMs;
             var localCorrect = current?.Query == query && Correct(displayedHits);
             await WaitForSettledSearch();
             var finalCorrect = current?.Query == query && Correct(displayedHits);
@@ -53,7 +54,7 @@ public partial class MainWindow
             var actionCorrect = current?.Intent.Action == ItemAction.Open;
             var passed = localCorrect && finalCorrect && selectionCorrect && actionCorrect;
             if (!passed) failures.Add(name);
-            checks.Add(new { name, query, passed, localCorrect, finalCorrect, selectionCorrect, actionCorrect, localMs, settledMs = timer.Elapsed.TotalMilliseconds, top = displayedHits.FirstOrDefault()?.Candidate.Target, count = displayedHits.Count, selected = Selected?.Title, status = Status.Text, modelNeeded = current != null && RankingPolicy.NeedsModel(current) });
+            checks.Add(new { name, query, passed, localCorrect, finalCorrect, selectionCorrect, actionCorrect, localMs, searchMs, settledMs = timer.Elapsed.TotalMilliseconds, top = displayedHits.FirstOrDefault()?.Candidate.Target, count = displayedHits.Count, selected = Selected?.Title, status = Status.Text, modelNeeded = current != null && RankingPolicy.NeedsModel(current) });
         }
         // Exercise a real inference inside an explicitly resolved folder. It must
         // never introduce out-of-folder results, regardless of model probability.
@@ -63,7 +64,7 @@ public partial class MainWindow
         var modelResponded = judgment is { Scores.Count: > 0 };
         var semanticCorrect = displayedHits.FirstOrDefault()?.Candidate.Title.Contains("Corporate_Profile", StringComparison.OrdinalIgnoreCase) == true;
         if (!semanticScoped || !modelResponded || !semanticCorrect) failures.Add("Scoped real Laya inference");
-        checks.Add(new { name = "Scoped real Laya inference", query = Query.Text, passed = semanticScoped && modelResponded && semanticCorrect, top = displayedHits.FirstOrDefault()?.Candidate.Target, count = displayedHits.Count, status = Status.Text });
+        checks.Add(new { name = "Scoped real Laya inference", query = Query.Text, passed = semanticScoped && modelResponded && semanticCorrect, semanticScoped, modelResponded, semanticCorrect, IsVisible, modelStatus = model.Status, taskStatus = refinementTask.Status.ToString(), revision, appliedRevision, modelNeeded = current != null && RankingPolicy.NeedsModel(current), top = displayedHits.FirstOrDefault()?.Candidate.Target, count = displayedHits.Count, status = Status.Text });
 
         Query.Text = "latest 3 files in telegram folder"; await WaitForSettledSearch();
         if (group.Count != 3) failures.Add("Three-file group");

@@ -111,6 +111,10 @@ def main():
         raise RuntimeError('LAYA_API_KEY is required')
     threading.Thread(target=monitor_parent, args=(int(os.environ.get('SCOUT_PARENT_PID', '0')),), daemon=True).start()
     agent = load_agent(os.environ.get('LAYA_MODEL', 'english'), os.environ['SCOUT_MODELS_DIR'], os.environ.get('LAYA_DEVICE', 'cpu'), int(os.environ.get('LAYA_THREADS', '4')))
+    # Initialize inference kernels before advertising readiness. Otherwise the
+    # first real query pays the cold GPU pass despite successful model loading.
+    from ranking import rank
+    rank(agent, 'notepad', [{'id': 'warmup', 'kind': 'app', 'title': 'Notepad'}])
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.bind(('127.0.0.1', 0))
     ready = Path(os.environ['SCOUT_READY_FILE'])

@@ -3,17 +3,24 @@ using System.Text.Json;
 
 namespace Scout.Core;
 
-public sealed class LayaRanker(HttpClient http, IReadOnlyDictionary<string, string>? context = null) : IRanker
+public sealed class LayaRanker(HttpClient http, IReadOnlyDictionary<string, string>? context = null, QueryIntent? resolvedIntent = null) : IRanker
 {
+    public static string QueryFor(QueryIntent intent)
+    {
+        // The catalog already enforces locations. Long absolute paths distract
+        // the small checkpoint and consume context needed to compare titles.
+        var text = intent.Folder != null ? FolderQuery.Extract(intent.Text).Text : intent.Text;
+        return System.Text.RegularExpressions.Regex.Replace(QueryParser.NormalizeRequest(text), @"\s+", " ").Trim();
+    }
     public async Task<RankResult> RankAsync(string query, IReadOnlyList<Candidate> candidates, CancellationToken cancellationToken)
     {
         if (query.Length > 512 || candidates.Count == 0) return new(new Dictionary<string, double>(), new HashSet<string>(), "Local results");
         // IDs are values only. The model never returns an execution target.
         var shown = candidates.Take(32).ToArray();
-        var intent = QueryParser.Parse(query, DateTimeOffset.Now);
+        var intent = resolvedIntent ?? QueryParser.Parse(query, DateTimeOffset.Now);
         var request = new
         {
-            query,
+            query = QueryFor(intent),
             plural = intent.Plural,
             context = context ?? new Dictionary<string, string>(),
             candidates = shown.Select(c => new
@@ -39,6 +46,16 @@ public sealed class LayaRanker(HttpClient http, IReadOnlyDictionary<string, stri
             scores[property.Name] = p;
         }
         if (scores.Values.Sum() > 1.001) throw new JsonException("Invalid probability total");
+        var relevance = new Dictionary<string, double>();
+        if (body.TryGetProperty("relevance", out var checks))
+        {
+            if (checks.ValueKind != JsonValueKind.Object) throw new JsonException("Invalid relevance response");
+            foreach (var check in checks.EnumerateObject())
+            {
+                if (!allowed.Contains(check.Name) || !check.Value.TryGetDouble(out var p) || !double.IsFinite(p) || p < 0 || p > 1) throw new JsonException("Invalid relevance judgment");
+                relevance[check.Name] = p;
+            }
+        }
         if (body.TryGetProperty("none", out var none) && none.TryGetDouble(out var noneProbability))
         {
             if (!double.IsFinite(noneProbability) || noneProbability < 0 || noneProbability > 1) throw new JsonException("Invalid none probability");
@@ -62,6 +79,6 @@ public sealed class LayaRanker(HttpClient http, IReadOnlyDictionary<string, stri
         var action = body.TryGetProperty("action", out var actionValue) ? actionValue.GetString() ?? "unclear" : "unclear";
         if (action is not ("open" or "preview" or "reveal" or "copy" or "unclear")) throw new JsonException("Invalid action");
         var elapsed = body.TryGetProperty("elapsed_ms", out var elapsedValue) && elapsedValue.TryGetDouble(out var ms) && double.IsFinite(ms) && ms >= 0 ? ms : 0;
-        return new(scores, members, scores.Count == 0 ? "Local results · Laya abstained" : $"Laya · {elapsed:0} ms") { Ready = Probability("ready"), All = Probability("all"), None = Probability("none"), Action = action, ElapsedMs = elapsed };
+        return new(scores, members, scores.Count == 0 ? "Local results · Laya abstained" : $"Laya · {elapsed:0} ms") { Relevance = relevance, Ready = Probability("ready"), All = Probability("all"), None = Probability("none"), Action = action, ElapsedMs = elapsed };
     }
 }

@@ -33,12 +33,14 @@ internal sealed record SearchDocument(Candidate Candidate, string Name, string[]
     public static SearchDocument Create(Candidate candidate)
     {
         var title = candidate.Kind == ItemKind.File ? Path.GetFileNameWithoutExtension(candidate.Title) : candidate.Title;
-        var words = QueryParser.Tokenize(title);
+        var splitTitle = System.Text.RegularExpressions.Regex.Replace(title, @"(?<=[\p{Ll}\p{N}])(?=\p{Lu})|(?<=\p{Lu})(?=\p{Lu}\p{Ll})", " ");
+        var parts = QueryParser.Tokenize(splitTitle);
+        var words = QueryParser.Tokenize(title).Concat(parts).Distinct().ToArray();
         var folders = candidate.Kind == ItemKind.File
             ? string.Join(' ', candidate.Detail.Split(['\\', '/'], StringSplitOptions.RemoveEmptyEntries).TakeLast(2))
             : candidate.Kind == ItemKind.Link ? candidate.Detail : "";
         var aliases = candidate.Keywords.Select(k => k.ToLowerInvariant()).ToArray();
         var screenshot = System.Text.RegularExpressions.Regex.IsMatch(candidate.Target, @"(?<![\p{L}])(?:screenshots?|screen[\s_-]+shots?|snips?|snipping)(?![\p{L}])", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-        return new(candidate, title.ToLowerInvariant(), words, QueryParser.Tokenize(folders), aliases, aliases.SelectMany(QueryParser.Tokenize).Distinct().ToArray(), string.Concat(words.Where(w => w.Length > 0).Select(w => w[0])), Path.GetExtension(candidate.Target).ToLowerInvariant()) { Screenshot = screenshot };
+        return new(candidate, title.ToLowerInvariant(), words, QueryParser.Tokenize(folders), aliases, aliases.SelectMany(QueryParser.Tokenize).Distinct().ToArray(), string.Concat(parts.Where(w => w.Length > 0).Select(w => w[0])), Path.GetExtension(candidate.Target).ToLowerInvariant()) { Screenshot = screenshot };
     }
 }

@@ -4,8 +4,10 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using System.Windows.Threading;
 using Scout.Core;
+using Brushes = System.Windows.Media.Brushes;
 
 namespace Scout.App;
 
@@ -39,11 +41,13 @@ public partial class MainWindow : Window
     private Task localSearchTask = Task.CompletedTask;
     private Task refinementTask = Task.CompletedTask, enrichmentTask = Task.CompletedTask;
     private long appliedRevision, observedIndexVersion = -1;
+    private double requestedHeight = 420;
 
     internal MainWindow(ScoutStore store, IndexService index, ModelHost model)
     {
         this.store = store; this.index = index; this.model = model;
         InitializeComponent();
+        WindowVisuals.Configure(this);
         SourceInitialized += (_, _) =>
         {
             HwndSource.FromHwnd(new WindowInteropHelper(this).Handle)?.AddHook(WindowMessage);
@@ -51,14 +55,14 @@ public partial class MainWindow : Window
         };
         Loaded += (_, _) => { UpdateScopes(); Query.Focus(); RefreshLocal(); };
         Closing += (_, e) => { if (!Application.Current.Dispatcher.HasShutdownStarted) { e.Cancel = true; HidePanel(); } };
-        index.Changed += text => Dispatcher.BeginInvoke(() => { indexStatus = text; indexChanged = true; });
+        index.Changed += text => Dispatcher.BeginInvoke(() => { indexStatus = text; Status.ToolTip = indexStatus; indexChanged = true; });
         uiRefresh = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
         uiRefresh.Tick += (_, _) =>
         {
             if (!indexChanged || !IsVisible) return;
             indexChanged = false;
             if (observedIndexVersion != index.Version) { observedIndexVersion = index.Version; ScheduleSearch(false); }
-            else if (Query.Text.Length == 0) Status.Text = indexStatus;
+            else if (Query.Text.Length == 0) Status.Text = "Scout";
         }; uiRefresh.Start();
         indexRefresh = new DispatcherTimer { Interval = TimeSpan.FromSeconds(30) };
         indexRefresh.Tick += async (_, _) => await index.RefreshAsync(); indexRefresh.Start();
@@ -81,11 +85,20 @@ public partial class MainWindow : Window
         _ = index.RefreshAsync(forceHistory: true); ScheduleSearch(false);
     }
     private void HidePanel() { search.Cancel(); revision++; Hide(); }
-    private void DragHeader(object sender, MouseButtonEventArgs e) { if (e.ChangedButton == MouseButton.Left && e.OriginalSource is not Button) DragMove(); }
+    private void DragHeader(object sender, MouseButtonEventArgs e)
+    {
+        if (e.ChangedButton != MouseButton.Left) return;
+        for (var source = e.OriginalSource as DependencyObject; source != null; source = VisualTreeHelper.GetParent(source))
+            if (source is Button or TextBox) return;
+        DragMove();
+    }
+    private void ClearQueryClick(object sender, RoutedEventArgs e) { Query.Clear(); Query.Focus(); }
+    private void DismissClick(object sender, RoutedEventArgs e) => HidePanel();
     private void QueryChanged(object sender, TextChangedEventArgs e)
     {
         if (!IsInitialized || Placeholder == null) return;
         Placeholder.Visibility = Query.Text.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
+        ClearQuery.Visibility = Query.Text.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
         enriched = []; manualSelection = false;
         if (!groupEdited && editingWorkspace == null) { group.Clear(); groupChoices.Clear(); UpdateGroup(); }
         ScheduleSearch(true);
@@ -96,14 +109,17 @@ public partial class MainWindow : Window
         foreach (Button button in Scopes.Children)
         {
             var selected = int.Parse((string)button.Tag) == (int)scope;
-            button.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString(selected ? "#225DB6" : "#E7EDF5"));
-            button.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(selected ? "#FFFFFF" : "#19334B"));
+            button.Background = selected ? WindowVisuals.Brush("Selection") : Brushes.Transparent;
+            button.Foreground = WindowVisuals.Brush(selected ? "Ink" : "Muted");
+            button.BorderBrush = Brushes.Transparent;
+            button.FontWeight = selected ? FontWeights.Medium : FontWeights.Normal;
+            System.Windows.Automation.AutomationProperties.SetItemStatus(button, selected ? "Selected" : "");
         }
     }
     private void ScheduleSearch(bool enrich)
     {
         search.Cancel(); search = new CancellationTokenSource(); var token = search.Token; var generation = ++revision;
-        Results.IsEnabled = false; judgment = null;
+        Results.IsEnabled = false; ActionsButton.IsEnabled = false; judgment = null;
         if (Results.ItemsSource is ResultRow[] previous) foreach (var row in previous) row.ClearReady();
         localSearchTask = RunLocalSearch(generation, Query.Text, scope, enrich, token);
     }
@@ -134,10 +150,9 @@ public partial class MainWindow : Window
     }
     private string ResultStatus(SearchResult result)
     {
-        if (result.Query.Length == 0) return indexStatus;
+        if (result.Query.Length == 0) return "Scout";
         if (result.Notice.Length > 0) return result.Notice;
-        var location = result.Locations.Length == 1 ? " · " + result.Locations[0] : result.Locations.Length > 1 ? $" · {result.Locations.Length} matching folders" : "";
-        return $"{result.ElapsedMs:0} ms · {result.Hits.Count} results" + location;
+        return result.Locations.Length == 1 ? result.Locations[0] : "Scout";
     }
     private async Task RefineAsync(long generation, bool enrich, CancellationToken token)
     {
@@ -150,8 +165,8 @@ public partial class MainWindow : Window
             }
             if (!store.Settings.AiEnabled || string.IsNullOrWhiteSpace(Query.Text) || current == null || !RankingPolicy.NeedsModel(current)) return;
             var local = current;
-            Status.Text = "Laya is refining results…";
-            var ranked = await model.RankAsync(store.Settings, Query.Text, local.ModelShortlist.Select(h => h.Candidate).ToArray(), token);
+            Status.Text = "Finding the best match…";
+            var ranked = await model.RankAsync(store.Settings, Query.Text, local.ModelShortlist.Select(h => h.Candidate).ToArray(), token, local.Intent);
             if (token.IsCancellationRequested || generation != revision || !IsVisible) return;
             if (ranked != null)
             {
@@ -163,7 +178,7 @@ public partial class MainWindow : Window
                     foreach (var hit in rows.Where(h => h.Candidate.IsGroupable && ranked.GroupMembers.Contains(h.Candidate.Id)).Take(local.Intent.Count ?? 25)) group[hit.Candidate.Id] = hit.Candidate;
                 ApplyRows(rows); UpdateGroup();
             }
-            Status.Text = ResultStatus(local) + " · " + model.Status;
+            Status.Text = ResultStatus(local);
         }
         catch (OperationCanceledException) { }
         catch (Exception e) when (e is IOException or InvalidOperationException) { if (generation == revision) Status.Text = "Local results ready"; }
@@ -199,14 +214,45 @@ public partial class MainWindow : Window
         Results.SelectedItem = rows.FirstOrDefault(r => r.Candidate.Id == selected) ?? rows.FirstOrDefault();
         applying = false;
         Empty.Visibility = rows.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
-        EmptyTitle.Text = Query.Text.Length == 0 ? "Your next thing, a few words away." : "No matching items yet.";
-        EmptyDetail.Text = Query.Text.Length == 0 ? "Search an app or file. Pin your favorites to keep them here." : "Try a name or fewer words. Enable browser history or add folders in Settings.";
+        EmptyTitle.Text = Query.Text.Length == 0 ? "What can we help you find?" : "No matches yet";
+        EmptyDetail.Text = Query.Text.Length == 0 ? "An app, a file, or a few words to get started." : "Try a different name or search in All.";
+        if (Query.Text.Length == 0 && scope != Scope.All)
+        {
+            EmptyTitle.Text = scope == Scope.Workspaces ? "Your work, ready to reopen" : $"Find your {scope.ToString().ToLowerInvariant()}";
+            EmptyDetail.Text = scope == Scope.Workspaces ? "Add results to a group, then save a workspace to open them together." : "Start typing a name. Pinned and recently opened items appear here.";
+        }
         if (rows.Length == 0 && current?.Intent.Recency is RecencyBasis.Added or RecencyBasis.Downloaded) EmptyDetail.Text = "No matching arrival dates. Browser history can supply completed-download dates when enabled in Settings.";
         if (rows.Length == 0 && current?.Intent.Recency == RecencyBasis.Opened) EmptyDetail.Text = "No matching openings in Windows Recent Items or Scout launch history.";
         if (current?.Notice is { Length: > 0 } notice) EmptyDetail.Text = notice;
-        Height = rows.Length == 0 ? 440 : 240 + Math.Min(7, rows.Length) * 58 + (group.Count > 0 ? 50 : 0);
+        ResultsHeading.Text = rows.Length == 0 ? "" : Query.Text.Length == 0 ? "Suggestions" : "Results";
+        ResultCount.Text = rows.Length == 0 ? "" : $"{rows.Length} {(rows.Length == 1 ? "item" : "items")}";
+        Examples.Visibility = Query.Text.Length == 0 && scope == Scope.All ? Visibility.Visible : Visibility.Collapsed;
+        ResultHints.Visibility = rows.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
+        FooterActions.Visibility = rows.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
+        ActionsButton.IsEnabled = rows.Length > 0;
+        ResizeToResults(rows.Length, rows.FirstOrDefault()?.Candidate.Kind == ItemKind.Calculation);
     }
-    private void SelectionChanged(object sender, SelectionChangedEventArgs e) { if (!applying && Results.IsKeyboardFocusWithin) manualSelection = true; }
+    private void ResizeToResults(int count, bool calculation)
+    {
+        var target = count == 0 ? (Examples.Visibility == Visibility.Visible ? 418 : 326)
+            : Math.Max(326, 220 + Math.Min(6, count) * 60 + (calculation ? 22 : 0));
+        if (GroupBar.Visibility == Visibility.Visible) target += 56;
+        var height = Math.Min(target, MaxHeight);
+        if (Math.Abs(requestedHeight - height) < 1) return;
+        requestedHeight = height;
+        BeginAnimation(HeightProperty, null);
+        Height = height;
+        // Resizing the native acrylic HWND on every animation frame stalls
+        // query updates in the compositor. Fit immediately; keep the open fade.
+    }
+    private void SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (!applying && Results.IsKeyboardFocusWithin) manualSelection = true;
+        if (PrimaryActionHint != null)
+            PrimaryActionHint.Text = Selected?.Kind == ItemKind.Calculation || current?.Intent.Action == ItemAction.Copy ? "Copy"
+                : current?.Intent.Action == ItemAction.Preview && Selected?.Kind == ItemKind.File ? "Preview"
+                : current?.Intent.Action == ItemAction.Reveal && Selected?.Kind is ItemKind.File or ItemKind.App or ItemKind.Folder ? "Reveal" : "Open";
+    }
     private void ResultMouseDown(object sender, MouseButtonEventArgs e) { manualSelection = true; }
     private Candidate? Selected => appliedRevision == revision ? (Results.SelectedItem as ResultRow)?.Candidate : null;
     private async void OpenDoubleClick(object sender, MouseButtonEventArgs e)
@@ -288,8 +334,8 @@ public partial class MainWindow : Window
     private void ShowActions()
     {
         if (Selected is not { } item) return;
-        var menu = new ContextMenu { PlacementTarget = Results };
-        void Add(string label, Action action) { var entry = new MenuItem { Header = label }; entry.Click += (_, _) => { try { action(); } catch (Exception e) when (e is IOException or System.Runtime.InteropServices.COMException or System.ComponentModel.Win32Exception) { Status.Text = e.Message; } }; menu.Items.Add(entry); }
+        var menu = new ContextMenu { PlacementTarget = ActionsButton, Placement = System.Windows.Controls.Primitives.PlacementMode.Top };
+        void Add(string label, Action action) { var parts = label.Split("    ", 2); var entry = new MenuItem { Header = parts[0], InputGestureText = parts.Length > 1 ? parts[1] : "" }; entry.Click += (_, _) => { try { action(); } catch (Exception e) when (e is IOException or System.Runtime.InteropServices.COMException or System.ComponentModel.Win32Exception) { Status.Text = e.Message; } }; menu.Items.Add(entry); }
         Add(item.Kind == ItemKind.Calculation ? "Copy result    Enter" : "Open    Enter", () => _ = OpenSelected());
         if (item.IsPinnable) Add("Pin / unpin    Ctrl+P", () => { store.TogglePin(item); RefreshLocal(); });
         if (item.IsGroupable || item.Kind is ItemKind.Calculation or ItemKind.WebSearch or ItemKind.Automation)
@@ -344,7 +390,7 @@ public partial class MainWindow : Window
         }
         Query.Focus();
     }
-    private void ExampleClick(object sender, RoutedEventArgs e) { Query.Text = (string)((Button)sender).Content; Query.Focus(); Query.CaretIndex = Query.Text.Length; }
+    private void ExampleClick(object sender, RoutedEventArgs e) { Query.Text = (string)((Button)sender).Tag; Query.Focus(); Query.CaretIndex = Query.Text.Length; }
     private async void OnKeyDown(object sender, KeyEventArgs e)
     {
         var ctrl = Keyboard.Modifiers.HasFlag(ModifierKeys.Control); var shift = Keyboard.Modifiers.HasFlag(ModifierKeys.Shift);
@@ -375,26 +421,30 @@ public partial class MainWindow : Window
         public bool Grouped => grouped;
         public Visibility MembershipVisibility => membership && candidate.IsGroupable ? Visibility.Visible : Visibility.Collapsed;
         public string ReadyMark => ready ? "↵" : "";
+        public bool IsReady => ready;
         public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
-        public void ClearReady() { ready = false; PropertyChanged?.Invoke(this, new(nameof(ReadyMark))); }
+        public void ClearReady() { ready = false; PropertyChanged?.Invoke(this, new(nameof(ReadyMark))); PropertyChanged?.Invoke(this, new(nameof(IsReady))); }
         private ImageSource? icon;
         private bool requestedIcon;
         public ImageSource? Icon { get { if (!requestedIcon && candidate.Kind is ItemKind.File or ItemKind.App or ItemKind.Automation or ItemKind.Folder) { requestedIcon = true; _ = LoadIcon(); } return icon; } }
-        private async Task LoadIcon() { icon = await NativeIcons.Get(candidate.Target); PropertyChanged?.Invoke(this, new(nameof(Icon))); PropertyChanged?.Invoke(this, new(nameof(GlyphVisibility))); }
+        private async Task LoadIcon() { icon = await NativeIcons.Get(candidate.Target); PropertyChanged?.Invoke(this, new(nameof(Icon))); PropertyChanged?.Invoke(this, new(nameof(GlyphVisibility))); PropertyChanged?.Invoke(this, new(nameof(IconBackground))); }
         public Visibility GlyphVisibility => icon == null ? Visibility.Visible : Visibility.Collapsed;
         public string Title => Candidate.Title;
         public string Detail => Candidate.Date(basis) is { } date
-            ? $"{(basis == RecencyBasis.Downloaded && Candidate.DownloadedAt == null ? "Arrived" : basis)} {Age(date)} · {Candidate.Detail}" : Candidate.Source + " · " + Candidate.Detail;
+            ? $"{(basis == RecencyBasis.Downloaded && Candidate.DownloadedAt == null ? "Arrived" : basis)} {Age(date)} · {Candidate.Detail}" : Candidate.Detail.Length > 0 ? Candidate.Detail : Candidate.Source;
         public string Evidence => Candidate.Evidence(basis) + (Candidate.Date(basis) is { } date ? $"\n{date.LocalDateTime:F}" : "") + "\n" + Candidate.Target;
         private static string Age(DateTimeOffset date)
         {
             var span = DateTimeOffset.Now - date;
             return span.TotalMinutes < 1 ? "just now" : span.TotalHours < 1 ? $"{(int)span.TotalMinutes} min ago" : span.TotalDays < 1 ? $"{(int)span.TotalHours} hr ago" : $"{(int)span.TotalDays} days ago";
         }
-        public string Marker => pinned ? "Pinned" : "";
+        public string Marker => pinned ? "\uE718" : "";
+        public string KindLabel => Candidate.Kind switch { ItemKind.File => Path.GetExtension(Candidate.Title).TrimStart('.').ToUpperInvariant(), ItemKind.WebSearch => "Web", ItemKind.Calculation => "Calculator", ItemKind.System => "System", ItemKind.Group => "Group", _ => Candidate.Kind.ToString() };
+        public string IconBackground => icon != null ? "Transparent" : Candidate.Kind switch { ItemKind.Folder => "#18C18F2E", ItemKind.Workspace or ItemKind.Group => "#16775AB5", ItemKind.Calculation => "#163B8862", ItemKind.Link or ItemKind.WebSearch => "#164568D4", _ => "#0B344C78" };
+        public string IconForeground => Candidate.Kind switch { ItemKind.Folder => "#A06B14", ItemKind.Workspace or ItemKind.Group => "#7255B5", ItemKind.Calculation => "#237548", _ => "#3970AC" };
         public string Glyph => Candidate.Kind switch { ItemKind.App or ItemKind.Automation => "\uE71D", ItemKind.Folder => "\uE8B7", ItemKind.Link or ItemKind.WebSearch => "\uE774", ItemKind.Workspace or ItemKind.Group => "\uE8F1", ItemKind.Calculation => "\uE8EF", ItemKind.System => "\uE713", _ => "\uE8A5" };
     }
-    internal async Task SmokeCheck()
+    internal async Task SmokeCheck(bool captureUi = false)
     {
         Query.Text = "pdf"; await WaitForSearch();
         if (current!.Hits.Count != 3) throw new InvalidOperationException("Fixture search failed");
@@ -427,7 +477,8 @@ public partial class MainWindow : Window
         if (Selected is not { Kind: ItemKind.Calculation, Target: "36" }) throw new InvalidOperationException("Calculator row failed");
         Query.Text = "zzzxqv nonexistent"; await WaitForSearch();
         if (Selected?.Kind != ItemKind.WebSearch || current!.Hits.Count != 0) throw new InvalidOperationException("Web fallback failed");
-        await PreviewDiagnostics.CheckAsync(Path.Combine(App.DataDirectory, "preview-fixtures"));
+        if (captureUi) await CaptureUiChecks();
+        else await PreviewDiagnostics.CheckAsync(Path.Combine(App.DataDirectory, "preview-fixtures"));
         Query.Text = "pdf"; RefreshLocal(); await WaitForSearch(); UpdateLayout();
     }
     private async Task WaitForSearch()

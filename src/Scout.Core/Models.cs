@@ -62,7 +62,7 @@ public sealed record SearchResult(string Query, QueryIntent Intent, IReadOnlyLis
     public string Notice { get; init; } = "";
     // Broader, still source/type/time constrained candidates. Hidden unless Laya endorses them.
     public IReadOnlyList<SearchHit> Recall { get; init; } = [];
-    public IReadOnlyList<SearchHit> ModelShortlist => Hits.Concat(Recall).DistinctBy(h => h.Candidate.Id).Take(32).ToArray();
+    public IReadOnlyList<SearchHit> ModelShortlist => Shortlist.Select(Hits, Recall);
 }
 public sealed record TimeWindow(DateTimeOffset Since, DateTimeOffset Until, string Description);
 public sealed record QueryIntent(string Text, string[] Terms, string? Extension, ItemKind? Kind, RecencyBasis Recency, TimeWindow? Window, bool Plural)
@@ -96,6 +96,7 @@ public sealed class ScoutSettings
 
 public sealed record RankResult(IReadOnlyDictionary<string, double> Scores, IReadOnlySet<string> GroupMembers, string Status)
 {
+    public IReadOnlyDictionary<string, double> Relevance { get; init; } = new Dictionary<string, double>();
     public double Ready { get; init; }
     public double All { get; init; }
     public double None { get; init; }

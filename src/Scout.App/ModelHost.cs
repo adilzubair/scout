@@ -25,7 +25,7 @@ internal sealed class ModelHost : IDisposable
         catch (OperationCanceledException) { }
         catch (Exception e) when (e is IOException or HttpRequestException or JsonException or InvalidOperationException or System.ComponentModel.Win32Exception) { Status = "Laya unavailable · local results ready"; }
     }
-    public async Task<RankResult?> RankAsync(ScoutSettings settings, string query, IReadOnlyList<Candidate> candidates, CancellationToken token)
+    public async Task<RankResult?> RankAsync(ScoutSettings settings, string query, IReadOnlyList<Candidate> candidates, CancellationToken token, QueryIntent? intent = null)
     {
         // Keep the gate until the actual server response: HTTP cancellation cannot stop a Torch pass.
         if (!settings.AiEnabled) return null;
@@ -37,9 +37,9 @@ internal sealed class ModelHost : IDisposable
             await EnsureStartedAsync(settings, session.Token);
             request.Token.ThrowIfCancellationRequested();
             if (client == null) return null;
-            var key = JsonSerializer.Serialize(new { query, candidates, Context, minute = DateTimeOffset.Now.ToUnixTimeSeconds() / 60 });
+            var key = JsonSerializer.Serialize(new { query, candidates, Context, intent, minute = DateTimeOffset.Now.ToUnixTimeSeconds() / 60 });
             if (cache.TryGetValue(key, out var cached)) { Status = cached.Status; return cached; }
-            var task = new LayaRanker(client, Context).RankAsync(query, candidates, session.Token);
+            var task = new LayaRanker(client, Context, intent).RankAsync(query, candidates, session.Token);
             var timeout = Task.Delay(TimeSpan.FromSeconds(2), request.Token);
             if (await Task.WhenAny(task, timeout) != task)
             {

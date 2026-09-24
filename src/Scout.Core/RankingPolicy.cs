@@ -10,7 +10,8 @@ public static class RankingPolicy
         if (local.Hits.Count > 0 && local.Intent.Recency != RecencyBasis.None && (local.Intent.Latest || local.Intent.Oldest || local.Intent.Terms.Length == 0)) return local.Hits;
         var confidence = judgment.Scores.Values.Max();
         var weight = Math.Clamp((confidence - .45) / .5, 0, 1);
-        var accepted = local.Recall.Where(h => judgment.None < .25 && judgment.Scores.GetValueOrDefault(h.Candidate.Id) >= .50);
+        bool Confirmed(SearchHit h) => judgment.None < .25 && judgment.Scores.GetValueOrDefault(h.Candidate.Id) > judgment.None && judgment.Relevance.GetValueOrDefault(h.Candidate.Id) >= .85;
+        var accepted = local.Recall.Where(h => judgment.None < .25 && (judgment.Scores.GetValueOrDefault(h.Candidate.Id) >= .50 || Confirmed(h)));
         var ordered = local.Hits.Concat(accepted).DistinctBy(h => h.Candidate.Id).Select((h, i) => (Hit: h, Position: i))
             .OrderByDescending(x => x.Hit.Score >= 1000 ? 1 : 0)
             .ThenByDescending(x => judgment.Scores.TryGetValue(x.Hit.Candidate.Id, out var score)

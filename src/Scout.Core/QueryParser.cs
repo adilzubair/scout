@@ -17,15 +17,17 @@ public static partial class QueryParser
         var actionText = q;
         var explorer = q.Contains("in explorer", StringComparison.Ordinal);
         var location = FolderQuery.Extract(explorer ? q.Replace("in explorer", "") : q);
-        q = location.Text.Trim();
+        q = NormalizeRequest(location.Text);
         int? count = null;
-        var counted = Regex.Match(q, @"\b(?:last|latest|newest|oldest|first|top)\s+(\d{1,3}|two|three|four|five|ten)\s+(?:files|documents|pdfs|photos|images|screenshots|presentations|spreadsheets|archives|videos)\b");
+        const string numberPattern = @"(?<number>\d{1,3}|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|twenty)";
+        const string ordering = @"(?:last|latest|newest|oldest|first|top|most recent)";
+        var counted = Regex.Match(q, @"\b(?:" + ordering + @"\s+" + numberPattern + "|" + numberPattern + @"\s+" + ordering + @")\s+(?:files|documents|pdfs|photos|images|screenshots|presentations|spreadsheets|archives|videos|links|pages)\b");
         if (counted.Success)
         {
-            var number = counted.Groups[1].Value;
-            count = number switch { "two" => 2, "three" => 3, "four" => 4, "five" => 5, "ten" => 10, _ => int.Parse(number, CultureInfo.InvariantCulture) };
+            var number = counted.Groups["number"].Value;
+            count = number switch { "one" => 1, "two" => 2, "three" => 3, "four" => 4, "five" => 5, "six" => 6, "seven" => 7, "eight" => 8, "nine" => 9, "ten" => 10, "eleven" => 11, "twelve" => 12, "twenty" => 20, _ => int.Parse(number, CultureInfo.InvariantCulture) };
             count = Math.Clamp(count.Value, 1, 25);
-            q = q.Remove(counted.Groups[1].Index, counted.Groups[1].Length);
+            q = q.Remove(counted.Groups["number"].Index, counted.Groups["number"].Length);
         }
         var stripped = q;
         var local = TimeZoneInfo.ConvertTime(now, zone);
@@ -76,10 +78,11 @@ public static partial class QueryParser
         var words = Tokenize(q).ToHashSet();
         if (words.Contains("arrived")) { words.Add("added"); stripped = Regex.Replace(stripped, @"\barrived\b", ""); }
         bool Has(params string[] values) => values.Any(words.Contains);
-        var appIntent = scope == Scope.Apps || Has("app", "apps", "application", "applications") && location.Folder == null;
+        var appRole = scope == Scope.All && location.Folder == null && !Has("file", "files", "created", "modified", "downloaded", "opened") && Regex.IsMatch(q, @"\b(?:text|pdf|json|xml|image|photo|video|audio|music|web)\s+(?:editor|viewer|player|browser)\b");
+        var appIntent = scope == Scope.Apps || (Has("app", "apps", "application", "applications") || appRole) && location.Folder == null;
         bool DescribedOfficeFile(string name) => Has(name) && (scope == Scope.Files || Has("file", "files", "document", "documents", "created", "made", "opened", "used", "edited", "modified", "downloaded") || words.Any(w => !Filler.Contains(w) && w != name && w != "microsoft"));
         string? extension = appIntent ? null : Has("pdf", "pdfs") ? ".pdf" : Has("deck", "decks", "slide", "slides", "presentation", "presentations") || DescribedOfficeFile("powerpoint") ? ".pptx" : Has("spreadsheet", "spreadsheets") || DescribedOfficeFile("excel") ? ".xlsx" : DescribedOfficeFile("word") ? ".docx" : Has("image", "images", "photo", "photos", "picture", "pictures", "screenshot", "screenshots") ? "image" : Has("video", "videos", "movie", "movies", "recording", "recordings") ? "video" : Has("music", "audio", "song", "songs") ? "audio" : Has("archive", "archives", "zip") ? "archive" : null;
-        var typed = Regex.Match(q, @"\.(pdf|pptx?|xlsx?|csv|docx?|txt|md|png|jpe?g|gif|webp|mp4|mp3|zip)\b");
+        var typed = appIntent ? Match.Empty : Regex.Match(q, @"(?<![\p{L}\p{N}])\.?(pdf|pptx?|pptm|ppsx|xlsx?|xlsm|csv|tsv|docx?|docm|odt|ods|odp|rtf|txt|md|json|ya?ml|xml|html|png|jpe?g|gif|webp|svg|bmp|tiff?|heic|mp4|mkv|mov|avi|webm|mp3|wav|m4a|flac|zip|7z|rar|tar|gz)\b");
         if (!appIntent && typed.Success) extension = "." + typed.Groups[1].Value;
         if (!appIntent && extension == null && Has("markdown", "md")) extension = ".md";
         if (!appIntent && extension == null && Has("text", "txt")) extension = ".txt";
@@ -99,5 +102,14 @@ public static partial class QueryParser
             Folder = location.Folder, Count = count, Screenshots = extension == "image" && Has("screenshot", "screenshots"),
             Action = Regex.IsMatch(actionText, @"^(?:please\s+)?preview\b") ? ItemAction.Preview : Regex.IsMatch(actionText, @"^(?:please\s+)?(?:reveal|locate)\b") || explorer ? ItemAction.Reveal : Regex.IsMatch(actionText, @"^(?:please\s+)?copy\b") ? ItemAction.Copy : ItemAction.Open
         };
+    }
+
+    // Remove request grammar at clause boundaries, without discarding useful
+    // filename words everywhere (for example a file actually named "Give").
+    internal static string NormalizeRequest(string text)
+    {
+        var q = text.Trim().Trim(',', '?', '!');
+        q = Regex.Replace(q, @"^(?:(?:please|can you|could you|would you)\s+)*(?:(?:give|show|get)\s+me\s+|(?:what|which)\s+(?:(?:is|was|are|were)\s+)?|(?:find|search for|look for)\s+)", "", RegexOptions.IgnoreCase);
+        return q.Trim();
     }
 }

@@ -25,12 +25,14 @@ internal sealed class PreviewWindow : Window
     private bool rendering;
     public PreviewWindow(Candidate item)
     {
-        this.item = item; Title = item.Title; Width = 850; Height = 660; WindowStartupLocation = WindowStartupLocation.CenterOwner;
-        var dock = new DockPanel { Margin = new Thickness(20) };
-        var heading = new TextBlock { Text = item.Title, FontSize = 21, FontWeight = FontWeights.SemiBold }; DockPanel.SetDock(heading, Dock.Top); dock.Children.Add(heading);
+        this.item = item; Title = item.Title; Width = 850; Height = 660; MinWidth = 600; MinHeight = 380; WindowStartupLocation = WindowStartupLocation.CenterOwner;
+        WindowVisuals.Configure(this);
+        var dock = new DockPanel();
+        var heading = WindowVisuals.Header(this, item.Title); DockPanel.SetDock(heading, Dock.Top); dock.Children.Add(heading);
+        status.Foreground = WindowVisuals.Brush("Muted"); status.FontSize = 11; status.TextTrimming = TextTrimming.CharacterEllipsis; status.Margin = new Thickness(24, 0, 24, 14);
         DockPanel.SetDock(status, Dock.Top); dock.Children.Add(status);
-        var controls = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 10, 0, 0) }; DockPanel.SetDock(controls, Dock.Bottom); dock.Children.Add(controls);
-        void Button(string label, Action action) { var b = new Button { Content = label }; b.Click += (_, _) => action(); controls.Children.Add(b); }
+        var controls = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(24, 16, 24, 20) }; DockPanel.SetDock(controls, Dock.Bottom); dock.Children.Add(controls);
+        void Button(string label, Action action) { var b = new Button { Content = label, Margin = new Thickness(0, 0, 8, 0), Style = WindowVisuals.Style(label == "Open file" ? "PrimaryButton" : "QuietButton") }; b.Click += (_, _) => action(); controls.Children.Add(b); }
         Button("Open file", () => { try { WindowsIntegration.Open(item); } catch (Exception e) when (e is IOException or System.ComponentModel.Win32Exception) { status.Text = e.Message; } });
         if (Path.GetExtension(item.Target).Equals(".pdf", StringComparison.OrdinalIgnoreCase))
         {
@@ -40,10 +42,9 @@ internal sealed class PreviewWindow : Window
         if (FileTypes.Matches(Path.GetExtension(item.Target).ToLowerInvariant(), "video") || FileTypes.Matches(Path.GetExtension(item.Target).ToLowerInvariant(), "audio"))
         { Button("Play", () => media?.Play()); Button("Pause", () => media?.Pause()); }
         Button("Close", Close);
-        dock.Children.Add(preview); Content = dock;
+        dock.Children.Add(new Border { Child = preview, Background = WindowVisuals.Brush("Surface"), BorderBrush = WindowVisuals.Brush("Line"), BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(9), Padding = new Thickness(12), Margin = new Thickness(24, 0, 24, 0) }); Content = WindowVisuals.Frame(dock);
         Loaded += async (_, _) => await LoadPreview();
         Closed += (_, _) => { lifetime.Cancel(); media?.Stop(); media?.Close(); };
-        PreviewKeyDown += (_, e) => { if (e.Key == Key.Escape) { Close(); e.Handled = true; } };
     }
     private async Task LoadPreview()
     {
@@ -80,7 +81,7 @@ internal sealed class PreviewWindow : Window
                 preview.Content = media; return;
             }
             var text = await Task.Run(() => PreviewText.Read(item.Target, lifetime.Token), lifetime.Token);
-            if (!lifetime.IsCancellationRequested) preview.Content = new TextBox { Text = text ?? "A preview is unavailable for this format. Use Open file to view it in its application.", IsReadOnly = true, TextWrapping = TextWrapping.Wrap, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, FontFamily = new FontFamily("Cascadia Mono, Consolas"), FontSize = 13 };
+            if (!lifetime.IsCancellationRequested) preview.Content = new TextBox { Text = text ?? "A preview is unavailable for this format. Use Open file to view it in its application.", IsReadOnly = true, BorderThickness = new Thickness(0), Background = System.Windows.Media.Brushes.Transparent, TextWrapping = TextWrapping.Wrap, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, FontFamily = new FontFamily("Cascadia Mono, Consolas"), FontSize = 13 };
         }
         catch (OperationCanceledException) { }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or NotSupportedException or System.Runtime.InteropServices.COMException or System.Xml.XmlException or FileFormatException) { if (!lifetime.IsCancellationRequested) status.Text = "Preview unavailable: " + e.Message; }

@@ -11,6 +11,8 @@ Try:
 - `notepad`, `vscode`, `budget excel`
 - `the last presentation I created`
 - `latest file in telegram folder`, `latest 3 files in downloads`
+- `show me the 3 newest files in telegram folder`, `latest json file in downloads`
+- `in "Telegram Desktop", find the latest file`
 - `last pdf in "Telegram Desktop"`, `files modified yesterday in telegram folder`
 - `latest screenshot in pictures`, `open Telegram Desktop folder`
 - `the pdf I just downloaded`
@@ -20,7 +22,7 @@ Try:
 - `15% of 240`, `sqrt(81)`, `2(3+4)`
 - `dark`, `wifi off`, `bluetooth off`, `bluetooth on`, `lock screen`, `show hidden files`
 
-Local results appear first. Laya can refine them or find a relevant item among broader candidates. Missing or ambiguous matches fall back locally. A green return arrow marks a clear local selection; it never runs an action automatically. Raw Laya probabilities are not displayed as calibrated certainty.
+Local results appear first. Laya can refine them or find a relevant item among broader candidates. Missing or ambiguous matches fall back locally. An accented return arrow marks a clear local selection; it never runs an action automatically. Raw Laya probabilities are not displayed as calibrated certainty.
 
 ## Local AI
 
@@ -67,6 +69,8 @@ Folder descriptions are restrictions on the results and model candidates. Names 
 
 `latest` uses modification dates unless another activity is named. Matching latest/oldest searches use recorded dates immediately without waiting for Laya. `latest 3 files` limits both the results and the suggested group; groups remain capped at 25 items. Screenshot searches require screenshot evidence in the filename or folder and cannot match every image. Images with arbitrary names outside such folders may need a normal image/name search.
 
+Counts work before or after ordering words (`3 newest files`, `newest three files`). Explicit format names such as CSV, JSON, YAML and XML filter by extension. Partial filenames preserve punctuation, and compound names such as `ClientBillingReport.pdf` can be found using their separate words. The model shortlist reserves room for broader candidates and limits repeated titles; constrained locations stay enforced before any model request. Laya receives readable filename labels and short folder context when it matches the description, with separate relevance checks when several candidates share the choice probability.
+
 | Description | Evidence |
 |---|---|
 | Created / made | Windows filesystem creation date |
@@ -98,6 +102,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/evaluate.ps1 -Device
 
 The build pins .NET SDK 10.0.400 and produces a self-contained directory, `artifacts/Scout-win-x64.zip`, and SHA-256 checksum. This personal build has no public installer, signing, automatic updater or startup registration.
 
-With `SCOUT_DATA_DIR` set to an isolated directory, `Scout.exe --smoke-test` checks actual WPF rendering/selection, groups, arithmetic, web fallback and PDF/image/Office/text previews, then exits. Set `SCOUT_TEST_PYTHON` and optionally `SCOUT_TEST_DEVICE=cuda` to include the model host. `--diagnose` exercises actual installed apps, fast typing, file watchers and the global hotkey, then exits. Keep the normal instance closed during diagnostics. Test reports and screenshots remain under the isolated data directory.
+With `SCOUT_DATA_DIR` set to an isolated directory, `Scout.exe --smoke-test` checks actual WPF rendering/selection, groups, arithmetic, web fallback and PDF/image/Office/text previews, then exits. Run `--ui-smoke-test` separately for interface screenshots, settings navigation, and validation checks; this mode requires an isolated data directory. Set `SCOUT_TEST_PYTHON` and optionally `SCOUT_TEST_DEVICE=cuda` to include the model host. `--diagnose` exercises actual installed apps, fast typing, file watchers and the global hotkey, then exits. Keep the normal instance closed during diagnostics. Test reports and UI screenshots remain under the isolated data directory. See [interface notes](docs/UI.md) for the visual system and native backdrop behavior.
 
 See [validation](docs/VALIDATION.md) for measured results and limits, and [parity](docs/PARITY.md) for Windows mappings. English queries are supported; Unicode filenames are preserved. No live Jev comparison has been run, so feature coverage and local benchmarks do not establish equal general model quality.
+
+The [search upgrade evaluation](docs/SEARCH_EVALUATION.md) measures the current build against a saved baseline on 504 frozen queries grounded in local file metadata. It also records remaining descriptive-search failures; those results are not a claim of general Intern parity.

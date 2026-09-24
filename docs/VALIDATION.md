@@ -1,4 +1,10 @@
-# Validation — 2026-09-23
+# Validation
+
+Latest search upgrade (2026-09-24): **259/271** final validation cases, compared
+with **213/271** for the saved baseline; **176 C# checks** and **13 Python adapter
+checks** pass. See [the search evaluation](SEARCH_EVALUATION.md) for the frozen
+metadata corpus, prompt experiments, current latency, remaining descriptive
+misses and reproduction instructions. Earlier measurements are retained below.
 
 Reference: Intern commit `c0bedee4b374b5f177b670016f5ff2b8e5bcf7eb`. Windows 11, .NET 10.0.400, Python 3.12.13, Laya 0.3.7, Transformers 4.57.6, PyTorch 2.8.0+cu128, NVIDIA RTX 5060 Laptop GPU (8 GB). Checkpoints are pinned to `5e7b2b1b8ca2ecdd3f2322d94069c9b6ce7e844b`.
 

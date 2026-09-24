@@ -15,11 +15,12 @@ public partial class App : Application
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
-        var smoke = e.Args.Contains("--smoke-test");
+        var uiSmoke = e.Args.Contains("--ui-smoke-test");
+        var smoke = uiSmoke || e.Args.Contains("--smoke-test");
         var diagnose = e.Args.Contains("--diagnose");
         var realworld = e.Args.Contains("--realworld-diagnose");
         var bluetooth = e.Args.Contains("--bluetooth-diagnose");
-        if ((realworld || bluetooth) && string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("SCOUT_DATA_DIR"))) { Shutdown(1); return; }
+        if ((uiSmoke || realworld || bluetooth) && string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("SCOUT_DATA_DIR"))) { Shutdown(1); return; }
         instance = new Mutex(true, smoke || diagnose || realworld || bluetooth ? "Local\\Scout.Test" : "Local\\Scout.Launcher", out var first);
         if (!first)
         {
@@ -78,12 +79,12 @@ public partial class App : Application
                     timer.Stop();
                     try
                     {
-                        await main.SmokeCheck();
-                        var renderer = new System.Windows.Media.Imaging.RenderTargetBitmap((int)main.ActualWidth, (int)main.ActualHeight, 96, 96, System.Windows.Media.PixelFormats.Pbgra32);
-                        renderer.Render(main);
-                        var encoder = new System.Windows.Media.Imaging.PngBitmapEncoder(); encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(renderer));
-                        using var output = File.Create(Path.Combine(DataDirectory, "launcher.png")); encoder.Save(output);
-                        File.WriteAllText(Path.Combine(DataDirectory, "smoke-result.txt"), "Desktop checks passed: rendering, scopes, manual selection, arrival selection, editable Open all, calculator, web fallback, PDF/image/Office/text previews, model host (when configured).");
+                        await main.SmokeCheck(uiSmoke);
+                        // Keep offscreen WPF captures separate from the WinRT PDF renderer.
+                        if (uiSmoke) await UiDiagnostics.Snapshot(main, "launcher");
+                        File.WriteAllText(Path.Combine(DataDirectory, "smoke-result.txt"), uiSmoke
+                            ? "UI checks passed: rendering, scopes, manual selection, arrival selection, editable Open all, calculator, web fallback, settings navigation and validation focus, workspace naming, UI screenshots."
+                            : "Desktop checks passed: rendering, scopes, manual selection, arrival selection, editable Open all, calculator, web fallback, PDF/image/Office/text previews, model host (when configured).");
                     }
                     catch (Exception error) { File.WriteAllText(Path.Combine(DataDirectory, "smoke-result.txt"), error.ToString()); Environment.ExitCode = 1; }
                     finally { Shutdown(); }

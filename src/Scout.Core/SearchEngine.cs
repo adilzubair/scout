@@ -15,7 +15,7 @@ public static class SearchEngine
         if (literal.Length >= 2 && literal[0] is '"' or '\'' && literal[^1] == literal[0]) literal = literal[1..^1];
         var intent = QueryParser.Parse(query, now, scope: scope);
         var emptyQuery = literal.Length == 0;
-        var queue = new PriorityQueue<SearchHit, (double Score, long Date, int Order)>();
+        var queue = new PriorityQueue<SearchHit, (int Evidence, double Score, long Date, int Order)>();
         var recall = new PriorityQueue<SearchHit, (double Score, long Date, int Order)>();
         var docs = catalog.Documents.AsEnumerable();
         var additions = extra?.DistinctBy(c => c.Id).ToDictionary(c => c.Id);
@@ -72,7 +72,8 @@ public static class SearchEngine
                 if (memory is not { Pinned: true } && memory?.LastLaunch == null && raw.Kind != ItemKind.Workspace) continue;
             }
             else if (intent.Recency == RecencyBasis.None && intent.Window == null && memory?.Aliases.Any(a => a.Equals(literal, StringComparison.OrdinalIgnoreCase)) == true) score = 1000;
-            else if (doc.Name == phrase && phrase.Length > 0 || raw.Title.Equals(literal, StringComparison.OrdinalIgnoreCase) || doc.Aliases.Contains(literal) || phrase.Length > 0 && doc.Aliases.Contains(phrase)) score = 1000;
+            else if (raw.Kind == ItemKind.File && literal.Length >= 3 && intent.Recency == RecencyBasis.None && intent.Folder == null && doc.Name.StartsWith(literal, StringComparison.Ordinal)) score = doc.Name == literal ? 1000 : 800;
+            else if (doc.Name == phrase && phrase.Length > 0 && !literal.Any(c => c is '_' or '-') || raw.Title.Equals(literal, StringComparison.OrdinalIgnoreCase) || doc.Aliases.Contains(literal) || phrase.Length > 0 && doc.Aliases.Contains(phrase)) score = 1000;
             else if (intent.Terms.Length == 1 && phrase.Length >= 2 && doc.Initials.StartsWith(phrase, StringComparison.Ordinal)) score = 250;
             else
             {
@@ -96,8 +97,8 @@ public static class SearchEngine
                     {
                         var recalledCandidate = opened == raw.OpenedAt ? raw : raw with { OpenedAt = opened, OpenedSource = "Scout launch history" };
                         var recallPriority = (score, (date ?? raw.CreatedAt ?? raw.VisitedAt ?? raw.ModifiedAt)?.ToUnixTimeMilliseconds() ?? 0, -position);
-                        if (recall.Count < 32 || recallPriority.CompareTo(recall.PeekPriority()) > 0)
-                        { recall.Enqueue(new(recalledCandidate, score), recallPriority); if (recall.Count > 32) recall.Dequeue(); }
+                        if (recall.Count < 128 || recallPriority.CompareTo(recall.PeekPriority()) > 0)
+                        { recall.Enqueue(new(recalledCandidate, score), recallPriority); if (recall.Count > 128) recall.Dequeue(); }
                     }
                     continue;
                 }
@@ -107,12 +108,13 @@ public static class SearchEngine
             score += memory?.Pinned == true ? 15 : 0;
             score += Math.Min(8, Math.Log2(1 + (memory?.Launches ?? 0)));
             if (memory?.LastLaunch is { } last) score += 5 / (1 + Math.Max(0, (now - last).TotalDays));
-            var sortDate = (date ?? memory?.LastLaunch ?? raw.VisitedAt ?? raw.ModifiedAt)?.ToUnixTimeMilliseconds() ?? 0;
+            var sortDate = (date ?? memory?.LastLaunch ?? raw.VisitedAt ?? raw.ModifiedAt)?.UtcTicks ?? 0;
             // A recency superlative orders the eligible set by evidence, including described files.
-            var primary = intent.Recency != RecencyBasis.None && (intent.Terms.Length == 0 || intent.Latest || intent.Oldest) ? (intent.Oldest ? -sortDate : sortDate) : score;
-            if (intent.Recency == RecencyBasis.Downloaded && raw.DownloadedAt != null) primary += 1e16;
-            if (raw.Kind == ItemKind.Link && Uri.TryCreate(raw.Target, UriKind.Absolute, out var uri)) primary -= Math.Min(1, uri.AbsolutePath.Count(c => c == '/') * .01);
-            var priority = (primary, sortDate, -position);
+            var chronological = intent.Recency != RecencyBasis.None && (intent.Terms.Length == 0 || intent.Latest || intent.Oldest);
+            var primary = chronological ? 0 : score;
+            var evidence = intent.Recency == RecencyBasis.Downloaded && raw.DownloadedAt != null ? 1 : 0;
+            if (!chronological && raw.Kind == ItemKind.Link && Uri.TryCreate(raw.Target, UriKind.Absolute, out var uri)) primary -= Math.Min(1, uri.AbsolutePath.Count(c => c == '/') * .01);
+            var priority = (evidence, primary, chronological && intent.Oldest ? -sortDate : sortDate, -position);
             if (queue.Count >= limit && priority.CompareTo(queue.PeekPriority()) <= 0) continue;
             var candidate = opened == raw.OpenedAt ? raw : raw with { OpenedAt = opened, OpenedSource = "Scout launch history" };
             queue.Enqueue(new(candidate, score, memory?.Pinned == true), priority);

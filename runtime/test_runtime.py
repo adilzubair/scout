@@ -67,6 +67,21 @@ class ContractTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             distribution({'probabilities': {'a': 1.0}}, {'criteria': {'a': 'Yes', 'b': 'No'}})
 
+    def test_independent_relevance_uses_original_ids(self):
+        result = rank(self.agent, 'report', [{'id': 'file:one', 'title': 'Report.pdf', 'kind': 'file'}])
+        self.assertEqual({'file:one': 1.0}, result['relevance'])
+
+    def test_relevance_not_returned_after_deadline(self):
+        result = rank(self.agent, 'report', [{'id': 'file:one', 'title': 'Report.pdf', 'kind': 'file'}], deadline_seconds=0)
+        self.assertEqual({}, result['relevance'])
+
+    def test_duplicate_titles_have_location_context(self):
+        items = [{'id': str(i), 'title': 'Report.pdf', 'kind': 'file', 'detail': folder} for i, folder in enumerate(['Finance/Annual', 'Engineering/Release'])]
+        rank(self.agent, 'finance report', items)
+        state = self.agent.calls[0][0]
+        self.assertIn('Finance/Annual', state)
+        self.assertIn('Engineering/Release', state)
+
     def test_batch_matches_public_runtime(self):
         from batching import predict_many
         question = {'type': 'choice', 'instructions': 'Which app is named?', 'criteria': {'a': 'Notepad', 'b': 'Calculator'}}

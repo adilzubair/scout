@@ -24,8 +24,8 @@ internal static class NativeIcons
                 return await Task.Run<ImageSource?>(() =>
                 {
                     if (target.StartsWith(@"\\", StringComparison.Ordinal) || !Path.IsPathFullyQualified(target)) return null;
-                    if (SHGetFileInfo(target, 0, out var info, (uint)Marshal.SizeOf<FileInfo>(), 0x100 | 0x1) == 0 || info.Icon == 0) return null;
-                    try { var image = Imaging.CreateBitmapSourceFromHIcon(info.Icon, Int32Rect.Empty, System.Windows.Media.Imaging.BitmapSizeOptions.FromWidthAndHeight(24, 24)); image.Freeze(); return image; }
+                    if (SHGetFileInfo(target, 0, out var info, (uint)Marshal.SizeOf<FileInfo>(), 0x100) == 0 || info.Icon == 0) return null;
+                    try { var image = Imaging.CreateBitmapSourceFromHIcon(info.Icon, Int32Rect.Empty, System.Windows.Media.Imaging.BitmapSizeOptions.FromWidthAndHeight(32, 32)); image.Freeze(); return image; }
                     finally { DestroyIcon(info.Icon); }
                 });
             }

@@ -1,0 +1,123 @@
+using System.Runtime.InteropServices;
+using System.Windows;
+using System.Windows.Automation;
+using System.Windows.Controls;
+using System.Windows.Input;
+using System.Windows.Interop;
+using System.Windows.Media;
+using System.Windows.Media.Animation;
+using System.Windows.Shell;
+using Brush = System.Windows.Media.Brush;
+using Brushes = System.Windows.Media.Brushes;
+using FontFamily = System.Windows.Media.FontFamily;
+using Point = System.Windows.Point;
+
+namespace Scout.App;
+
+internal static class WindowVisuals
+{
+    internal static Brush Brush(string key) => (Brush)Application.Current.FindResource(key);
+    internal static Style Style(string key) => (Style)Application.Current.FindResource(key);
+
+    internal static void Configure(Window window)
+    {
+        // Code-created Window subclasses do not pick up the implicit Window style.
+        window.Style = (Style)Application.Current.FindResource(typeof(Window));
+        window.WindowStyle = WindowStyle.None;
+        WindowChrome.SetWindowChrome(window, new WindowChrome
+        {
+            CaptionHeight = 0, CornerRadius = new CornerRadius(12), GlassFrameThickness = new Thickness(0),
+            ResizeBorderThickness = new Thickness(window.ResizeMode == ResizeMode.NoResize ? 0 : 5), UseAeroCaptionButtons = false
+        });
+        window.SourceInitialized += (_, _) =>
+        {
+            var handle = new WindowInteropHelper(window).Handle;
+            var rounded = 2;
+            _ = DwmSetWindowAttribute(handle, 33, ref rounded, sizeof(int));
+            var border = unchecked((int)0xFFFFFFFE); // Let the fine inner rim define the edge.
+            _ = DwmSetWindowAttribute(handle, 34, ref border, sizeof(int));
+            // Keep the compositor's native shadow without a layered/software-rendered window.
+            var margins = new Margins { Left = 1, Right = 1, Top = 1, Bottom = 1 };
+            _ = DwmExtendFrameIntoClientArea(handle, ref margins);
+            if (OperatingSystem.IsWindowsVersionAtLeast(10, 0, 22621) && !SystemParameters.HighContrast
+                && Microsoft.Win32.Registry.GetValue(@"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize", "EnableTransparency", 1) is not 0)
+            {
+                var light = 0;
+                _ = DwmSetWindowAttribute(handle, 20, ref light, sizeof(int));
+                var acrylic = 3; // DWMSBT_TRANSIENTWINDOW: native desktop acrylic.
+                if (DwmSetWindowAttribute(handle, 38, ref acrylic, sizeof(int)) == 0)
+                {
+                    WindowChrome.GetWindowChrome(window).GlassFrameThickness = new Thickness(-1);
+                    window.Background = Brushes.Transparent;
+                    if (HwndSource.FromHwnd(handle)?.CompositionTarget is { } target) target.BackgroundColor = Colors.Transparent;
+                    if (window.Content is Border frame) frame.Background = Brush("Glass");
+                }
+            }
+            var area = WorkArea(window);
+            window.MaxWidth = Math.Max(1, area.Width - 24);
+            window.MaxHeight = Math.Max(1, area.Height - 24);
+            window.MinWidth = Math.Min(window.MinWidth, window.MaxWidth);
+            window.MinHeight = Math.Min(window.MinHeight, window.MaxHeight);
+        };
+        window.Loaded += (_, _) => { KeepOnScreen(window); Reveal(window); };
+        window.SizeChanged += (_, _) => { if (window.IsLoaded) KeepOnScreen(window); };
+        window.IsVisibleChanged += (_, _) => { if (window.IsVisible && window.IsLoaded) { KeepOnScreen(window); Reveal(window); } };
+    }
+
+    private static Rect WorkArea(Window window)
+    {
+        var area = System.Windows.Forms.Screen.FromHandle(new WindowInteropHelper(window).Handle).WorkingArea;
+        var transform = PresentationSource.FromVisual(window)?.CompositionTarget?.TransformFromDevice ?? Matrix.Identity;
+        return new Rect(transform.Transform(new Point(area.Left, area.Top)), transform.Transform(new Point(area.Right, area.Bottom)));
+    }
+
+    private static void KeepOnScreen(Window window)
+    {
+        var area = WorkArea(window);
+        window.Left = Math.Clamp(window.Left, area.Left + 12, Math.Max(area.Left + 12, area.Right - window.ActualWidth - 12));
+        window.Top = Math.Clamp(window.Top, area.Top + 12, Math.Max(area.Top + 12, area.Bottom - window.ActualHeight - 12));
+    }
+
+    private static void Reveal(Window window)
+    {
+        if (!SystemParameters.ClientAreaAnimation || window.Content is not FrameworkElement content) return;
+        content.BeginAnimation(UIElement.OpacityProperty, new DoubleAnimation(.88, 1, TimeSpan.FromMilliseconds(140)) { FillBehavior = FillBehavior.Stop });
+    }
+
+    internal static Border Frame(UIElement content) => new()
+    {
+        Background = Brush("Canvas"), BorderBrush = Brush("Rim"), BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(12), Child = content
+    };
+
+    internal static Grid Header(Window window, string title, string? subtitle = null)
+    {
+        var header = new Grid { Margin = new Thickness(24, 19, 18, 19), Background = Brushes.Transparent };
+        header.ColumnDefinitions.Add(new ColumnDefinition());
+        header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        var text = new StackPanel { Margin = new Thickness(0, 0, 14, 0) };
+        text.Children.Add(new TextBlock { Text = title, FontSize = 20, FontWeight = FontWeights.SemiBold, TextTrimming = TextTrimming.CharacterEllipsis });
+        if (subtitle != null) text.Children.Add(new TextBlock { Text = subtitle, Foreground = Brush("Muted"), FontSize = 12, Margin = new Thickness(0, 5, 0, 0), TextWrapping = TextWrapping.Wrap });
+        header.Children.Add(text);
+        var close = new Button
+        {
+            Content = new TextBlock { Text = "\uE711", FontFamily = new FontFamily("Segoe Fluent Icons"), FontSize = 12 },
+            Style = Style("QuietButton"), Padding = new Thickness(9), VerticalAlignment = VerticalAlignment.Top, ToolTip = "Close (Escape)"
+        };
+        AutomationProperties.SetName(close, "Close");
+        close.Click += (_, _) => window.Close(); Grid.SetColumn(close, 1); header.Children.Add(close);
+        header.MouseLeftButtonDown += (_, e) =>
+        {
+            if (e.ChangedButton == MouseButton.Left && !close.IsMouseOver) window.DragMove();
+        };
+        // Let controls consume Escape (for example, to dismiss a dropdown) first.
+        window.KeyDown += (_, e) => { if (e.Key == Key.Escape) { window.Close(); e.Handled = true; } };
+        return header;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct Margins { public int Left, Right, Top, Bottom; }
+    [DllImport("dwmapi.dll")]
+    private static extern int DwmSetWindowAttribute(nint hwnd, int attribute, ref int value, int size);
+    [DllImport("dwmapi.dll")]
+    private static extern int DwmExtendFrameIntoClientArea(nint hwnd, ref Margins margins);
+}

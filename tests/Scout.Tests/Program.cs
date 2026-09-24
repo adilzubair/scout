@@ -5,6 +5,7 @@ using Scout.Core;
 
 if (args.Length == 3 && args[0] == "--profile") return SearchProfiler.Run(args[1], args[2]);
 if (args.Length == 3 && args[0] == "--realworld") return RealWorldAudit.Run(args[1], args[2]);
+if (args.Length is 4 or 5 && args[0] == "--search-eval") return SearchEvaluation.Run(args[1], args[2], args[3], args.Length == 5 ? args[4] : null);
 if (args.Length == 2 && args[0] == "--quality-export") return QualityEvaluation.Export(args[1]);
 if (args.Length == 2 && args[0] == "--heldout-export") return QualityEvaluation.Export(args[1], true);
 if (args.Length == 4 && args[0] == "--quality-assess") return QualityEvaluation.Assess(args[1], args[2], args[3]);
@@ -24,6 +25,7 @@ var empty = new Dictionary<string, LibraryItem>();
 ParityChecks.Run(Test);
 FolderChecks.Run(Test);
 BluetoothChecks.Run(Test);
+SearchUpgradeChecks.Run(Test);
 Candidate FileItem(string name, int hours) => new(Candidate.Key(ItemKind.File, name), ItemKind.File, name, "C:\\Documents\\" + name) { ModifiedAt = now.AddHours(-hours), Detail = "Documents" };
 var recent = FileItem("Roadmap.pdf", 1) with { AddedAt = now.AddMinutes(-5) };
 var old = FileItem("Budget.pdf", 0) with { AddedAt = now.AddDays(-3), OpenedAt = now.AddMinutes(-1) };
