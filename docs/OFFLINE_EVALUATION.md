@@ -68,3 +68,6 @@ holdout.
 This process can support a claim that Scout meets specific user-task and
 hardware targets. It cannot support a numeric claim that Scout's model equals
 Jev when Jev itself has not been measured on the same tasks.
+
+See [the Laya replacement research](LAYA_REPLACEMENT_RESEARCH.md) for the
+current model shortlist and its offline evaluation gates.
