@@ -2,9 +2,9 @@
 
 A native Windows launcher built against [Intern](https://github.com/dabit3/intern)'s behavior, using local [Laya](https://huggingface.co/convaiinnovations/laya) instead of Jev. C#/.NET 10, WPF, SQLite and an authenticated Python sidecar. Intern is cloned under `.reference/intern` for reference; its code and assets are not redistributed.
 
-## Run
+## Download and run
 
-On Windows 11 x64, open `artifacts/Scout/Scout.exe`. **Ctrl+Alt+Space** opens the panel. Closing it leaves Scout in the notification area; **Ctrl+Q** quits. From source: `dotnet run --project src/Scout.App`.
+On Windows 11 x64, download the latest `Scout-win-x64.zip` from the [Releases page](https://github.com/adilzubair/scout/releases), extract the whole ZIP to a folder, and run `Scout.exe` from that folder. **Ctrl+Alt+Space** opens the panel. Closing it leaves Scout in the notification area; **Ctrl+Q** quits. Scout has no installer or automatic updater yet; to update, quit Scout and replace the extracted application folder with the contents of a newer ZIP. Your data in `%LOCALAPPDATA%\Scout` stays in place. From source: `dotnet run --project src/Scout.App`.
 
 Try:
 
