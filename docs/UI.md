@@ -3,7 +3,7 @@
 Scout opens as a 720 × 76 px search field when the query is empty. Typing opens
 the results panel; Down or Tab opens suggestions and scope filters. Clearing the
 query returns to the compact field unless a group or workspace edit is active.
-The search field opens slightly above screen center and keeps room below for
+The search field opens near the upper third of the screen and keeps room below for
 the expanded results panel.
 The panel keeps up to six results visible before scrolling and stays within the
 current monitor's work area. Existing launch, preview, group, and action

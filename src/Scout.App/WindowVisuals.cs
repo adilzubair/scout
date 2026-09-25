@@ -211,8 +211,8 @@ internal static class WindowVisuals
     internal static void PlaceLauncher(Window window)
     {
         var area = WorkArea(window);
-        // Keep the search field just above center, with space for six results below it.
-        var centeredTop = area.Top + (area.Height - window.ActualHeight) / 2 - 72;
+        // Place the field near the upper third, with space for six results below it.
+        var centeredTop = area.Top + area.Height * .35 - window.ActualHeight / 2;
         var expandedTop = area.Bottom - Math.Min(window.MaxHeight, 610) - 12;
         window.Top = Math.Max(area.Top + 12, Math.Min(centeredTop, expandedTop));
     }

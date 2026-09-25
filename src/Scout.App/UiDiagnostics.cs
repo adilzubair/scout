@@ -22,8 +22,8 @@ public partial class MainWindow
         await SearchView("", Scope.All, "launcher-empty");
         if (ActualHeight > 90 || ScopesRow.IsVisible || ResultsRegion.IsVisible) throw new InvalidOperationException("Empty search did not open compact.");
         var workArea = WindowVisuals.WorkArea(this);
-        if (Top + ActualHeight / 2 >= workArea.Top + workArea.Height / 2 - 24)
-            throw new InvalidOperationException("Compact search did not open above the screen center.");
+        if (Top + ActualHeight / 2 >= workArea.Top + workArea.Height * .39)
+            throw new InvalidOperationException("Compact search did not open near the upper third.");
         WindowVisuals.SetTestTheme(true);
         await UiDiagnostics.Snapshot(this, "launcher-empty-dark");
         WindowVisuals.SetTestTheme(null);
