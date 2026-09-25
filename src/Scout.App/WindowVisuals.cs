@@ -11,16 +11,40 @@ using Brush = System.Windows.Media.Brush;
 using Brushes = System.Windows.Media.Brushes;
 using FontFamily = System.Windows.Media.FontFamily;
 using Point = System.Windows.Point;
+using SystemColors = System.Windows.SystemColors;
 
 namespace Scout.App;
 
+internal enum WindowSurface { Transient, Document }
+
 internal static class WindowVisuals
 {
-    internal static Brush Brush(string key) => (Brush)Application.Current.FindResource(key);
+    private static readonly List<(WeakReference<Window> Window, WindowSurface Surface)> windows = [];
+    private static readonly Dictionary<string, SolidColorBrush> codeBrushes = [];
+    private static bool watchingTheme;
+    private static bool? darkPalette, contrastPalette;
+    private static bool? testDark, testContrast;
+    private static bool? testMotion;
+    private static bool? testTransparency;
+    internal static bool MotionEnabled => testMotion ?? SystemParameters.ClientAreaAnimation;
+    internal static Brush Brush(string key)
+    {
+        if (!codeBrushes.TryGetValue(key, out var brush))
+            codeBrushes[key] = brush = ((SolidColorBrush)Application.Current.FindResource(key)).CloneCurrentValue();
+        return brush;
+    }
     internal static Style Style(string key) => (Style)Application.Current.FindResource(key);
 
-    internal static void Configure(Window window)
+    internal static void Configure(Window window, WindowSurface surface = WindowSurface.Transient)
     {
+        windows.Add((new WeakReference<Window>(window), surface));
+        if (!watchingTheme)
+        {
+            watchingTheme = true;
+            Microsoft.Win32.SystemEvents.UserPreferenceChanged += (_, _) =>
+                Application.Current?.Dispatcher.BeginInvoke(new Action(RefreshTheme));
+        }
+        RefreshTheme();
         // Code-created Window subclasses do not pick up the implicit Window style.
         window.Style = (Style)Application.Current.FindResource(typeof(Window));
         window.WindowStyle = WindowStyle.None;
@@ -39,29 +63,135 @@ internal static class WindowVisuals
             // Keep the compositor's native shadow without a layered/software-rendered window.
             var margins = new Margins { Left = 1, Right = 1, Top = 1, Bottom = 1 };
             _ = DwmExtendFrameIntoClientArea(handle, ref margins);
-            if (OperatingSystem.IsWindowsVersionAtLeast(10, 0, 22621) && !SystemParameters.HighContrast
-                && Microsoft.Win32.Registry.GetValue(@"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize", "EnableTransparency", 1) is not 0)
+            HwndSource.FromHwnd(handle)?.AddHook((nint _, int message, nint _, nint _, ref bool _) =>
             {
-                var light = 0;
-                _ = DwmSetWindowAttribute(handle, 20, ref light, sizeof(int));
-                var acrylic = 3; // DWMSBT_TRANSIENTWINDOW: native desktop acrylic.
-                if (DwmSetWindowAttribute(handle, 38, ref acrylic, sizeof(int)) == 0)
-                {
-                    WindowChrome.GetWindowChrome(window).GlassFrameThickness = new Thickness(-1);
-                    window.Background = Brushes.Transparent;
-                    if (HwndSource.FromHwnd(handle)?.CompositionTarget is { } target) target.BackgroundColor = Colors.Transparent;
-                    if (window.Content is Border frame) frame.Background = Brush("Glass");
-                }
-            }
+                if (message is 0x001A or 0x031A) window.Dispatcher.BeginInvoke(new Action(RefreshTheme));
+                return 0;
+            });
+            ApplyMaterial(window, surface);
             var area = WorkArea(window);
             window.MaxWidth = Math.Max(1, area.Width - 24);
             window.MaxHeight = Math.Max(1, area.Height - 24);
             window.MinWidth = Math.Min(window.MinWidth, window.MaxWidth);
             window.MinHeight = Math.Min(window.MinHeight, window.MaxHeight);
         };
-        window.Loaded += (_, _) => { KeepOnScreen(window); Reveal(window); };
+        window.Loaded += (_, _) => { RefreshTheme(); KeepOnScreen(window); Reveal(window); };
         window.SizeChanged += (_, _) => { if (window.IsLoaded) KeepOnScreen(window); };
-        window.IsVisibleChanged += (_, _) => { if (window.IsVisible && window.IsLoaded) { KeepOnScreen(window); Reveal(window); } };
+        window.IsVisibleChanged += (_, _) => { if (window.IsVisible && window.IsLoaded) { RefreshTheme(); KeepOnScreen(window); Reveal(window); } };
+    }
+
+    internal static void RefreshTheme()
+    {
+        if (Application.Current == null) return;
+        var contrast = testContrast ?? SystemParameters.HighContrast;
+        var dark = testDark ?? (!contrast && Microsoft.Win32.Registry.GetValue(
+            @"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize", "AppsUseLightTheme", 1) is 0);
+        if (darkPalette != dark || contrastPalette != contrast)
+        {
+            darkPalette = dark; contrastPalette = contrast;
+            var colors = contrast ? new Dictionary<string, Color>
+            {
+                ["Ink"] = SystemColors.WindowTextColor, ["Muted"] = SystemColors.WindowTextColor,
+                ["Accent"] = SystemColors.HighlightColor, ["OnAccent"] = SystemColors.HighlightTextColor,
+                ["Canvas"] = SystemColors.WindowColor, ["Glass"] = SystemColors.WindowColor,
+                ["DocumentGlass"] = SystemColors.WindowColor, ["Rim"] = SystemColors.ActiveBorderColor,
+                ["Divider"] = SystemColors.ActiveBorderColor, ["PageSurface"] = SystemColors.WindowColor,
+                ["Surface"] = SystemColors.WindowColor, ["Line"] = SystemColors.ActiveBorderColor,
+                ["Hover"] = SystemColors.ControlColor, ["Selection"] = SystemColors.ControlColor,
+                ["SelectionLine"] = SystemColors.HighlightColor, ["KeycapFill"] = SystemColors.WindowColor,
+                ["CheckSurface"] = SystemColors.WindowColor, ["CheckBorder"] = SystemColors.WindowTextColor,
+                ["SwitchTrack"] = SystemColors.ActiveBorderColor, ["ScrollThumb"] = SystemColors.WindowTextColor,
+                ["ScrollThumbHover"] = SystemColors.HighlightColor, ["Success"] = SystemColors.WindowTextColor,
+                ["Error"] = SystemColors.WindowTextColor, ["IconSurface"] = SystemColors.WindowColor,
+                ["IconGreenSurface"] = SystemColors.WindowColor, ["IconInk"] = SystemColors.WindowTextColor,
+                ["IconGreenInk"] = SystemColors.WindowTextColor, ["TextSelection"] = SystemColors.HighlightColor,
+                ["SwitchKnob"] = SystemColors.WindowTextColor
+            } : Palette(dark);
+            foreach (var (key, color) in colors)
+                Application.Current.Resources[key] = new SolidColorBrush(color);
+            foreach (var (key, brush) in codeBrushes) brush.Color = colors[key];
+        }
+        for (var i = windows.Count - 1; i >= 0; i--)
+        {
+            var (reference, surface) = windows[i];
+            if (reference.TryGetTarget(out var window)) ApplyMaterial(window, surface);
+            else windows.RemoveAt(i);
+        }
+    }
+
+    internal static void SetTestTheme(bool? dark, bool? contrast = null)
+    {
+        testDark = dark; testContrast = contrast; RefreshTheme();
+    }
+
+    internal static void SetTestMotion(bool? enabled) => testMotion = enabled;
+
+    internal static void SetTestTransparency(bool? enabled)
+    {
+        testTransparency = enabled; RefreshTheme();
+    }
+
+    private static Dictionary<string, Color> Palette(bool dark)
+    {
+        var colors = new Dictionary<string, (string Light, string Dark)>
+        {
+            ["Ink"] = ("#202733", "#F3F5F8"),
+            ["Muted"] = ("#626C7A", "#AAB4C2"),
+            ["Accent"] = ("#4568D4", "#91A8FF"),
+            ["OnAccent"] = ("#FFFFFF", "#101827"),
+            ["Canvas"] = ("#F7F9FC", "#1B2028"),
+            ["Glass"] = ("#EEF7F9FC", "#EE1B2028"),
+            ["DocumentGlass"] = ("#DFF7F9FC", "#D91B2028"),
+            ["Rim"] = ("#D5DCE8", "#536070"),
+            ["Divider"] = ("#DDE3ED", "#39414F"),
+            ["PageSurface"] = ("#F0F3F8", "#252C37"),
+            ["Surface"] = ("#FFFFFF", "#252C37"),
+            ["Line"] = ("#DDE3ED", "#414A59"),
+            ["Hover"] = ("#E9EEF6", "#303B4B"),
+            ["Selection"] = ("#E8EEFC", "#2A3650"),
+            ["SelectionLine"] = ("#A9BDED", "#6684B9"),
+            ["Success"] = ("#237548", "#7ACAA0"),
+            ["Error"] = ("#A8303A", "#FF9B9B"),
+            ["KeycapFill"] = ("#ECF0F6", "#303A49"),
+            ["CheckSurface"] = ("#FFFFFF", "#252C37"),
+            ["CheckBorder"] = ("#AEB9CA", "#78869B"),
+            ["SwitchTrack"] = ("#C8D1DE", "#536174"),
+            ["ScrollThumb"] = ("#ADB9C9", "#69798E"),
+            ["ScrollThumbHover"] = ("#8292A7", "#91A2B8"),
+            ["IconSurface"] = ("#EEF3FA", "#2B3647"),
+            ["IconGreenSurface"] = ("#EAF5EE", "#263C33"),
+            ["IconInk"] = ("#3970AC", "#A9C5FF"),
+            ["IconGreenInk"] = ("#237548", "#7ACAA0"),
+            ["TextSelection"] = ("#C9DAFF", "#486091"),
+            ["SwitchKnob"] = ("#FFFFFF", "#F3F5F8")
+        };
+        return colors.ToDictionary(pair => pair.Key,
+            pair => (Color)ColorConverter.ConvertFromString(dark ? pair.Value.Dark : pair.Value.Light)!);
+    }
+
+    private static void ApplyMaterial(Window window, WindowSurface surface)
+    {
+        var handle = new WindowInteropHelper(window).Handle;
+        if (handle == 0) return;
+        if (OperatingSystem.IsWindowsVersionAtLeast(10, 0, 22000))
+        {
+            var dark = darkPalette == true ? 1 : 0;
+            _ = DwmSetWindowAttribute(handle, 20, ref dark, sizeof(int));
+        }
+        var transparent = testTransparency ?? (Microsoft.Win32.Registry.GetValue(
+            @"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize", "EnableTransparency", 1) is not 0);
+        var backdrop = OperatingSystem.IsWindowsVersionAtLeast(10, 0, 22621) && contrastPalette != true && transparent;
+        if (OperatingSystem.IsWindowsVersionAtLeast(10, 0, 22621))
+        {
+            var kind = backdrop ? surface == WindowSurface.Document ? 2 : 3 : 1;
+            backdrop = DwmSetWindowAttribute(handle, 38, ref kind, sizeof(int)) == 0 && backdrop;
+        }
+        WindowChrome.GetWindowChrome(window).GlassFrameThickness = backdrop ? new Thickness(-1) : new Thickness(0);
+        window.Background = backdrop ? Brushes.Transparent : Brush("Canvas");
+        if (HwndSource.FromHwnd(handle)?.CompositionTarget is { } target)
+            target.BackgroundColor = backdrop ? Colors.Transparent : ((SolidColorBrush)Brush("Canvas")).Color;
+        if (window.Content is Border frame)
+            frame.Background = Brush(backdrop ? surface == WindowSurface.Document ? "DocumentGlass" : "Glass" : "Canvas");
     }
 
     private static Rect WorkArea(Window window)
@@ -80,8 +210,12 @@ internal static class WindowVisuals
 
     private static void Reveal(Window window)
     {
-        if (!SystemParameters.ClientAreaAnimation || window.Content is not FrameworkElement content) return;
-        content.BeginAnimation(UIElement.OpacityProperty, new DoubleAnimation(.88, 1, TimeSpan.FromMilliseconds(140)) { FillBehavior = FillBehavior.Stop });
+        if (!MotionEnabled || window.Content is not FrameworkElement content) return;
+        content.BeginAnimation(UIElement.OpacityProperty, new DoubleAnimation(.78, 1, TimeSpan.FromMilliseconds(160)) { FillBehavior = FillBehavior.Stop });
+        var transform = new TranslateTransform();
+        content.RenderTransform = transform;
+        transform.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(6, 0, TimeSpan.FromMilliseconds(160))
+        { EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut }, FillBehavior = FillBehavior.Stop });
     }
 
     internal static Border Frame(UIElement content) => new()

@@ -7,6 +7,7 @@ using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
 using Scout.Core;
+using Brush = System.Windows.Media.Brush;
 using Brushes = System.Windows.Media.Brushes;
 
 namespace Scout.App;
@@ -41,7 +42,10 @@ public partial class MainWindow : Window
     private Task localSearchTask = Task.CompletedTask;
     private Task refinementTask = Task.CompletedTask, enrichmentTask = Task.CompletedTask;
     private long appliedRevision, observedIndexVersion = -1;
-    private double requestedHeight = 420;
+    private double requestedHeight = 76;
+    private bool suggestionsRevealed, expanded;
+    private string lastRenderedQuery = "";
+    private HashSet<string> lastRenderedIds = [];
 
     internal MainWindow(ScoutStore store, IndexService index, ModelHost model)
     {
@@ -53,7 +57,7 @@ public partial class MainWindow : Window
             HwndSource.FromHwnd(new WindowInteropHelper(this).Handle)?.AddHook(WindowMessage);
             ApplyHotkey(store.Settings.Hotkey);
         };
-        Loaded += (_, _) => { UpdateScopes(); Query.Focus(); RefreshLocal(); };
+        Loaded += (_, _) => { UpdateScopes(); UpdateExpansion(); Query.Focus(); RefreshLocal(); };
         Closing += (_, e) => { if (!Application.Current.Dispatcher.HasShutdownStarted) { e.Cancel = true; HidePanel(); } };
         index.Changed += text => Dispatcher.BeginInvoke(() => { indexStatus = text; Status.ToolTip = indexStatus; indexChanged = true; });
         uiRefresh = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
@@ -80,11 +84,12 @@ public partial class MainWindow : Window
     internal void Toggle(bool show = false)
     {
         if (IsVisible && !show) { HidePanel(); return; }
+        WindowVisuals.RefreshTheme(); UpdateExpansion();
         model.Context = WindowsIntegration.CaptureContext();
         Show(); Activate(); WindowsIntegration.SetForegroundWindow(new WindowInteropHelper(this).Handle); Query.Focus(); Query.SelectAll();
         _ = index.RefreshAsync(forceHistory: true); ScheduleSearch(false);
     }
-    private void HidePanel() { search.Cancel(); revision++; Hide(); }
+    private void HidePanel() { search.Cancel(); revision++; suggestionsRevealed = false; UpdateExpansion(); Hide(); }
     private void DragHeader(object sender, MouseButtonEventArgs e)
     {
         if (e.ChangedButton != MouseButton.Left) return;
@@ -99,11 +104,41 @@ public partial class MainWindow : Window
         if (!IsInitialized || Placeholder == null) return;
         Placeholder.Visibility = Query.Text.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
         ClearQuery.Visibility = Query.Text.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
+        if (Query.Text.Length == 0) suggestionsRevealed = false;
         enriched = []; manualSelection = false;
         if (!groupEdited && editingWorkspace == null) { group.Clear(); groupChoices.Clear(); UpdateGroup(); }
+        UpdateExpansion();
         ScheduleSearch(true);
     }
-    private void ScopeClick(object sender, RoutedEventArgs e) { scope = (Scope)int.Parse((string)((Button)sender).Tag); manualSelection = false; UpdateScopes(); ScheduleSearch(false); }
+    private void ScopeClick(object sender, RoutedEventArgs e) { scope = (Scope)int.Parse((string)((Button)sender).Tag); suggestionsRevealed = true; UpdateExpansion(); manualSelection = false; UpdateScopes(); ScheduleSearch(false); }
+
+    private void RevealSuggestions()
+    {
+        if (expanded) return;
+        suggestionsRevealed = true;
+        UpdateExpansion();
+    }
+
+    private void UpdateExpansion()
+    {
+        if (!IsInitialized) return;
+        var shouldExpand = Query.Text.Length > 0 || suggestionsRevealed || group.Count > 0 || editingWorkspace != null;
+        if (expanded == shouldExpand) return;
+        expanded = shouldExpand;
+        ScopesRow.Visibility = expanded ? Visibility.Visible : Visibility.Collapsed;
+        ResultsRegion.Visibility = expanded ? Visibility.Visible : Visibility.Collapsed;
+        FooterBar.Visibility = expanded ? Visibility.Visible : Visibility.Collapsed;
+        GroupBar.Visibility = expanded && (group.Count > 0 || editingWorkspace != null) ? Visibility.Visible : Visibility.Collapsed;
+        if (expanded && WindowVisuals.MotionEnabled && IsVisible)
+        {
+            ResultsRegion.BeginAnimation(OpacityProperty, new DoubleAnimation(.55, 1, TimeSpan.FromMilliseconds(130)) { FillBehavior = FillBehavior.Stop });
+            var shift = new TranslateTransform();
+            ResultsRegion.RenderTransform = shift;
+            shift.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(-5, 0, TimeSpan.FromMilliseconds(130))
+            { EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut }, FillBehavior = FillBehavior.Stop });
+        }
+        ResizeToResults(Results.Items.Count, (Results.Items.Cast<ResultRow>().FirstOrDefault()?.Candidate.Kind == ItemKind.Calculation));
+    }
     private void UpdateScopes()
     {
         foreach (Button button in Scopes.Children)
@@ -196,6 +231,8 @@ public partial class MainWindow : Window
     }
     private void ApplyRows(IEnumerable<SearchHit> hits)
     {
+        var previousQuery = lastRenderedQuery;
+        var previousIds = lastRenderedIds;
         var selected = manualSelection ? (Results.SelectedItem as ResultRow)?.Candidate.Id : null;
         applying = true;
         displayedHits = hits.ToArray();
@@ -211,6 +248,8 @@ public partial class MainWindow : Window
         var ready = current != null && RankingPolicy.Ready(current, effective, judgment);
         var rows = effective.Select((h, i) => new ResultRow(h.Candidate, h.Pinned, group.ContainsKey(h.Candidate.Id), current?.Intent.Recency ?? RecencyBasis.None, i == 0 && (ready || h.Candidate.Kind == ItemKind.Group), group.Count > 0)).ToArray();
         Results.ItemsSource = rows;
+        lastRenderedQuery = Query.Text;
+        lastRenderedIds = rows.Select(row => row.Candidate.Id).ToHashSet();
         Results.SelectedItem = rows.FirstOrDefault(r => r.Candidate.Id == selected) ?? rows.FirstOrDefault();
         applying = false;
         Empty.Visibility = rows.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
@@ -231,11 +270,26 @@ public partial class MainWindow : Window
         FooterActions.Visibility = rows.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
         ActionsButton.IsEnabled = rows.Length > 0;
         ResizeToResults(rows.Length, rows.FirstOrDefault()?.Candidate.Kind == ItemKind.Calculation);
+        if (expanded && previousQuery == Query.Text && WindowVisuals.MotionEnabled)
+        {
+            var arrivals = rows.Where(row => !previousIds.Contains(row.Candidate.Id)).ToArray();
+            if (arrivals.Length > 0) Dispatcher.BeginInvoke(() => AnimateArrivals(arrivals), DispatcherPriority.Loaded);
+        }
+    }
+
+    private void AnimateArrivals(ResultRow[] arrivals)
+    {
+        if (!expanded || !WindowVisuals.MotionEnabled) return;
+        foreach (var row in arrivals)
+        {
+            if (Results.ItemContainerGenerator.ContainerFromItem(row) is not ListBoxItem item) continue;
+            item.BeginAnimation(OpacityProperty, new DoubleAnimation(.68, 1, TimeSpan.FromMilliseconds(110)) { FillBehavior = FillBehavior.Stop });
+        }
     }
     private void ResizeToResults(int count, bool calculation)
     {
-        var target = count == 0 ? (Examples.Visibility == Visibility.Visible ? 418 : 326)
-            : Math.Max(326, 220 + Math.Min(6, count) * 60 + (calculation ? 22 : 0));
+        var target = !expanded ? 76 : count == 0 ? (Examples.Visibility == Visibility.Visible ? 448 : 370)
+            : Math.Max(370, 250 + Math.Min(6, count) * 60 + (calculation ? 22 : 0));
         if (GroupBar.Visibility == Visibility.Visible) target += 56;
         var height = Math.Min(target, MaxHeight);
         if (Math.Abs(requestedHeight - height) < 1) return;
@@ -248,10 +302,26 @@ public partial class MainWindow : Window
     private void SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (!applying && Results.IsKeyboardFocusWithin) manualSelection = true;
+        if (!applying && WindowVisuals.MotionEnabled)
+        {
+            AnimateSelection(e.RemovedItems, false);
+            AnimateSelection(e.AddedItems, true);
+        }
         if (PrimaryActionHint != null)
             PrimaryActionHint.Text = Selected?.Kind == ItemKind.Calculation || current?.Intent.Action == ItemAction.Copy ? "Copy"
                 : current?.Intent.Action == ItemAction.Preview && Selected?.Kind == ItemKind.File ? "Preview"
                 : current?.Intent.Action == ItemAction.Reveal && Selected?.Kind is ItemKind.File or ItemKind.App or ItemKind.Folder ? "Reveal" : "Open";
+    }
+    private void AnimateSelection(System.Collections.IList changed, bool selected)
+    {
+        foreach (var row in changed)
+        {
+            if (Results.ItemContainerGenerator.ContainerFromItem(row) is not ListBoxItem item ||
+                item.Template.FindName("SelectionFill", item) is not Border fill) continue;
+            fill.BeginAnimation(OpacityProperty, new DoubleAnimation(selected ? 0 : 1, selected ? 1 : 0,
+                TimeSpan.FromMilliseconds(selected ? 105 : 80))
+            { EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut }, FillBehavior = FillBehavior.Stop });
+        }
     }
     private void ResultMouseDown(object sender, MouseButtonEventArgs e) { manualSelection = true; }
     private Candidate? Selected => appliedRevision == revision ? (Results.SelectedItem as ResultRow)?.Candidate : null;
@@ -329,10 +399,11 @@ public partial class MainWindow : Window
         groupChoices[row.Candidate.Id] = group.ContainsKey(row.Candidate.Id); UpdateGroup(); ApplyRows(displayedHits); e.Handled = true;
     }
     private void Preview(Candidate item) { if (item.Kind == ItemKind.File) new PreviewWindow(item) { Owner = this }.ShowDialog(); }
-    private void UpdateGroup() { GroupBar.Visibility = group.Count > 0 || editingWorkspace != null ? Visibility.Visible : Visibility.Collapsed; GroupLabel.Text = $"{group.Count} selected"; }
+    private void UpdateGroup() { GroupBar.Visibility = expanded && (group.Count > 0 || editingWorkspace != null) ? Visibility.Visible : Visibility.Collapsed; GroupLabel.Text = $"{group.Count} selected"; UpdateExpansion(); }
     private void ActionsClick(object sender, RoutedEventArgs e) => ShowActions();
     private void ShowActions()
     {
+        RevealSuggestions();
         if (Selected is not { } item) return;
         var menu = new ContextMenu { PlacementTarget = ActionsButton, Placement = System.Windows.Controls.Primitives.PlacementMode.Top };
         void Add(string label, Action action) { var parts = label.Split("    ", 2); var entry = new MenuItem { Header = parts[0], InputGestureText = parts.Length > 1 ? parts[1] : "" }; entry.Click += (_, _) => { try { action(); } catch (Exception e) when (e is IOException or System.Runtime.InteropServices.COMException or System.ComponentModel.Win32Exception) { Status.Text = e.Message; } }; menu.Items.Add(entry); }
@@ -405,9 +476,10 @@ public partial class MainWindow : Window
         { try { Clipboard.SetText(copy.Target); Status.Text = "Copied"; } catch (System.Runtime.InteropServices.COMException) { Status.Text = "Clipboard is busy. Try again."; } }
         else if (ctrl && e.Key == Key.R && Selected is { } reveal)
         { try { WindowsIntegration.Reveal(reveal); } catch (Exception ex) when (ex is IOException or System.ComponentModel.Win32Exception) { Status.Text = ex.Message; } }
-        else if (e.Key == Key.Tab) { scope = (Scope)(((int)scope + (shift ? 4 : 1)) % 5); UpdateScopes(); ScheduleSearch(false); }
+        else if (e.Key == Key.Tab) { RevealSuggestions(); scope = (Scope)(((int)scope + (shift ? 4 : 1)) % 5); UpdateScopes(); ScheduleSearch(false); }
         else if (e.Key is Key.Up or Key.Down)
         {
+            RevealSuggestions();
             manualSelection = true; var delta = e.Key == Key.Down ? 1 : -1;
             if (Results.Items.Count > 0) { Results.SelectedIndex = Math.Clamp(Results.SelectedIndex + delta, 0, Results.Items.Count - 1); Results.ScrollIntoView(Results.SelectedItem); }
         }
@@ -440,8 +512,8 @@ public partial class MainWindow : Window
         }
         public string Marker => pinned ? "\uE718" : "";
         public string KindLabel => Candidate.Kind switch { ItemKind.File => Path.GetExtension(Candidate.Title).TrimStart('.').ToUpperInvariant(), ItemKind.WebSearch => "Web", ItemKind.Calculation => "Calculator", ItemKind.System => "System", ItemKind.Group => "Group", _ => Candidate.Kind.ToString() };
-        public string IconBackground => icon != null ? "Transparent" : Candidate.Kind switch { ItemKind.Folder => "#18C18F2E", ItemKind.Workspace or ItemKind.Group => "#16775AB5", ItemKind.Calculation => "#163B8862", ItemKind.Link or ItemKind.WebSearch => "#164568D4", _ => "#0B344C78" };
-        public string IconForeground => Candidate.Kind switch { ItemKind.Folder => "#A06B14", ItemKind.Workspace or ItemKind.Group => "#7255B5", ItemKind.Calculation => "#237548", _ => "#3970AC" };
+        public Brush IconBackground => icon != null ? Brushes.Transparent : WindowVisuals.Brush(Candidate.Kind == ItemKind.Calculation ? "IconGreenSurface" : "IconSurface");
+        public Brush IconForeground => WindowVisuals.Brush(Candidate.Kind == ItemKind.Calculation ? "IconGreenInk" : "IconInk");
         public string Glyph => Candidate.Kind switch { ItemKind.App or ItemKind.Automation => "\uE71D", ItemKind.Folder => "\uE8B7", ItemKind.Link or ItemKind.WebSearch => "\uE774", ItemKind.Workspace or ItemKind.Group => "\uE8F1", ItemKind.Calculation => "\uE8EF", ItemKind.System => "\uE713", _ => "\uE8A5" };
     }
     internal async Task SmokeCheck(bool captureUi = false)

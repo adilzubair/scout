@@ -26,7 +26,7 @@ internal sealed class PreviewWindow : Window
     public PreviewWindow(Candidate item)
     {
         this.item = item; Title = item.Title; Width = 850; Height = 660; MinWidth = 600; MinHeight = 380; WindowStartupLocation = WindowStartupLocation.CenterOwner;
-        WindowVisuals.Configure(this);
+        WindowVisuals.Configure(this, WindowSurface.Document);
         var dock = new DockPanel();
         var heading = WindowVisuals.Header(this, item.Title); DockPanel.SetDock(heading, Dock.Top); dock.Children.Add(heading);
         status.Foreground = WindowVisuals.Brush("Muted"); status.FontSize = 11; status.TextTrimming = TextTrimming.CharacterEllipsis; status.Margin = new Thickness(24, 0, 24, 14);

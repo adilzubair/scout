@@ -70,11 +70,11 @@ internal sealed class SettingsWindow : Window
     {
         Value = settings;
         Title = "Scout settings"; Width = 800; Height = 654; MinWidth = 680; MinHeight = 460; WindowStartupLocation = WindowStartupLocation.CenterOwner;
-        WindowVisuals.Configure(this);
+        WindowVisuals.Configure(this, WindowSurface.Document);
         var root = new DockPanel();
         var header = WindowVisuals.Header(this, "Settings"); DockPanel.SetDock(header, Dock.Top); root.Children.Add(header);
         var footer = new StackPanel { Margin = new Thickness(24, 12, 24, 20) }; DockPanel.SetDock(footer, Dock.Bottom); root.Children.Add(footer);
-        var feedback = new TextBlock { TextWrapping = TextWrapping.Wrap, Foreground = Brushes.Firebrick, Margin = new Thickness(0, 0, 0, 10), Visibility = Visibility.Collapsed };
+        var feedback = new TextBlock { TextWrapping = TextWrapping.Wrap, Foreground = WindowVisuals.Brush("Error"), Margin = new Thickness(0, 0, 0, 10), Visibility = Visibility.Collapsed };
         AutomationProperties.SetLiveSetting(feedback, AutomationLiveSetting.Polite);
         footer.Children.Add(feedback);
         var actions = new DockPanel();
