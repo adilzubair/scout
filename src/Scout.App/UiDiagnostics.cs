@@ -21,11 +21,16 @@ public partial class MainWindow
         }
         await SearchView("", Scope.All, "launcher-empty");
         if (ActualHeight > 90 || ScopesRow.IsVisible || ResultsRegion.IsVisible) throw new InvalidOperationException("Empty search did not open compact.");
+        var workArea = WindowVisuals.WorkArea(this);
+        if (Top + ActualHeight / 2 >= workArea.Top + workArea.Height / 2 - 24)
+            throw new InvalidOperationException("Compact search did not open above the screen center.");
         WindowVisuals.SetTestTheme(true);
         await UiDiagnostics.Snapshot(this, "launcher-empty-dark");
         WindowVisuals.SetTestTheme(null);
         RevealSuggestions(); UpdateLayout();
         if (ActualHeight < 300 || !ScopesRow.IsVisible) throw new InvalidOperationException("Down/Tab suggestions did not expand the launcher.");
+        if (Top + ActualHeight > workArea.Bottom - 8)
+            throw new InvalidOperationException("Expanded search fell below the work area.");
         await UiDiagnostics.Snapshot(this, "launcher-suggestions");
         Query.Text = "pdf"; await WaitForSearch();
         Query.Clear(); await WaitForSearch();

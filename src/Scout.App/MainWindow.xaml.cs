@@ -57,7 +57,7 @@ public partial class MainWindow : Window
             HwndSource.FromHwnd(new WindowInteropHelper(this).Handle)?.AddHook(WindowMessage);
             ApplyHotkey(store.Settings.Hotkey);
         };
-        Loaded += (_, _) => { UpdateScopes(); UpdateExpansion(); Query.Focus(); RefreshLocal(); };
+        Loaded += (_, _) => { WindowVisuals.PlaceLauncher(this); UpdateScopes(); UpdateExpansion(); Query.Focus(); RefreshLocal(); };
         Closing += (_, e) => { if (!Application.Current.Dispatcher.HasShutdownStarted) { e.Cancel = true; HidePanel(); } };
         index.Changed += text => Dispatcher.BeginInvoke(() => { indexStatus = text; Status.ToolTip = indexStatus; indexChanged = true; });
         uiRefresh = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };

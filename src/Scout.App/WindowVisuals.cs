@@ -194,7 +194,7 @@ internal static class WindowVisuals
             frame.Background = Brush(backdrop ? surface == WindowSurface.Document ? "DocumentGlass" : "Glass" : "Canvas");
     }
 
-    private static Rect WorkArea(Window window)
+    internal static Rect WorkArea(Window window)
     {
         var area = System.Windows.Forms.Screen.FromHandle(new WindowInteropHelper(window).Handle).WorkingArea;
         var transform = PresentationSource.FromVisual(window)?.CompositionTarget?.TransformFromDevice ?? Matrix.Identity;
@@ -206,6 +206,15 @@ internal static class WindowVisuals
         var area = WorkArea(window);
         window.Left = Math.Clamp(window.Left, area.Left + 12, Math.Max(area.Left + 12, area.Right - window.ActualWidth - 12));
         window.Top = Math.Clamp(window.Top, area.Top + 12, Math.Max(area.Top + 12, area.Bottom - window.ActualHeight - 12));
+    }
+
+    internal static void PlaceLauncher(Window window)
+    {
+        var area = WorkArea(window);
+        // Keep the search field just above center, with space for six results below it.
+        var centeredTop = area.Top + (area.Height - window.ActualHeight) / 2 - 72;
+        var expandedTop = area.Bottom - Math.Min(window.MaxHeight, 610) - 12;
+        window.Top = Math.Max(area.Top + 12, Math.Min(centeredTop, expandedTop));
     }
 
     private static void Reveal(Window window)
