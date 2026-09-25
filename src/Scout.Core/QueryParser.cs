@@ -88,12 +88,15 @@ public static partial class QueryParser
         if (Regex.IsMatch(q, @"^(?:(?:open|find|show|preview|reveal)\s+)?(?:(?:the|a|my)\s+)?documents?\b") && extension is "image" or "video" or "audio" or "archive") extension = null;
         var typed = appIntent ? Match.Empty : Regex.Match(q, @"(?<![\p{L}\p{N}])\.?(pdf|pptx?|pptm|ppsx|xlsx?|xlsm|csv|tsv|docx?|docm|odt|ods|odp|rtf|txt|md|json|ya?ml|xml|html|png|jpe?g|gif|webp|svg|bmp|tiff?|heic|mp4|mkv|mov|avi|webm|mp3|wav|m4a|flac|zip|7z|rar|tar|gz)\b");
         if (!appIntent && typed.Success) extension = "." + typed.Groups[1].Value;
-        if (!appIntent && extension == null && Has("markdown", "md")) extension = ".md";
+        // An explicit Markdown format outranks "recording" used as a verb in a
+        // description, just as an explicit file extension outranks media words.
+        if (!appIntent && Has("markdown", "md") && !typed.Success) extension = ".md";
         if (!appIntent && extension == null && Has("text", "txt")) extension = ".txt";
         ItemKind? kind = Has("link", "links", "page", "pages", "visited", "website", "websites") ? ItemKind.Link : appIntent ? ItemKind.App : extension != null || Has("file", "files", "document", "documents", "downloaded", "modified", "edited", "created", "authored") ? ItemKind.File : Has("workspace", "workspaces") ? ItemKind.Workspace : null;
         if (location.Folder != null && !appIntent) kind = q.Length == 0 ? ItemKind.Folder : ItemKind.File;
         if (scope != Scope.All) kind = scope switch { Scope.Files => kind == ItemKind.Folder ? ItemKind.Folder : ItemKind.File, Scope.Apps => ItemKind.App, Scope.Links => ItemKind.Link, Scope.Workspaces => ItemKind.Workspace, _ => kind };
-        var basis = Has("created", "made", "authored") ? RecencyBasis.Created : Has("modified", "edited", "changed", "saved") ? RecencyBasis.Modified : Has("downloaded", "download") ? RecencyBasis.Downloaded : Has("added") ? RecencyBasis.Added : Has("visited", "read") && kind == ItemKind.Link ? RecencyBasis.Visited : Has("opened", "used", "worked", "working") || Has("read") && kind == ItemKind.File ? RecencyBasis.Opened : kind == ItemKind.Link && window != null ? RecencyBasis.Visited : RecencyBasis.None;
+        var madeFile = Has("made") && (!fileDescription || Regex.IsMatch(q, @"\b(?:files?|documents?|pdfs?|markdown|presentations?|slides?|spreadsheets?)\s+(?:(?:that|which)\s+)?(?:(?:i|we)\s+)?made\b"));
+        var basis = Has("created", "authored") || madeFile ? RecencyBasis.Created : Has("modified", "edited", "changed", "saved") ? RecencyBasis.Modified : Has("downloaded", "download") ? RecencyBasis.Downloaded : Has("added") ? RecencyBasis.Added : Has("visited", "read") && kind == ItemKind.Link ? RecencyBasis.Visited : Has("opened", "used", "worked", "working") || Has("read") && kind == ItemKind.File ? RecencyBasis.Opened : kind == ItemKind.Link && window != null ? RecencyBasis.Visited : RecencyBasis.None;
         var latest = Has("last", "latest", "newest", "recent", "recently", "just");
         if (basis == RecencyBasis.None && (window != null || latest || Has("oldest", "first"))) basis = kind == ItemKind.Link ? RecencyBasis.Visited : RecencyBasis.Modified;
         var typeWords = extension == "image" ? new[] { "screenshot", "screenshots" } : extension == "video" ? ["movie", "movies", "recording", "recordings"] : extension == "audio" ? ["song", "songs"] : extension == "archive" ? ["zip"] : Array.Empty<string>();

@@ -18,6 +18,10 @@ list of candidates, not a replacement decision.
 decision APIs closer to Laya's, but neither has Scout or Windows laptop CPU
 measurements, and neither is ready to displace the current default.
 
+The [task benchmark workflow](TASK_BENCHMARK.md) now supports manually labelled
+holdout tasks. A small-folder recall experiment increased candidate coverage
+but worsened final CPU Laya outcomes, so it was not enabled by default.
+
 The shortlist below came from an online model survey. Its published retrieval
 benchmarks use document passages and always rank candidates; Scout must also
 reject searches for which no indexed file fits. The subsequent local screen

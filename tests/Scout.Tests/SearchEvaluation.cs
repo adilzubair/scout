@@ -35,7 +35,11 @@ internal static class SearchEvaluation
         object Summarize(IEnumerable<(bool Local, bool Final, bool Recalled, bool Scope, bool Intent, bool Negative, double Ms)> source)
         {
             var all = source.ToArray();
-            return new { cases = all.Length, localCorrect = all.Count(r => r.Local && r.Scope && r.Intent), finalCorrect = all.Count(r => r.Final && r.Scope && r.Intent), shortlistRecall = all.Count(r => r.Recalled), scopeFailures = all.Count(r => !r.Scope), intentFailures = all.Count(r => !r.Intent), negatives = all.Count(r => r.Negative), falseMatches = all.Count(r => r.Negative && !r.Final), p50Ms = all.Select(r => r.Ms).Order().ElementAt(all.Length / 2), p95Ms = all.Select(r => r.Ms).Order().ElementAt(Math.Min(all.Length - 1, (int)(all.Length * .95))) };
+            return new { cases = all.Length, localCorrect = all.Count(r => r.Local && r.Scope && r.Intent), finalCorrect = all.Count(r => r.Final && r.Scope && r.Intent),
+                positives = all.Count(r => !r.Negative), positiveShortlistRecall = all.Count(r => !r.Negative && r.Recalled), positiveFinalCorrect = all.Count(r => !r.Negative && r.Final && r.Scope && r.Intent),
+                shortlistRecall = all.Count(r => r.Recalled), scopeFailures = all.Count(r => !r.Scope), intentFailures = all.Count(r => !r.Intent),
+                negatives = all.Count(r => r.Negative), negativeCorrect = all.Count(r => r.Negative && r.Final && r.Scope && r.Intent), falseMatches = all.Count(r => r.Negative && !r.Final),
+                p50Ms = all.Select(r => r.Ms).Order().ElementAt(all.Length / 2), p95Ms = all.Select(r => r.Ms).Order().ElementAt(Math.Min(all.Length - 1, (int)(all.Length * .95))) };
         }
         var aggregate = Summarize(summary.Values.SelectMany(v => v));
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(output))!);
