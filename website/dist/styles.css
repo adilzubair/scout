@@ -149,6 +149,7 @@ h3 { margin-top: 24px; font-size: 22px; font-weight: 700; letter-spacing: -.045e
 .download-section .eyebrow { margin-bottom: 18px; }
 .download-section > p:not(.eyebrow) { max-width: 610px; margin: 23px auto 29px; color: var(--body); font-size: 18px; line-height: 1.65; }
 .download-note { display: block; margin-top: 14px; color: var(--muted); font-size: 13px; }
+.download-note a { text-decoration: underline; text-underline-offset: 3px; }
 .site-footer { border-top: 1px solid var(--line); }
 .footer-inner { display: flex; align-items: center; gap: 30px; min-height: 88px; }
 .footer-inner .brand { font-size: 18px; }
