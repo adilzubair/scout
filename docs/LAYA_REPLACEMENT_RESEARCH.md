@@ -2,17 +2,23 @@
 
 ## Decision
 
-**Test Ettin Reranker 32M and 68M first; do not replace Laya yet.** They are
-plausible CPU choices for Scout's descriptive file searches, with permissively
-licensed models and publisher-provided INT8 ONNX files. The 150M Ettin model is a
-quality reference for a small finalist set. Qwen3-Reranker-0.6B is a larger
+**The initial shortlist was Ettin Reranker 32M and 68M; do not replace Laya
+yet.** They are plausible CPU choices for Scout's descriptive file searches.
+Both have permissive licenses and publisher-provided INT8 ONNX files. The 150M
+Ettin model is a quality reference for a small finalist set.
+Qwen3-Reranker-0.6B is a larger
 knowledge-oriented reference, not the ordinary-laptop default.
 
-This is an online model survey, **not a Scout accuracy or latency result**. None
-of these new candidates has run on Scout's fixtures. The published retrieval
+The [local Ettin CPU screen](ETTIN_OFFLINE_SCREEN.md) has since tested 32M,
+68M and the 150M reference. All are fast on the available desktop CPU, but
+none passed the no-match gate. This research shortlist therefore remains a
+list of candidates, not a replacement decision.
+
+The shortlist below came from an online model survey. Its published retrieval
 benchmarks use document passages and always rank candidates; Scout must also
-reject searches for which no indexed file fits. The old 64-case Scout set has
-already been inspected and is useful for development, not a new holdout.
+reject searches for which no indexed file fits. The subsequent local screen
+tested Ettin on the old 64-case Scout set, which is useful for development but
+not a new holdout.
 
 ## What Scout needs from a replacement
 
@@ -67,6 +73,9 @@ At the published CPU throughput, scoring all 32 candidates would take roughly
 projections from a desktop CPU benchmark, not latency predictions for an
 ordinary laptop. A bounded 8–12-item rerank after a high-recall first stage
 could make larger models feasible, but only if it retains the right file.
+The subsequent [local screen](ETTIN_OFFLINE_SCREEN.md) measured much shorter
+filename pairs and lower CPU times, including a synthetic 32-title timing
+check. It does not establish latency on the target laptops.
 
 Qwen3-Reranker-0.6B is Apache-2.0, multilingual and instruction-aware. Its
 foundation model makes it a reasonable probe for world-knowledge queries. Its
@@ -109,23 +118,23 @@ The product therefore has three independent problems to measure:
    for genuine deeper search, with measured update cost, size, privacy, and
    file-type coverage.
 
-## Proposed offline experiment, with no Jev key
+## Offline evaluation status, with no Jev key
 
-1. Download only Ettin 32M and 68M into ignored `.runtime/models/` and pin
-   exact revisions/checksums. Probe their official INT8 ONNX artifacts on CPU;
-   an initial FP32 screen is acceptable for model selection but is not a
-   shipping result. ONNX Runtime supports C# on Windows x64 and Arm64, so a
-   successful encoder path could later avoid the Python/PyTorch sidecar.
+1. **Completed:** Download Ettin 32M, 68M and the 150M quality reference into
+   ignored `.runtime/models/`, pin revisions/checksums, and probe their official
+   INT8 ONNX artifacts on CPU. ONNX Runtime supports C# on Windows x64 and Arm64,
+   so a successful encoder path could later avoid the Python/PyTorch sidecar.
    [ONNX Runtime C# guide](https://onnxruntime.ai/docs/get-started/with-csharp.html).
-2. Run the existing 64-case set as a development screen: top choice, no-match
-   separation, final Scout outcomes, cold load, p50/p95, working set, and
-   one-versus-all/action regression. Keep per-case local paths and scores in
-   ignored diagnostics.
-3. Freeze a new independently labeled holdout before tuning the admission
+2. **Completed as a model screen:** Run the existing 64-case set for top choice,
+   no-match separation, cold load, p50/p95, and working set. Case-level results
+   are ignored. Final Scout outcomes and one-versus-all/action regression await
+   a proposed replacement policy; the raw reranker does not provide those
+   decisions.
+3. **Pending:** Freeze a new independently labeled holdout before tuning the admission
    rule. Include positives, close negatives, no-match, vague requests,
    shorthand/knowledge associations, temporal, folder, app/file, and plural
    requests. Split related task families across development and holdout.
-4. Test the exact candidate, policy and package on an 8–16 GB CPU-only Windows
+4. **Pending:** Test the exact candidate, policy and package on an 8–16 GB CPU-only Windows
    laptop. Compare against Scout without AI and the current Laya path. Ship a
    default model only if final outcomes improve while false matches, p95,
    cold load, memory and installed size meet the release gates.
