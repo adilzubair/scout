@@ -36,6 +36,7 @@ public partial class MainWindow : Window
     private readonly RegisteredWaitHandle wait;
     private readonly DispatcherTimer indexRefresh;
     private readonly DispatcherTimer uiRefresh;
+    private readonly DispatcherTimer modelIdle;
     private bool indexChanged;
     private string indexStatus = "Updating index…";
     private string hotkey = "";
@@ -68,6 +69,12 @@ public partial class MainWindow : Window
             if (observedIndexVersion != index.Version) { observedIndexVersion = index.Version; ScheduleSearch(false); }
             else if (Query.Text.Length == 0) Status.Text = "Scout";
         }; uiRefresh.Start();
+        modelIdle = new DispatcherTimer { Interval = TimeSpan.FromMinutes(1) };
+        modelIdle.Tick += async (_, _) =>
+        {
+            modelIdle.Stop();
+            if (!IsVisible) await model.ResetAsync();
+        };
         indexRefresh = new DispatcherTimer { Interval = TimeSpan.FromSeconds(30) };
         indexRefresh.Tick += async (_, _) => await index.RefreshAsync(); indexRefresh.Start();
         wait = ThreadPool.RegisterWaitForSingleObject(showEvent, (_, _) => Dispatcher.BeginInvoke(() => Toggle(true)), null, -1, false);
@@ -84,12 +91,14 @@ public partial class MainWindow : Window
     internal void Toggle(bool show = false)
     {
         if (IsVisible && !show) { HidePanel(); return; }
+        modelIdle.Stop();
+        _ = model.WarmAsync(store.Settings);
         WindowVisuals.RefreshTheme(); UpdateExpansion();
         model.Context = WindowsIntegration.CaptureContext();
         Show(); Activate(); WindowsIntegration.SetForegroundWindow(new WindowInteropHelper(this).Handle); Query.Focus(); Query.SelectAll();
         _ = index.RefreshAsync(forceHistory: true); ScheduleSearch(false);
     }
-    private void HidePanel() { search.Cancel(); revision++; suggestionsRevealed = false; UpdateExpansion(); Hide(); }
+    private void HidePanel() { search.Cancel(); revision++; suggestionsRevealed = false; UpdateExpansion(); Hide(); modelIdle.Stop(); modelIdle.Start(); }
     private void DragHeader(object sender, MouseButtonEventArgs e)
     {
         if (e.ChangedButton != MouseButton.Left) return;
@@ -450,13 +459,13 @@ public partial class MainWindow : Window
     }
     private async void OpenGroupClick(object sender, RoutedEventArgs e) => await Execute(group.Values.ToArray());
     private void SettingsClick(object sender, RoutedEventArgs e) => ShowSettings();
-    internal void ShowSettings()
+    internal async void ShowSettings()
     {
         Toggle(true);
         var dialog = new SettingsWindow(store.Settings, ApplyHotkey, () => store.ClearLaunchHistory()) { Owner = this };
         if (dialog.ShowDialog() == true)
         {
-            search.Cancel(); revision++; model.Reset(); store.SaveSettings(dialog.Value); enriched = []; ClearGroup();
+            search.Cancel(); revision++; await model.ResetAsync(); store.SaveSettings(dialog.Value); enriched = []; ClearGroup();
             _ = index.ConfigureAsync(dialog.Value); _ = model.WarmAsync(dialog.Value); ScheduleSearch(false);
         }
         Query.Focus();

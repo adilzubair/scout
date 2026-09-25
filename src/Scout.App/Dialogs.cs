@@ -144,8 +144,12 @@ internal sealed class SettingsWindow : Window
         var local = Page("Local AI", "\uE945", "Find things with a description, even when you forget the name.");
         var ai = Check(local, "Use Laya to understand descriptions", settings.AiEnabled);
         Note(local, "Runs on this PC. Setup downloads the runtime and model once; your searches stay local.");
-        var semanticHelper = Check(local, "Improve descriptive file search", settings.SemanticHelper);
-        Note(local, "Adds a local model to help distinguish similar documents. Requires a compatible GPU and a 2.5 GB download through Set up local AI.");
+        CheckBox? semanticHelper = null;
+        if (LocalSetup.ExperimentalSemanticHelper)
+        {
+            semanticHelper = Check(local, "Experimental 4B semantic helper", settings.SemanticHelper);
+            Note(local, "Research only. Adds a 2.5 GB model and requires a compatible GPU.");
+        }
         Heading(local, "Processing device");
         var device = new ComboBox { ItemsSource = new[] { "cpu", "cuda" }, SelectedItem = settings.Device, Padding = new Thickness(10), MinWidth = 160, HorizontalAlignment = HorizontalAlignment.Left }; AutomationProperties.SetName(device, "Processing device"); local.Children.Add(device);
         Note(local, "Choose cuda for a supported NVIDIA GPU, or cpu for any PC. Setup needs several GB of free space.");
@@ -164,7 +168,7 @@ internal sealed class SettingsWindow : Window
             setup.IsEnabled = false; setupStatus.Text = "Setting up local AI…";
             try
             {
-                python.Text = await LocalSetup.InstallAsync((string)device.SelectedItem == "cuda", new Progress<string>(text => setupStatus.Text = text), setupLifetime.Token, semanticHelper.IsChecked == true);
+                python.Text = await LocalSetup.InstallAsync((string)device.SelectedItem == "cuda", new Progress<string>(text => setupStatus.Text = text), setupLifetime.Token, semanticHelper?.IsChecked == true);
                 checkpoint.SelectedItem = "english"; ai.IsChecked = true; setupStatus.Text = "Laya is ready. Save settings to enable it.";
             }
             catch (OperationCanceledException) { }
@@ -197,7 +201,7 @@ internal sealed class SettingsWindow : Window
                 if (Lines(field.Text).Any(p => !Path.IsPathFullyQualified(p) || !Directory.Exists(p))) { Error("Use existing, full folder paths, such as C:\\Users\\you\\Projects.", 1, field); return; }
             if (ai.IsChecked == true && !File.Exists(python.Text.Trim())) { Error("Choose the Python executable created by local AI setup.", 2, python); return; }
             if (!applyHotkey(shortcut.Text.Trim())) { Error("That shortcut is invalid or already in use. Try Ctrl+Alt+S.", 0, shortcut); return; }
-            Value = new ScoutSettings { ChromeHistory = chrome.IsChecked == true, EdgeHistory = edge.IsChecked == true, WindowsSearch = windows.IsChecked == true, RecentItems = recent.IsChecked == true, WebFallback = web.IsChecked == true, AutomationFolders = automationFolders, AiEnabled = ai.IsChecked == true, SemanticHelper = semanticHelper.IsChecked == true, PythonPath = python.Text.Trim(), Model = (string)checkpoint.SelectedItem, Device = (string)device.SelectedItem, CpuThreads = settings.CpuThreads, Hotkey = shortcut.Text.Trim(), ExtraFolders = extra, Exclusions = exclusions };
+            Value = new ScoutSettings { ChromeHistory = chrome.IsChecked == true, EdgeHistory = edge.IsChecked == true, WindowsSearch = windows.IsChecked == true, RecentItems = recent.IsChecked == true, WebFallback = web.IsChecked == true, AutomationFolders = automationFolders, AiEnabled = ai.IsChecked == true, SemanticHelper = semanticHelper?.IsChecked == true, PythonPath = python.Text.Trim(), Model = (string)checkpoint.SelectedItem, Device = (string)device.SelectedItem, CpuThreads = settings.CpuThreads, Hotkey = shortcut.Text.Trim(), ExtraFolders = extra, Exclusions = exclusions };
             DialogResult = true;
         };
         SelectPage(pages[0].Page);

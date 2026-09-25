@@ -21,25 +21,27 @@ internal sealed class ModelHost : IDisposable
     public async Task WarmAsync(ScoutSettings settings)
     {
         if (!settings.AiEnabled) return;
-        try { await EnsureStartedAsync(settings, session.Token); }
+        var sessionToken = session.Token;
+        try { await EnsureStartedAsync(settings, sessionToken); }
         catch (OperationCanceledException) { }
-        catch (Exception e) when (e is IOException or HttpRequestException or JsonException or InvalidOperationException or System.ComponentModel.Win32Exception) { Status = "Laya unavailable · local results ready"; }
+        catch (Exception e) when (e is IOException or HttpRequestException or JsonException or InvalidOperationException or ObjectDisposedException or System.ComponentModel.Win32Exception) { Status = "Laya unavailable · local results ready"; }
     }
     public async Task<RankResult?> RankAsync(ScoutSettings settings, string query, IReadOnlyList<Candidate> candidates, CancellationToken token, QueryIntent? intent = null)
     {
         // Keep the gate until the actual server response: HTTP cancellation cannot stop a Torch pass.
         if (!settings.AiEnabled) return null;
-        using var request = CancellationTokenSource.CreateLinkedTokenSource(token, session.Token);
+        var sessionToken = session.Token;
+        using var request = CancellationTokenSource.CreateLinkedTokenSource(token, sessionToken);
         await inferenceGate.WaitAsync(request.Token);
         var releaseGate = true;
         try
         {
-            await EnsureStartedAsync(settings, session.Token);
+            await EnsureStartedAsync(settings, sessionToken);
             request.Token.ThrowIfCancellationRequested();
             if (client == null) return null;
             var key = JsonSerializer.Serialize(new { query, candidates, Context, intent, minute = DateTimeOffset.Now.ToUnixTimeSeconds() / 60 });
             if (cache.TryGetValue(key, out var cached)) { Status = cached.Status; return cached; }
-            var task = new LayaRanker(client, Context, intent).RankAsync(query, candidates, session.Token);
+            var task = new LayaRanker(client, Context, intent).RankAsync(query, candidates, sessionToken);
             var timeout = Task.Delay(TimeSpan.FromSeconds(2), request.Token);
             if (await Task.WhenAny(task, timeout) != task)
             {
@@ -52,7 +54,7 @@ internal sealed class ModelHost : IDisposable
             request.Token.ThrowIfCancellationRequested();
             var result = await task; if (cache.Count >= 24) cache.Clear(); cache[key] = result; Status = result.Status; return result;
         }
-        catch (Exception e) when (e is HttpRequestException or JsonException or IOException or InvalidOperationException or System.ComponentModel.Win32Exception)
+        catch (Exception e) when (e is HttpRequestException or JsonException or IOException or InvalidOperationException or ObjectDisposedException or System.ComponentModel.Win32Exception)
         { Status = "Laya unavailable · local results ready"; return null; }
         finally { if (releaseGate) inferenceGate.Release(); }
     }
@@ -66,7 +68,8 @@ internal sealed class ModelHost : IDisposable
         await startGate.WaitAsync(token);
         try
         {
-            var key = $"{settings.PythonPath}|{settings.Model}|{settings.Device}|{settings.CpuThreads}|{settings.SemanticHelper}";
+            var useHelper = settings.SemanticHelper && LocalSetup.ExperimentalSemanticHelper;
+            var key = $"{settings.PythonPath}|{settings.Model}|{settings.Device}|{settings.CpuThreads}|{useHelper}";
             if (process is { HasExited: false } && configuration == key && client != null) return;
             StopProcess();
             if (!File.Exists(settings.PythonPath)) { Status = "Set up Laya in Settings"; return; }
@@ -82,7 +85,7 @@ internal sealed class ModelHost : IDisposable
             start.Environment["LAYA_MODEL"] = settings.Model;
             start.Environment["LAYA_DEVICE"] = settings.Device;
             start.Environment["LAYA_THREADS"] = settings.CpuThreads.ToString();
-            start.Environment["SCOUT_SEMANTIC_HELPER"] = settings.SemanticHelper ? "1" : "0";
+            start.Environment["SCOUT_SEMANTIC_HELPER"] = useHelper ? "1" : "0";
             start.Environment["USE_TF"] = "0";
             start.Environment["HF_HUB_OFFLINE"] = "1";
             start.Environment["SCOUT_MODELS_DIR"] = Path.Combine(Path.GetDirectoryName(Path.GetDirectoryName(settings.PythonPath))!, "..", "models");
@@ -107,8 +110,8 @@ internal sealed class ModelHost : IDisposable
                     {
                         using var health = await client.GetAsync("health", deadline.Token); health.EnsureSuccessStatusCode();
                         using var info = JsonDocument.Parse(await health.Content.ReadAsStringAsync(deadline.Token));
-                        Status = settings.SemanticHelper && info.RootElement.TryGetProperty("helper", out var helper) && helper.GetString() == "ready"
-                            ? "Laya + local helper ready" : settings.SemanticHelper ? "Laya ready · helper unavailable" : "Laya · experimental";
+                        Status = useHelper && info.RootElement.TryGetProperty("helper", out var helper) && helper.GetString() == "ready"
+                            ? "Laya + local helper ready" : useHelper ? "Laya ready · helper unavailable" : "Laya · experimental";
                         break;
                     }
                     catch (HttpRequestException) when (attempt < 20) { await Task.Delay(100, deadline.Token); }
@@ -128,6 +131,13 @@ internal sealed class ModelHost : IDisposable
             try { Directory.Delete(sessionDirectory, true); } catch (IOException) { } catch (UnauthorizedAccessException) { }
         }
     }
-    public void Reset() { session.Cancel(); session = new CancellationTokenSource(); StopProcess(); cache.Clear(); Status = "AI off"; }
+    public async Task ResetAsync()
+    {
+        session.Cancel();
+        session = new CancellationTokenSource();
+        await startGate.WaitAsync();
+        try { StopProcess(); cache.Clear(); Status = "AI off"; }
+        finally { startGate.Release(); }
+    }
     public void Dispose() { session.Cancel(); StopProcess(); }
 }

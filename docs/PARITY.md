@@ -14,6 +14,13 @@ Implemented behavior:
 
 Verification is documented in `VALIDATION.md`. Readiness uses clear local evidence, while raw model readiness is retained internally pending broader calibration. Semantic groups remain constrained by candidate eligibility and explicit user confirmation. Windows system mutations are implemented but excluded from automated execution tests. Live macOS/Jev equivalence has not been measured.
 
+The [ordinary-laptop baseline](LIGHTWEIGHT_BASELINE.md) records why Scout's
+current CPU Laya stack cannot be treated as an Intern-quality default. The
+standard Settings flow no longer offers the 4B helper, which improves the
+authored semantic suite but exceeds the target footprint. A direct Intern/Jev
+head-to-head and a fresh compact-model holdout are release gates for a parity
+claim.
+
 Windows mappings: Spotlight → Windows Search and local file watchers; Finder recent use → Windows Recent Items and Scout launches; Chrome history → Chrome/Edge visits and completed downloads; Quick Look → bounded built-in previews; Shortcuts → user-selected Windows shortcuts/Power Automate links; Focus → Windows notification settings; Trash → Recycle Bin.
 
 Creation means the filesystem's creation timestamp, which can change when a file is copied. It does not establish document authorship. Recent Items depends on Windows/application history support; filesystem access times are not treated as proof of opening.

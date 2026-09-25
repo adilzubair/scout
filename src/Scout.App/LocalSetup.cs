@@ -4,6 +4,10 @@ namespace Scout.App;
 
 internal static class LocalSetup
 {
+    // The large helper is retained for research, outside the standard setup path.
+    public static bool ExperimentalSemanticHelper =>
+        Environment.GetEnvironmentVariable("SCOUT_EXPERIMENTAL_SEMANTIC_HELPER") == "1";
+
     public static string FindPython()
     {
         var folder = new DirectoryInfo(AppContext.BaseDirectory);

@@ -1,5 +1,11 @@
 # Local semantic helper
 
+**Research status:** the 4B helper is excluded from the standard Settings flow.
+It is retained for local experiments behind
+`SCOUT_EXPERIMENTAL_SEMANTIC_HELPER=1`; its weights remain outside the app ZIP.
+The measurements below explain why it was useful, but its footprint does not
+meet the ordinary-laptop product target.
+
 Scout can optionally use a stronger local model to compare descriptive file
 queries with the existing shortlist. Laya still supplies typed scope, action,
 readiness and group decisions, and handles apps, system commands and short
@@ -10,9 +16,9 @@ The helper uses Qwen3-4B-Instruct-2507, quantized to Q4_K_M, through a pinned
 llama.cpp Windows Vulkan runtime. Both run locally alongside Laya. Queries and
 filenames stay on this PC; personal document contents are not read or indexed.
 Setup downloads about 2.5 GB for the helper model plus a 32 MB runtime archive.
-The feature defaults off for existing and new installations and can be enabled
-under Settings > Local AI > Improve descriptive file search. Select the option
-before running Set up local AI to install its files.
+The feature defaults off for existing and new installations. In the research
+configuration, set the environment variable before starting Scout, then select
+the experimental helper in Settings before running setup.
 
 ## Measured improvement
 

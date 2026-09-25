@@ -26,14 +26,14 @@ Local results appear first. Laya can refine them or find a relevant item among b
 
 ## Local AI
 
-Open **Settings**, choose **cpu** or **cuda**, and click **Set up local AI**. Setup downloads an isolated Python runtime and pinned model weights; save Settings afterward to enable Laya. Existing nearby runtimes are detected automatically. CUDA requires a supported NVIDIA GPU. English is the recommended checkpoint based on the current evaluation.
+Local AI is opt-in. Open **Settings**, choose **cpu** or **cuda**, and click **Set up local AI**. Setup downloads an isolated Python runtime and pinned model weights; save Settings afterward to enable Laya. Existing nearby runtimes are detected automatically. CUDA requires a supported NVIDIA GPU. English is the recommended checkpoint based on the current evaluation. CPU mode works but the [measured baseline](docs/LIGHTWEIGHT_BASELINE.md) is too slow and error-prone to recommend as Scout's default on ordinary laptops.
 
-For stronger filename-description matching, select **Improve descriptive file
-search** before setup. This adds a local Qwen helper alongside Laya, requires a
-compatible GPU, and downloads another 2.5 GB. It improves the fresh semantic
-evaluation from 38/64 to 56/64, with remaining errors and tradeoffs documented in
-[the helper evaluation](docs/LOCAL_SEMANTIC_HELPER.md). It searches filenames and
-metadata; it does not index document contents.
+The 2.5 GB Qwen helper is now research-only and unavailable in the standard
+Settings flow. It improved a small authored semantic evaluation from 38/64 to
+56/64 but is too large for Scout's target of ordinary Windows laptops. Existing
+experimental installations can still be tested by starting Scout with
+`SCOUT_EXPERIMENTAL_SEMANTIC_HELPER=1`. See [the helper evaluation](docs/LOCAL_SEMANTIC_HELPER.md).
+Neither model indexes document contents.
 
 Command-line setup is also available:
 
@@ -43,7 +43,15 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/setup-laya.ps1 -Cuda
 
 Omit `-Cuda` for CPU. Setup installs its own `uv` if necessary and never replaces system Python. Models and dependencies require several GB, with additional space for download caches. Interrupted downloads are resumable. The application ZIP excludes Python and model weights.
 
-Scout preloads Laya and the optional helper and stops their processes on exit or settings changes. Exact names and learned aliases need no AI round trip. Superseded requests cannot replace current results; the interface remains usable during inference. Services bind only to random `127.0.0.1` ports with fresh bearer tokens. Inference is offline after setup. The local API includes `/v1/systemone` and Scout's `/rank` adapter. No Jev key is needed.
+When AI is enabled, Scout loads Laya while the launcher is active and releases
+the model processes after the panel has been hidden for one minute. Reopening the
+panel starts them again; local results remain available during startup. Closing
+the panel leaves Scout in the notification area, while **Ctrl+Q** or **Quit**
+stops the app and its processes. Exact names and learned aliases need no AI
+round trip. Superseded requests cannot replace current results; the interface
+remains usable during inference. Services bind only to random `127.0.0.1` ports
+with fresh bearer tokens. Inference is offline after setup. The local API includes
+`/v1/systemone` and Scout's `/rank` adapter. No Jev key is needed.
 
 ## Actions and workspaces
 

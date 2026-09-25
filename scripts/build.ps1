@@ -19,6 +19,7 @@ try {
         Copy-Item -LiteralPath docs/SEARCH_EVALUATION.md -Destination artifacts/Scout/docs/SEARCH_EVALUATION.md
         Copy-Item -LiteralPath docs/SEMANTIC_SEARCH.md -Destination artifacts/Scout/docs/SEMANTIC_SEARCH.md
         Copy-Item -LiteralPath docs/LOCAL_SEMANTIC_HELPER.md -Destination artifacts/Scout/docs/LOCAL_SEMANTIC_HELPER.md
+        Copy-Item -LiteralPath docs/LIGHTWEIGHT_BASELINE.md -Destination artifacts/Scout/docs/LIGHTWEIGHT_BASELINE.md
         New-Item -ItemType Directory -Path artifacts/Scout/scripts -Force | Out-Null
         Copy-Item -LiteralPath scripts/setup-laya.ps1 -Destination artifacts/Scout/scripts/setup-laya.ps1
         Compress-Archive -Path artifacts/Scout/* -DestinationPath artifacts/Scout-win-x64.zip -Force
