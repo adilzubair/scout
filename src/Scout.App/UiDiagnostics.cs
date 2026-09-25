@@ -13,10 +13,10 @@ public partial class MainWindow
     // Runs only in the isolated --ui-smoke-test flow; no user settings are saved.
     private async Task CaptureUiChecks()
     {
-        async Task SearchView(string text, Scope filter, string name)
+        async Task SearchView(string text, Scope filter, string name, int pixelScale = 1)
         {
             scope = filter; UpdateScopes(); Query.Text = text; RefreshLocal(); await WaitForSearch();
-            await UiDiagnostics.Snapshot(this, name);
+            await UiDiagnostics.Snapshot(this, name, pixelScale);
             if (Query.ActualWidth < 200 || Results.ActualHeight < 100) throw new InvalidOperationException("Launcher content was clipped.");
         }
         await SearchView("", Scope.All, "launcher-empty");
@@ -43,9 +43,9 @@ public partial class MainWindow
         await SearchView("pdfs", Scope.All, "launcher-group");
         if (GroupBar.Visibility != Visibility.Visible || GroupBar.ActualHeight < 40) throw new InvalidOperationException("Group controls are not visible.");
         ClearGroup();
-        await SearchView("the pdf I just downloaded", Scope.All, "site-recent-download");
+        await SearchView("the pdf I just downloaded", Scope.All, "site-recent-download", pixelScale: 3);
         if (Selected?.Title != "Product Roadmap.pdf") throw new InvalidOperationException("Site arrival example selected the wrong file.");
-        await SearchView("latest 3 files in downloads", Scope.All, "site-download-group");
+        await SearchView("latest 3 files in downloads", Scope.All, "site-download-group", pixelScale: 3);
         if (Selected?.Kind != ItemKind.Group || group.Count != 3) throw new InvalidOperationException("Site download example did not form a three-file group.");
         ClearGroup();
         await SearchView("15% of 240", Scope.All, "launcher-calculator");
@@ -152,7 +152,7 @@ internal static class UiDiagnostics
         }
     }
 
-    internal static async Task Snapshot(Window window, string name)
+    internal static async Task Snapshot(Window window, string name, int pixelScale = 1)
     {
         await Task.Delay(200); window.UpdateLayout();
         window.BeginAnimation(Window.HeightProperty, null);
@@ -162,7 +162,10 @@ internal static class UiDiagnostics
         // fallback surface for deterministic, readable client-area screenshots.
         var frame = window.Content as Border;
         var material = frame?.Background;
-        var renderer = new RenderTargetBitmap((int)window.ActualWidth, (int)window.ActualHeight, 96, 96, PixelFormats.Pbgra32);
+        var renderer = new RenderTargetBitmap(
+            (int)Math.Ceiling(window.ActualWidth * pixelScale),
+            (int)Math.Ceiling(window.ActualHeight * pixelScale),
+            96 * pixelScale, 96 * pixelScale, PixelFormats.Pbgra32);
         try { if (frame != null) frame.Background = WindowVisuals.Brush("Canvas"); renderer.Render(window); }
         finally { if (frame != null) frame.Background = material; }
         var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(renderer));
