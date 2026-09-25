@@ -14,6 +14,10 @@ The [local Ettin CPU screen](ETTIN_OFFLINE_SCREEN.md) has since tested 32M,
 none passed the no-match gate. This research shortlist therefore remains a
 list of candidates, not a replacement decision.
 
+[Kev and Von were also reviewed](KEV_VON_RESEARCH.md). They offer typed
+decision APIs closer to Laya's, but neither has Scout or Windows laptop CPU
+measurements, and neither is ready to displace the current default.
+
 The shortlist below came from an online model survey. Its published retrieval
 benchmarks use document passages and always rank candidates; Scout must also
 reject searches for which no indexed file fits. The subsequent local screen
