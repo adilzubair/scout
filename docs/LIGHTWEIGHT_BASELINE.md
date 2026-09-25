@@ -63,11 +63,13 @@ inspected regression measurements, not a fresh holdout for model selection.
 2. Require improvement in final Scout outcomes, low false matches, acceptable
    median and p95 latency on an 8–16 GB CPU-only Windows laptop, cold load and
    steady memory. Report the installed runtime and clean CPU package size.
-3. Run the same synthetic candidate pools against Intern/Jev and Scout, recording
-   result selection, abstention, group/action decisions and end-to-end latency.
-   The machine used here has no configured TypeSafe API key, so a live Jev
-   comparison is pending. Never send personal indexed metadata to that API.
-4. After semantic parity, evaluate deeper file search separately, including
+3. Use Intern's public app behavior and test examples as an offline feature
+   checklist. Score Scout on independent Windows queries with explicit expected
+   outcomes, including abstention, groups/actions and end-to-end latency. No Jev
+   account or API request is part of this plan. Describe any quality claim as a
+   Scout benchmark result, not measured Jev equivalence.
+4. After Scout meets the semantic acceptance gates, evaluate deeper file search
+   separately, including
    content indexing, recall, index size, privacy controls and update cost. Scout
    currently searches file metadata and only reads content on explicit preview.
 
@@ -80,3 +82,6 @@ dotnet tests/Scout.Tests/bin/Debug/net10.0/Scout.Tests.dll --search-eval artifac
 
 The runner refuses to overwrite existing output. These ignored reports contain
 case-level local paths and should stay off Git.
+
+See [the compact-model CPU screen](OFFLINE_EVALUATION.md) for the first local
+experiment and its limitations.

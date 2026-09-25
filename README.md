@@ -26,7 +26,7 @@ Local results appear first. Laya can refine them or find a relevant item among b
 
 ## Local AI
 
-Local AI is opt-in. Open **Settings**, choose **cpu** or **cuda**, and click **Set up local AI**. Setup downloads an isolated Python runtime and pinned model weights; save Settings afterward to enable Laya. Existing nearby runtimes are detected automatically. CUDA requires a supported NVIDIA GPU. English is the recommended checkpoint based on the current evaluation. CPU mode works but the [measured baseline](docs/LIGHTWEIGHT_BASELINE.md) is too slow and error-prone to recommend as Scout's default on ordinary laptops.
+Local AI is opt-in. Open **Settings**, choose **cpu** or **cuda**, and click **Set up local AI**. Setup downloads an isolated Python runtime and pinned model weights; save Settings afterward to enable Laya. Existing nearby runtimes are detected automatically. CUDA requires a supported NVIDIA GPU. English is the recommended checkpoint based on the current evaluation. CPU mode works but the [measured baseline](docs/LIGHTWEIGHT_BASELINE.md) is too slow and error-prone to recommend as Scout's default on ordinary laptops. The [offline evaluation](docs/OFFLINE_EVALUATION.md) tracks smaller local alternatives without a Jev API key.
 
 The 2.5 GB Qwen helper is now research-only and unavailable in the standard
 Settings flow. It improved a small authored semantic evaluation from 38/64 to
