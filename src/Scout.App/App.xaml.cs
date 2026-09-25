@@ -42,7 +42,22 @@ public partial class App : Application
             if (smoke)
             {
                 store.SaveSettings(new ScoutSettings { WindowsSearch = false });
-                var fixtures = new[] { "Product Roadmap.pdf", "Research Notes.pdf", "Quarterly Review.pdf" }.Select((name, i) => new Candidate("smoke:" + i, ItemKind.File, name, Path.Combine(DataDirectory, name)) { Detail = "Documents", Source = "Files", AddedAt = DateTimeOffset.UtcNow.AddMinutes(-i - 1), ModifiedAt = DateTimeOffset.UtcNow.AddMinutes(-i - 1) }).ToArray();
+                var now = DateTimeOffset.UtcNow;
+                var demoDownloads = Path.Combine(Path.GetPathRoot(DataDirectory) ?? "C:\\", "Users", "Alex", "Downloads");
+                var fixtures = new[] { "Product Roadmap.pdf", "Research Notes.pdf", "Quarterly Review.pdf" }
+                    .Select((name, i) => new Candidate("smoke:" + i, ItemKind.File, name, Path.Combine(DataDirectory, name))
+                    {
+                        Detail = "Documents", Source = "Files", AddedAt = now.AddMinutes(-i - 1),
+                        ModifiedAt = now.AddMinutes(-i - 1), DownloadedAt = i == 0 ? now.AddMinutes(-1) : null,
+                        DownloadSource = i == 0 ? "Browser download" : ""
+                    })
+                    .Concat(new[] { "Q4 Product Launch.pptx", "Campaign Budget.xlsx", "Landing Page Mockup.png" }
+                        .Select((name, i) => new Candidate("smoke:download:" + i, ItemKind.File, name, Path.Combine(demoDownloads, name))
+                        {
+                            Detail = "Downloads", Source = "Files", AddedAt = now.AddMinutes(-i * 3 - 2),
+                            ModifiedAt = now.AddMinutes(-i * 3 - 2)
+                        }))
+                    .ToArray();
                 store.ReplaceIndex(fixtures);
             }
             index = new IndexService(store); model = new ModelHost();

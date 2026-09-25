@@ -43,6 +43,11 @@ public partial class MainWindow
         await SearchView("pdfs", Scope.All, "launcher-group");
         if (GroupBar.Visibility != Visibility.Visible || GroupBar.ActualHeight < 40) throw new InvalidOperationException("Group controls are not visible.");
         ClearGroup();
+        await SearchView("the pdf I just downloaded", Scope.All, "site-recent-download");
+        if (Selected?.Title != "Product Roadmap.pdf") throw new InvalidOperationException("Site arrival example selected the wrong file.");
+        await SearchView("latest 3 files in downloads", Scope.All, "site-download-group");
+        if (Selected?.Kind != ItemKind.Group || group.Count != 3) throw new InvalidOperationException("Site download example did not form a three-file group.");
+        ClearGroup();
         await SearchView("15% of 240", Scope.All, "launcher-calculator");
         await SearchView("", Scope.Workspaces, "launcher-workspaces");
         await SearchView("no-such-file", Scope.Files, "launcher-no-results");
