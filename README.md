@@ -4,9 +4,13 @@ A native Windows launcher built against [Intern](https://github.com/dabit3/inter
 
 [Website](https://adilzubair.github.io/scout-site/) · [Public beta download](https://github.com/adilzubair/scout-site/releases/tag/v0.1.0-beta.1)
 
-## Download and run
+## Download and install
 
-On Windows 11 x64, download the latest `Scout-win-x64.zip` from the [public Releases page](https://github.com/adilzubair/scout-site/releases), extract the whole ZIP to a folder, and run `Scout.exe` from that folder. **Ctrl+Alt+Space** opens the panel. Closing it leaves Scout in the notification area; **Ctrl+Q** quits. Scout has no installer or automatic updater yet; to update, quit Scout and replace the extracted application folder with the contents of a newer ZIP. Your data in `%LOCALAPPDATA%\Scout` stays in place. From source: `dotnet run --project src/Scout.App`.
+On Windows 11 x64, download `Scout-Setup.exe` from the [public Releases page](https://github.com/adilzubair/scout-site/releases) and open it. Setup installs for your Windows account without admin access, adds **Scout** and **Uninstall Scout** to the Start menu, and launches Scout when it finishes. Press **Ctrl+Alt+Space** to open the panel. Closing it leaves Scout in the notification area; **Ctrl+Q** quits. To uninstall, choose **Uninstall Scout** from Start or use Windows Settings → Apps → Installed apps. Uninstalling leaves your settings and workspaces in `%LOCALAPPDATA%\Scout` for a later reinstall.
+
+Scout is an unsigned beta. Windows may show an unknown-publisher or SmartScreen warning. Check that the installer came from the Scout GitHub release and use its SHA-256 checksum if you want to verify it before choosing to proceed. Updates are manual: quit Scout and run the installer from a newer release. There is no automatic updater.
+
+The portable `Scout-win-x64.zip` remains available on the same release. Extract the entire ZIP to a folder, then run `Scout.exe`. To update a portable copy, quit Scout and replace the extracted application folder with the contents of a newer ZIP. Your data in `%LOCALAPPDATA%\Scout` stays in place. From source: `dotnet run --project src/Scout.App`.
 
 Try:
 
@@ -111,13 +115,13 @@ Every launch requires Enter or an explicit Open action. A model can select only 
 ## Build and test
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build.ps1 -Publish
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build.ps1 -Installer
 .runtime/.venv/Scripts/python.exe runtime/test_runtime.py
 .runtime/.venv/Scripts/python.exe runtime/test_http.py
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts/evaluate.ps1 -Device cuda
 ```
 
-The build pins .NET SDK 10.0.400 and produces a self-contained directory, `artifacts/Scout-win-x64.zip`, and SHA-256 checksum. This personal build has no public installer, signing, automatic updater or startup registration.
+The build pins .NET SDK 10.0.400 and produces a self-contained directory, `artifacts/Scout-win-x64.zip`, `artifacts/Scout-Setup.exe`, and SHA-256 checksums. The installer is built with Inno Setup 7 and installs per user. The beta remains unsigned and has no automatic updater or startup registration.
 
 With `SCOUT_DATA_DIR` set to an isolated directory, `Scout.exe --smoke-test` checks actual WPF rendering/selection, groups, arithmetic, web fallback and PDF/image/Office/text previews, then exits. Run `--ui-smoke-test` separately for interface screenshots, settings navigation, and validation checks; this mode requires an isolated data directory. Set `SCOUT_TEST_PYTHON` and optionally `SCOUT_TEST_DEVICE=cuda` to include the model host. `--diagnose` exercises actual installed apps, fast typing, file watchers and the global hotkey, then exits. Keep the normal instance closed during diagnostics. Test reports and UI screenshots remain under the isolated data directory. See [interface notes](docs/UI.md) for the visual system and native backdrop behavior.
 

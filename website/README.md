@@ -10,5 +10,5 @@ application source remains in the private `adilzubair/scout` repository. The
 public repository contains only these static site files and release assets.
 GitHub Pages serves the files from its `main` branch root.
 
-The beta is a portable Windows 11 x64 ZIP. It is unsigned and has no installer
-or automatic updater.
+The Windows 11 x64 beta offers a per-user installer as the primary download and
+a portable ZIP as a secondary option. It is unsigned and has no automatic updater.

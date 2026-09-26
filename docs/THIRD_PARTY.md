@@ -4,6 +4,8 @@ Scout was independently implemented after reviewing Intern's public behavior, so
 
 The application uses Microsoft .NET/WPF, C#/WinRT and Microsoft.Data.Sqlite (MIT), SQLitePCLRaw (Apache-2.0), and SQLite (public domain). The self-contained build includes their runtime binaries. Windows PDF rendering uses the operating system's PDF API. Consult the packages' upstream license notices for full terms. Setup can download uv (MIT/Apache-2.0) separately.
 
+The optional Windows setup executable is built with Inno Setup 7. Its copyright and project URL remain in the installer; see the [Inno Setup license](https://jrsoftware.org/files/is/license.txt).
+
 Optional model setup installs Laya and its dependencies separately. Laya code and checkpoint weights identify their license as Apache-2.0. PyTorch, Transformers, FastAPI, Uvicorn, Hugging Face Hub, and their dependencies retain their respective upstream licenses and installed package metadata. Scout does not redistribute checkpoint weights in its application ZIP.
 
 Optional descriptive file search additionally downloads Qwen3-4B-Instruct-2507
