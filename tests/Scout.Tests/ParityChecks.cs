@@ -43,6 +43,65 @@ internal static class ParityChecks
         test("Show/hide commands preserve their distinguishing words", () => Check(Search("show hidden files", SystemCommands.Items).Hits[0].Candidate.Target == "hidden-show" && Search("hide hidden files", SystemCommands.Items).Hits[0].Candidate.Target == "hidden-hide"));
         test("System commands never enter groups", () => Check(!SystemCommands.Items[0].IsGroupable));
         test("System actions stay outside file scope", () => Check(SearchEngine.Search("wifi off", Scope.Files, SystemCommands.Items, memory, now).Hits.Count == 0));
+        test("Volume queries select fixed controls", () => Check(Search("volume up", SystemCommands.Items).Hits[0].Candidate.Target == "volume-up" && Search("volume down", SystemCommands.Items).Hits[0].Candidate.Target == "volume-down"));
+        test("Mute queries select explicit fixed states", () => Check(Search("mute", SystemCommands.Items).Hits[0].Candidate.Target == "mute-on" && Search("unmute", SystemCommands.Items).Hits[0].Candidate.Target == "mute-off"));
+        test("Brightness queries select fixed controls", () => Check(Search("brightness up", SystemCommands.Items).Hits[0].Candidate.Target == "brightness-up" && Search("brightness down", SystemCommands.Items).Hits[0].Candidate.Target == "brightness-down"));
+        test("Bare volume remains ambiguous", () => { var result = Search("volume", SystemCommands.Items); Check(result.Hits.Count >= 2 && !RankingPolicy.Ready(result, result.Hits)); });
+        test("Bare brightness remains ambiguous", () => { var result = Search("brightness", SystemCommands.Items); Check(result.Hits.Count == 2 && !RankingPolicy.Ready(result, result.Hits)); });
+        test("Hardware controls stay outside file scope and groups", () =>
+        {
+            var controls = SystemCommands.Items.Where(item => item.Target is "volume-up" or "volume-down" or "mute-on" or "mute-off" or "brightness-up" or "brightness-down").ToArray();
+            Check(controls.Length == 6 && controls.All(item => !item.IsGroupable && !item.IsPinnable) && SearchEngine.Search("brightness up", Scope.Files, controls, memory, now).Hits.Count == 0);
+        });
+        test("Volume steps dispatch to the default audio provider", () =>
+        {
+            var audio = new FakeAudioControl(); var brightness = new FakeBrightnessControl();
+            HardwareControl.ExecuteAsync("volume-up", audio, brightness).GetAwaiter().GetResult();
+            HardwareControl.ExecuteAsync("volume-down", audio, brightness).GetAwaiter().GetResult();
+            Check(audio.Steps.SequenceEqual([true, false]) && brightness.SetCalls == 0);
+        });
+        test("Mute commands always dispatch the explicit state", () =>
+        {
+            var audio = new FakeAudioControl { Muted = true }; var brightness = new FakeBrightnessControl();
+            HardwareControl.ExecuteAsync("mute-on", audio, brightness).GetAwaiter().GetResult();
+            Check(audio.Muted && audio.SetMuteCalls == 1);
+            HardwareControl.ExecuteAsync("mute-off", audio, brightness).GetAwaiter().GetResult();
+            Check(!audio.Muted && audio.SetMuteCalls == 2);
+        });
+        test("Brightness selects the only active integrated display and a supported step", () =>
+        {
+            var brightness = new FakeBrightnessControl
+            {
+                Displays = [new("inactive", false, 50, [0, 50, 100]), new("panel", true, 20, [0, 20, 40, 100])]
+            };
+            HardwareControl.ExecuteAsync("brightness-up", new FakeAudioControl(), brightness).GetAwaiter().GetResult();
+            Check(brightness.SetCalls == 1 && brightness.SetInstance == "panel" && brightness.SetLevel == 40);
+        });
+        test("Brightness down chooses the nearest supported level", () =>
+        {
+            var brightness = new FakeBrightnessControl { Displays = [new("panel", true, 65, [0, 50, 65, 80, 100])] };
+            HardwareControl.ExecuteAsync("brightness-down", new FakeAudioControl(), brightness).GetAwaiter().GetResult();
+            Check(brightness.SetLevel == 50);
+        });
+        test("Brightness bounds are idempotent", () =>
+        {
+            var brightness = new FakeBrightnessControl { Displays = [new("panel", true, 100, [0, 50, 100])] };
+            HardwareControl.ExecuteAsync("brightness-up", new FakeAudioControl(), brightness).GetAwaiter().GetResult();
+            Check(brightness.SetCalls == 0);
+        });
+        void ControlFails(string id, IAudioControl audio, IBrightnessControl brightness, string explanation)
+        {
+            try { HardwareControl.ExecuteAsync(id, audio, brightness).GetAwaiter().GetResult(); }
+            catch (IOException exception) { Check(exception.Message.Contains(explanation, StringComparison.OrdinalIgnoreCase)); return; }
+            throw new Exception("Expected hardware control failure");
+        }
+        test("Brightness rejects unsupported devices", () => ControlFails("brightness-up", new FakeAudioControl(), new FakeBrightnessControl(), "unavailable"));
+        test("Brightness rejects ambiguous active displays", () => ControlFails("brightness-up", new FakeAudioControl(), new FakeBrightnessControl { Displays = [new("a", true, 50, [0, 50, 100]), new("b", true, 50, [0, 50, 100])] }, "ambiguous"));
+        test("Brightness rejects missing supported levels", () => ControlFails("brightness-up", new FakeAudioControl(), new FakeBrightnessControl { Displays = [new("panel", true, 50, [])] }, "supported"));
+        test("Brightness rejects a current level outside the supported set", () => ControlFails("brightness-up", new FakeAudioControl(), new FakeBrightnessControl { Displays = [new("panel", true, 55, [0, 50, 100])] }, "unsupported current"));
+        test("Audio provider failures remain visible", () => ControlFails("volume-up", new FakeAudioControl { StepFailure = new IOException("audio method failed") }, new FakeBrightnessControl(), "audio method failed"));
+        test("Mute provider failures remain visible", () => ControlFails("mute-on", new FakeAudioControl { MuteSetFailure = new IOException("mute method failed") }, new FakeBrightnessControl(), "mute method failed"));
+        test("Brightness method failures remain visible", () => ControlFails("brightness-up", new FakeAudioControl(), new FakeBrightnessControl { Displays = [new("panel", true, 50, [0, 50, 60, 100])], SetFailure = new IOException("brightness method failed") }, "brightness method failed"));
         test("Synthetic web rows encode query text", () => Check(SyntheticResults.Web("a&b #value")!.Target.EndsWith("a%26b%20%23value", StringComparison.Ordinal)));
         test("Pasted web addresses open directly", () => Check(SyntheticResults.Web("example.com/docs")!.Target == "https://example.com/docs"));
         test("Executable URIs are never web fallback targets", () => Check(SyntheticResults.Web("javascript:alert(1)")!.Target.StartsWith("https://www.google.com/search?", StringComparison.Ordinal)));
@@ -84,5 +143,31 @@ internal static class ParityChecks
             });
         }
         finally { SqliteConnection.ClearAllPools(); Directory.Delete(root, true); }
+    }
+
+    private sealed class FakeAudioControl : IAudioControl
+    {
+        public bool Muted { get; set; }
+        public List<bool> Steps { get; } = [];
+        public int SetMuteCalls { get; private set; }
+        public IOException? StepFailure { get; init; }
+        public IOException? MuteSetFailure { get; init; }
+        public Task StepAsync(bool increase) { if (StepFailure != null) throw StepFailure; Steps.Add(increase); return Task.CompletedTask; }
+        public Task SetMutedAsync(bool muted) { if (MuteSetFailure != null) throw MuteSetFailure; SetMuteCalls++; Muted = muted; return Task.CompletedTask; }
+    }
+
+    private sealed class FakeBrightnessControl : IBrightnessControl
+    {
+        public IReadOnlyList<BrightnessDisplay> Displays { get; init; } = [];
+        public IOException? SetFailure { get; init; }
+        public int SetCalls { get; private set; }
+        public string SetInstance { get; private set; } = "";
+        public byte SetLevel { get; private set; }
+        public Task<IReadOnlyList<BrightnessDisplay>> GetDisplaysAsync() => Task.FromResult(Displays);
+        public Task SetBrightnessAsync(string instanceName, byte brightness)
+        {
+            if (SetFailure != null) throw SetFailure;
+            SetCalls++; SetInstance = instanceName; SetLevel = brightness; return Task.CompletedTask;
+        }
     }
 }

@@ -10,6 +10,12 @@ public static class SystemCommands
         Command("wifi-off", "Turn Wi-Fi off", "Disable the wireless radio", "wifi off", "wi fi off", "turn wifi off", "disable wifi", "disable wi fi", "turn wi fi off", "wireless off"),
         Command("bluetooth-on", "Turn Bluetooth on", "Enable the Bluetooth radio", "bluetooth on", "bt on", "enable bluetooth", "turn bluetooth on", "turn on bluetooth", "switch bluetooth on", "switch on bluetooth"),
         Command("bluetooth-off", "Turn Bluetooth off", "Disable the Bluetooth radio", "bluetooth off", "bt off", "disable bluetooth", "turn bluetooth off", "turn off bluetooth", "switch bluetooth off", "switch off bluetooth"),
+        Command("volume-up", "Volume up", "Raise the default output volume one step", "volume up", "turn volume up", "increase volume", "raise volume", "louder"),
+        Command("volume-down", "Volume down", "Lower the default output volume one step", "volume down", "turn volume down", "decrease volume", "lower volume", "quieter"),
+        Command("mute-on", "Mute volume", "Mute the default output device", "mute", "mute volume", "mute audio", "mute sound", "sound off"),
+        Command("mute-off", "Unmute volume", "Unmute the default output device", "unmute", "unmute volume", "unmute audio", "unmute sound", "sound on"),
+        Command("brightness-up", "Brightness up", "Raise integrated-display brightness", "brightness up", "turn brightness up", "increase brightness", "raise brightness", "brighter"),
+        Command("brightness-down", "Brightness down", "Lower integrated-display brightness", "brightness down", "turn brightness down", "decrease brightness", "lower brightness", "dimmer"),
         Command("focus", "Do not disturb", "Open Windows notification settings", "dnd", "focus", "do not disturb", "notifications", "silence notifications"),
         Command("sleep", "Sleep", "Put this PC to sleep", "sleep", "sleep pc", "sleep computer", "put pc to sleep"),
         Command("lock", "Lock screen", "Lock this Windows session", "lock", "lock screen", "lock pc", "lock computer"),
@@ -18,7 +24,7 @@ public static class SystemCommands
         Command("hidden-hide", "Hide hidden files", "Hide hidden items in File Explorer", "hide hidden files", "hide hidden"),
     ];
     private static Candidate Command(string id, string title, string detail, params string[] keywords) => new("system:" + id, ItemKind.System, title, id) { Detail = detail, Source = "Windows", Keywords = keywords };
-    public static bool LooksLikeCommand(string query) => Items.Any(c => c.Title.Equals(query, StringComparison.OrdinalIgnoreCase) || c.Keywords.Contains(query, StringComparer.OrdinalIgnoreCase)) || query is "wifi" or "wi fi" or "wireless" or "bluetooth" or "bt" or "hidden files";
+    public static bool LooksLikeCommand(string query) => Items.Any(c => c.Title.Equals(query, StringComparison.OrdinalIgnoreCase) || c.Keywords.Contains(query, StringComparer.OrdinalIgnoreCase)) || query is "wifi" or "wi fi" or "wireless" or "bluetooth" or "bt" or "volume" or "brightness" or "hidden files";
     public static bool IsKnown(string id) => Items.Any(c => c.Target == id);
 }
 
