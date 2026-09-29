@@ -10,6 +10,7 @@ public sealed class ScoutStore
     private ScoutSettings settingsCache = new();
     private IReadOnlyDictionary<string, LibraryItem> libraryCache = new Dictionary<string, LibraryItem>();
     private Workspace[] workspaceCache = [];
+    public ContentIndex ContentIndex { get; }
     public ScoutStore(string path)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path))!);
@@ -31,6 +32,7 @@ public sealed class ScoutStore
         settingsCache = Read<ScoutSettings>("settings").FirstOrDefault() ?? new();
         libraryCache = Read<LibraryItem>("library").ToDictionary(x => x.Candidate.Id);
         workspaceCache = Read<Workspace>("workspaces");
+        ContentIndex = new(path + ".content");
     }
     private T WithConnection<T>(Func<SqliteConnection, T> action)
     {
@@ -116,7 +118,7 @@ public sealed class ScoutStore
             var old = Library.GetValueOrDefault(c.Id) ?? new(c, false, 0, null, []);
             var aliases = old.Aliases.AsEnumerable();
             var intent = QueryParser.Parse(query, now);
-            if (!string.IsNullOrWhiteSpace(query) && intent.Recency == RecencyBasis.None && intent.Window == null && !intent.Plural) aliases = new[] { query.Trim().ToLowerInvariant() }.Concat(aliases);
+            if (c.Source != "File contents" && !string.IsNullOrWhiteSpace(query) && intent.Recency == RecencyBasis.None && intent.Window == null && !intent.Plural) aliases = new[] { query.Trim().ToLowerInvariant() }.Concat(aliases);
             Put("library", c.Id, old with { Candidate = c, Launches = Math.Min(100_000, old.Launches + 1), LastLaunch = now, Aliases = aliases.Distinct().Take(20).ToArray() });
         }
     }

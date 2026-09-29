@@ -55,14 +55,18 @@ public sealed record Workspace(string Id, string Name, Candidate[] Members)
 {
     public Candidate ToCandidate() => new(Id, ItemKind.Workspace, Name, Id) { Detail = $"{Members.Length} items", Source = "Workspace" };
 }
-public sealed record SearchHit(Candidate Candidate, double Score, bool Pinned = false);
+public sealed record SearchHit(Candidate Candidate, double Score, bool Pinned = false)
+{
+    public string Evidence { get; init; } = "";
+}
 public sealed record SearchResult(string Query, QueryIntent Intent, IReadOnlyList<SearchHit> Hits, double ElapsedMs)
 {
     public string[] Locations { get; init; } = [];
     public string Notice { get; init; } = "";
     // Broader, still source/type/time constrained candidates. Hidden unless Laya endorses them.
     public IReadOnlyList<SearchHit> Recall { get; init; } = [];
-    public IReadOnlyList<SearchHit> ModelShortlist => Shortlist.Select(Hits, Recall);
+    public IReadOnlySet<string> LocalOnlyIds { get; init; } = new HashSet<string>();
+    public IReadOnlyList<SearchHit> ModelShortlist => Shortlist.Select(Hits, Recall).Where(hit => !LocalOnlyIds.Contains(hit.Candidate.Id)).ToArray();
 }
 public sealed record TimeWindow(DateTimeOffset Since, DateTimeOffset Until, string Description);
 public sealed record QueryIntent(string Text, string[] Terms, string? Extension, ItemKind? Kind, RecencyBasis Recency, TimeWindow? Window, bool Plural)
@@ -85,6 +89,8 @@ public sealed class ScoutSettings
     public bool WebFallback { get; set; } = true;
     public string[] AutomationFolders { get; set; } = [];
     public bool AiEnabled { get; set; }
+    public bool ContentSearchEnabled { get; set; }
+    public string[] ContentFolders { get; set; } = [];
     public bool SemanticHelper { get; set; }
     public string PythonPath { get; set; } = "";
     public string Model { get; set; } = "english";
