@@ -1,4 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net10.0</TargetFramework></PropertyGroup>
-  <ItemGroup><ProjectReference Include="../../src/Scout.Core/Scout.Core.csproj" /></ItemGroup>
+  <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net10.0-windows10.0.19041.0</TargetFramework></PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/Scout.Core/Scout.Core.csproj" />
+    <ProjectReference Include="../../src/Scout.App/Scout.App.csproj" />
+  </ItemGroup>
 </Project>

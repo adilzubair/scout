@@ -26,6 +26,8 @@ ParityChecks.Run(Test);
 FolderChecks.Run(Test);
 BluetoothChecks.Run(Test);
 SearchUpgradeChecks.Run(Test);
+ContentSearchChecks.Run(Test);
+IndexRaceChecks.Run(Test);
 Candidate FileItem(string name, int hours) => new(Candidate.Key(ItemKind.File, name), ItemKind.File, name, "C:\\Documents\\" + name) { ModifiedAt = now.AddHours(-hours), Detail = "Documents" };
 var recent = FileItem("Roadmap.pdf", 1) with { AddedAt = now.AddMinutes(-5) };
 var old = FileItem("Budget.pdf", 0) with { AddedAt = now.AddDays(-3), OpenedAt = now.AddMinutes(-1) };
@@ -147,9 +149,9 @@ try
     });
     Test("Settings roundtrip and opt-in defaults", () =>
     {
-        Assert(!store.Settings.AiEnabled && !store.Settings.SemanticHelper && !store.Settings.ChromeHistory && !store.Settings.EdgeHistory);
-        store.SaveSettings(new() { ChromeHistory = true, SemanticHelper = true, ExtraFolders = ["C:\\Project"] });
-        Assert(store.Settings.ChromeHistory && store.Settings.SemanticHelper && store.Settings.ExtraFolders.Length == 1);
+        Assert(!store.Settings.AiEnabled && !store.Settings.ContentSearchEnabled && store.Settings.ContentFolders.Length == 0 && !store.Settings.SemanticHelper && !store.Settings.ChromeHistory && !store.Settings.EdgeHistory);
+        store.SaveSettings(new() { ChromeHistory = true, ContentSearchEnabled = true, ContentFolders = ["C:\\Documents"], SemanticHelper = true, ExtraFolders = ["C:\\Project"] });
+        Assert(store.Settings.ChromeHistory && store.Settings.ContentSearchEnabled && store.Settings.ContentFolders.Length == 1 && store.Settings.SemanticHelper && store.Settings.ExtraFolders.Length == 1);
     });
     Test("Index replacement is persistent", () =>
     {
