@@ -10,6 +10,12 @@ public static class IndexPolicy
     private static readonly HashSet<string> IgnoredExtensions = new(StringComparer.OrdinalIgnoreCase)
     { ".pyc", ".pyo", ".obj", ".o", ".pdb", ".dll", ".lib", ".class", ".tmp", ".crdownload", ".part" };
     public static bool Within(string path, string root) => path.Equals(root.TrimEnd('\\', '/'), StringComparison.OrdinalIgnoreCase) || path.StartsWith(root.TrimEnd('\\', '/') + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
+    public static string[] ActiveRoots(IEnumerable<string> metadataRoots, ScoutSettings settings) => metadataRoots
+        .Concat(settings.ContentSearchEnabled ? settings.ContentFolders : [])
+        .Where(Directory.Exists)
+        .Where(path => !Excluded(path, settings.Exclusions))
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .ToArray();
     public static bool Excluded(string path, IEnumerable<string>? exclusions = null)
     {
         if (exclusions?.Any(root => Within(path, root)) == true) return true;
