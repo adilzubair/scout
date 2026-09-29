@@ -26,20 +26,21 @@ Try:
 - `slides about the direction of our company`
 - `devin links I visited today`
 - `15% of 240`, `sqrt(81)`, `2(3+4)`
-- `dark`, `wifi off`, `bluetooth off`, `bluetooth on`, `lock screen`, `show hidden files`
+- `dark`, `wifi off`, `bluetooth on`, `volume up`, `mute`, `brightness down`, `lock screen`
 
 Local results appear first. Laya can refine them or find a relevant item among broader candidates. Missing or ambiguous matches fall back locally. An accented return arrow marks a clear local selection; it never runs an action automatically. Raw Laya probabilities are not displayed as calibrated certainty.
 
 ## Local AI
 
-Local AI is opt-in. Open **Settings**, choose **cpu** or **cuda**, and click **Set up local AI**. Setup downloads an isolated Python runtime and pinned model weights; save Settings afterward to enable Laya. Existing nearby runtimes are detected automatically. CUDA requires a supported NVIDIA GPU. English is the recommended checkpoint based on the current evaluation. CPU mode works but the [measured baseline](docs/LIGHTWEIGHT_BASELINE.md) is too slow and error-prone to recommend as Scout's default on ordinary laptops. The [offline evaluation](docs/OFFLINE_EVALUATION.md) tracks smaller local alternatives without a Jev API key.
+Local AI is opt-in and remains off by default. Open **Settings**, choose **cpu** or **cuda**, and click **Set up local AI**. CPU is the initial device choice, but it does not enable AI automatically. Setup downloads an isolated Python runtime and pinned model weights; save Settings afterward to enable Laya. Existing nearby runtimes are detected automatically. CUDA requires a supported NVIDIA GPU. English is the recommended checkpoint based on the current evaluation. CPU mode works but the [measured baseline](docs/LIGHTWEIGHT_BASELINE.md) is too slow and error-prone to recommend as Scout's default on ordinary laptops. The [offline evaluation](docs/OFFLINE_EVALUATION.md) tracks smaller local alternatives without a Jev API key.
 
 The 2.5 GB Qwen helper is now research-only and unavailable in the standard
 Settings flow. It improved a small authored semantic evaluation from 38/64 to
 56/64 but is too large for Scout's target of ordinary Windows laptops. Existing
 experimental installations can still be tested by starting Scout with
 `SCOUT_EXPERIMENTAL_SEMANTIC_HELPER=1`. See [the helper evaluation](docs/LOCAL_SEMANTIC_HELPER.md).
-Neither model indexes document contents.
+Content search is separate from local AI. Document body text stays in Scout's
+private local index and is never sent to either model.
 
 Command-line setup is also available:
 
@@ -80,7 +81,7 @@ Plural searches can offer **Open all**. Edit member checkboxes or use **Review g
 
 Previews support PDF pages, images, bounded text/source files, Office/OpenDocument text and Windows-supported audio/video playback. Office previews show text, not the application's full layout. Copy/reveal/preview are also understood as query actions. Unknown formats offer an explicit Open file button.
 
-Windows actions include dark mode, Wi-Fi on/off, Bluetooth on/off, notification settings, sleep, lock, Recycle Bin and hidden files. Empty Recycle Bin uses Windows' confirmation dialog. Radio changes can be denied by Windows policy or hardware switches; failures are reported. Bluetooth controls only Bluetooth radios and verifies the requested state; it does not disable PnP devices or alter Wi-Fi. System commands cannot be included in a workspace. These are implemented Windows actions, not arbitrary settings that the language model can change.
+Windows actions include dark mode, Wi-Fi on/off, Bluetooth on/off, notification settings, sleep, lock, Recycle Bin and hidden files. The approved media additions use only these fixed command IDs: `volume-up`, `volume-down`, `mute-on`, `mute-off`, `brightness-up` and `brightness-down`. Volume commands target the default Windows audio output. Brightness commands target integrated displays and work only when Windows exposes brightness control, which commonly excludes external desktop monitors. Radio and media changes can be blocked by Windows policy, drivers, hardware switches or unsupported hardware; failures are reported. Bluetooth controls only Bluetooth radios and verifies the requested state; it does not disable PnP devices or alter Wi-Fi. Empty Recycle Bin uses Windows' confirmation dialog. System commands cannot be included in a workspace. The language model cannot create or alter system commands.
 
 For automations, add a folder of your `.lnk` or `.url` shortcuts in Settings. This supports user-created Windows shortcuts and Power Automate desktop links. Search by name to run one explicitly.
 
@@ -107,8 +108,9 @@ Creation dates can change when copying a file and do not prove authorship. Acces
 - Windows Search optionally expands filename/type retrieval across indexed locations in the user profile and configured roots. Local indexing continues if that service is unavailable. Watchers batch changed files; full reconciliation runs every 30 minutes or after watcher overflow.
 - Chrome and Edge history are separately opt-in. Regular profiles supply up to 10,000 distinct HTTP(S) URLs and 10,000 completed downloads from the last 90 days. Databases are read-only; a locked database can use a bounded disposable snapshot with consistency checks. Incognito data, cookies and open tabs are not read.
 - Calendar phrases use the Windows timezone, including daylight-saving boundaries. `last week` is the preceding Monday–Sunday; `past seven days` is rolling. Singular superlatives use the requested evidence even when filenames also match.
-- Search indexes metadata, not document contents. File contents are read only for an explicitly requested preview. Laya receives query text, shortlisted titles/kinds, relevant evidence and limited local context: foreground/recent app names, clipboard **kind**, time and weekday. Clipboard contents are not read for ranking.
-- Data is stored in `%LOCALAPPDATA%\Scout\scout.db`. Pins, workspaces and successful launches are retained locally. Disabling a browser removes its history source; explicitly saved or previously launched items remain in the personal library. Clear launch history removes learned aliases and launch boosts while retaining pins and workspaces.
+- Content search is off by default. When enabled, it searches only selected folders that Scout already searches and supports bounded text/source files plus Office and OpenDocument files. Files larger than 16 MiB are skipped, and at most 64,000 characters are extracted from each supported file. PDF contents and OCR are not indexed.
+- Extracted body text is stored in a private local full-text index. Turning content search off clears that index. The model never receives document body text. Laya receives query text, shortlisted titles/kinds, relevant evidence and limited local context: foreground/recent app names, clipboard **kind**, time and weekday. Clipboard contents are not read for ranking.
+- Data is stored in `%LOCALAPPDATA%\Scout\scout.db`, with content text kept in its separate local index. Pins, workspaces and successful launches are retained locally. Disabling a browser removes its history source; explicitly saved or previously launched items remain in the personal library. Clear launch history removes learned aliases and launch boosts while retaining pins and workspaces.
 
 Every launch requires Enter or an explicit Open action. A model can select only known candidate IDs; it cannot produce shell commands. Each group member is validated before launching, with partial failures reported. Successful shell dispatch does not guarantee the receiving app finished loading.
 

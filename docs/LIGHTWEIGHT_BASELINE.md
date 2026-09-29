@@ -68,10 +68,11 @@ inspected regression measurements, not a fresh holdout for model selection.
    outcomes, including abstention, groups/actions and end-to-end latency. No Jev
    account or API request is part of this plan. Describe any quality claim as a
    Scout benchmark result, not measured Jev equivalence.
-4. After Scout meets the semantic acceptance gates, evaluate deeper file search
-   separately, including
-   content indexing, recall, index size, privacy controls and update cost. Scout
-   currently searches file metadata and only reads content on explicit preview.
+4. Validate the approved content-search first pass on an 8 to 16 GB Windows
+   laptop. It is opt-in, limited to selected folders, and keeps extracted text
+   in a separate local index that is cleared when disabled. Laptop measurements
+   for indexing time, search latency, memory, index size and update cost are
+   still pending. No measured footprint or timing claim is available yet.
 
 Reproduce the CPU model and C# policy measurements with ignored local fixtures:
 
