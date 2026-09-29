@@ -6,7 +6,7 @@ Push-Location $scoutRoot
 try {
     & dotnet build Scout.slnx -c Release -m:1
     if ($LASTEXITCODE -ne 0) { throw 'Build failed.' }
-    & dotnet tests/Scout.Tests/bin/Release/net10.0/Scout.Tests.dll
+    & dotnet run --project tests/Scout.Tests/Scout.Tests.csproj --configuration Release --no-build --no-restore
     if ($LASTEXITCODE -ne 0) { throw 'Tests failed.' }
     if ($Publish) {
         $artifactsDir = [System.IO.Path]::GetFullPath((Join-Path $scoutRoot 'artifacts'))
