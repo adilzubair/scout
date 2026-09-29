@@ -126,6 +126,13 @@ internal sealed class SettingsWindow : Window
             var field = new TextBox { Text = text, AcceptsReturn = multiline, MinHeight = multiline ? 76 : 0, MaxHeight = multiline ? 140 : double.PositiveInfinity, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, TextWrapping = multiline ? TextWrapping.Wrap : TextWrapping.NoWrap };
             AutomationProperties.SetLabeledBy(field, caption); panel.Children.Add(field); return field;
         }
+        Button Browse(Panel panel, TextBox field, string name)
+        {
+            var browse = new Button { Content = "Browse…", HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 8, 0, 6) };
+            AutomationProperties.SetName(browse, name); panel.Children.Add(browse);
+            browse.Click += (_, _) => { var picked = FolderPicker.Pick(this); if (picked != null) field.Text = FolderList.Append(field.Text, picked); };
+            return browse;
+        }
         var general = Page("General", "\uE713", "Make Scout fit the way you work.");
         var shortcut = Field(general, "Open Scout", settings.Hotkey); Note(general, "Your global keyboard shortcut. For example, Ctrl+Alt+Space.");
         Heading(general, "Search behavior");
@@ -135,18 +142,22 @@ internal sealed class SettingsWindow : Window
         Note(general, "Windows Recent Items helps Scout find files you describe by when you last opened them.");
 
         var search = Page("Folders", "\uE8B7", "Choose where Scout looks for your files and shortcuts.");
-        Note(search, "Desktop, Documents, Downloads, and Pictures are included automatically. Add one full folder path per line below.");
+        Note(search, "Desktop, Documents, Downloads, and Pictures are included automatically. Add one full folder path per line below, or choose Browse… under a list.");
         Heading(search, "Content search");
         var contentSearch = Check(search, "Search inside files in selected folders", settings.ContentSearchEnabled);
         Note(search, "Off by default. Scout indexes supported text and Office files only; PDFs and OCR are not included. Extracted text stays on this PC. Saving with this off clears all persisted extracted text.");
         var contentFolders = Field(search, "Content search folders", string.Join(Environment.NewLine, settings.ContentFolders), true);
-        contentFolders.IsEnabled = contentSearch.IsChecked == true;
-        contentSearch.Checked += (_, _) => contentFolders.IsEnabled = true;
-        contentSearch.Unchecked += (_, _) => contentFolders.IsEnabled = false;
-        Note(search, "Add one full, existing folder path per line. Only the folders listed here are included in content search.");
+        var contentBrowse = Browse(search, contentFolders, "Browse for a content search folder");
+        contentFolders.IsEnabled = contentBrowse.IsEnabled = contentSearch.IsChecked == true;
+        contentSearch.Checked += (_, _) => contentFolders.IsEnabled = contentBrowse.IsEnabled = true;
+        contentSearch.Unchecked += (_, _) => contentFolders.IsEnabled = contentBrowse.IsEnabled = false;
+        Note(search, "Use Browse… or add one full, existing folder path per line. Only the folders listed here are included in content search.");
         var folders = Field(search, "Additional folders", string.Join(Environment.NewLine, settings.ExtraFolders), true);
+        Browse(search, folders, "Browse for an additional folder");
         var excluded = Field(search, "Excluded folders", string.Join(Environment.NewLine, settings.Exclusions), true);
+        Browse(search, excluded, "Browse for an excluded folder");
         var automations = Field(search, "Automation folders", string.Join(Environment.NewLine, settings.AutomationFolders), true);
+        Browse(search, automations, "Browse for an automation folder");
         Note(search, "Add folders containing Windows shortcuts (.lnk) or Power Automate links (.url), then search a shortcut's name to run it.");
 
         var local = Page("Local AI", "\uE945", "Find things with a description, even when you forget the name.");
