@@ -9,6 +9,8 @@ namespace Scout.App;
 
 internal static class WindowsCommands
 {
+    private static readonly IAudioControl Audio = new CoreAudioControl();
+    private static readonly IBrightnessControl Brightness = new WmiBrightnessControl();
     [DllImport("user32.dll", SetLastError = true)] private static extern bool LockWorkStation();
     [DllImport("powrprof.dll", SetLastError = true)] [return: MarshalAs(UnmanagedType.U1)] private static extern bool SetSuspendState([MarshalAs(UnmanagedType.U1)] bool hibernate, [MarshalAs(UnmanagedType.U1)] bool force, [MarshalAs(UnmanagedType.U1)] bool disableWake);
     [DllImport("shell32.dll", CharSet = CharSet.Unicode)] private static extern int SHEmptyRecycleBin(nint hwnd, string? root, uint flags);
@@ -52,6 +54,8 @@ internal static class WindowsCommands
                     catch (OperationCanceledException) { throw new IOException("Bluetooth did not respond in time. Check Bluetooth settings."); }
                 }
                 break;
+            case "volume-up": case "volume-down": case "mute-on": case "mute-off": case "brightness-up": case "brightness-down":
+                await HardwareControl.ExecuteAsync(id, Audio, Brightness); break;
             default: throw new InvalidOperationException("System action has no Windows implementation.");
         }
     }
