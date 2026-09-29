@@ -11,6 +11,7 @@ public sealed class SearchCatalog
     public int Count => Documents.Length;
     public IEnumerable<Candidate> Candidates => Documents.Select(d => d.Candidate);
     public bool Contains(string id) => byId.ContainsKey(id);
+    internal bool TryGet(string id, out SearchDocument document) => byId.TryGetValue(id, out document!);
     public bool HasTitle(string title, Scope scope) => titles.TryGetValue(title, out var items) && items.Any(c => c.InScope(scope));
     public SearchCatalog(IEnumerable<Candidate> candidates, SearchCatalog? previous = null, IEnumerable<string>? roots = null)
     {

@@ -16,8 +16,11 @@ public static class RankingPolicy
         // because choice mass is shared by several plausible candidates.
         var supportedWinner = local.ModelShortlist.FirstOrDefault(h => h.Candidate.Id == winner) is { } best && Confirmed(best);
         var accepted = local.Recall.Where(h => judgment.None < .25 && (judgment.Scores.GetValueOrDefault(h.Candidate.Id) >= .50 || Confirmed(h)));
+        var strongestLocalOnlyScore = local.Hits.Where(h => local.LocalOnlyIds.Contains(h.Candidate.Id)).Select(h => h.Score).DefaultIfEmpty(double.MaxValue).Max();
+        int LocalEvidenceTier(SearchHit hit, int position) => position >= local.Hits.Count ? 0 : hit.Score > strongestLocalOnlyScore ? 2 : local.LocalOnlyIds.Contains(hit.Candidate.Id) ? 1 : 0;
         var ordered = local.Hits.Concat(accepted).DistinctBy(h => h.Candidate.Id).Select((h, i) => (Hit: h, Position: i))
             .OrderByDescending(x => x.Hit.Score >= 1000 ? 1 : 0)
+            .ThenByDescending(x => LocalEvidenceTier(x.Hit, x.Position))
             .ThenByDescending(x => supportedWinner && x.Hit.Candidate.Id == winner ? 1 : 0)
             .ThenByDescending(x => judgment.Scores.TryGetValue(x.Hit.Candidate.Id, out var score)
                 ? weight * score + (1 - weight * .65) * Math.Clamp(x.Hit.Score / 400, 0, 1)
