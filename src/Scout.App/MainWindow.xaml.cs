@@ -176,7 +176,8 @@ public partial class MainWindow : Window
             var catalog = index.Catalog;
             var library = store.Library;
             var extra = enriched.Concat(store.Workspaces.Select(w => w.ToCandidate())).Concat(library.Values.Where(l => (l.Pinned || l.LastLaunch != null) && l.Candidate.IsPinnable && !catalog.Contains(l.Candidate.Id)).Select(l => l.Candidate)).ToArray();
-            var result = await Task.Run(() => SearchEngine.Search(query, requestedScope, catalog, library, DateTimeOffset.Now, cancellationToken: token, extra: extra), token);
+            var now = DateTimeOffset.Now;
+            var result = await Task.Run(() => SearchEngine.Search(query, requestedScope, catalog, library, now, cancellationToken: token, extra: extra, contentMatches: index.SearchContent(query, requestedScope, now, token)), token);
             if (token.IsCancellationRequested || generation != revision) return;
             current = result; appliedRevision = generation;
             judgment = null;
@@ -465,8 +466,19 @@ public partial class MainWindow : Window
         var dialog = new SettingsWindow(store.Settings, ApplyHotkey, () => store.ClearLaunchHistory()) { Owner = this };
         if (dialog.ShowDialog() == true)
         {
-            search.Cancel(); revision++; await model.ResetAsync(); store.SaveSettings(dialog.Value); enriched = []; ClearGroup();
-            _ = index.ConfigureAsync(dialog.Value); _ = model.WarmAsync(dialog.Value); ScheduleSearch(false);
+            search.Cancel(); revision++; uiRefresh.Stop(); await model.ResetAsync();
+            try
+            {
+                await index.ConfigureAsync(dialog.Value);
+                store.SaveSettings(dialog.Value); enriched = []; ClearGroup();
+                indexChanged = false; observedIndexVersion = index.Version; ScheduleSearch(false);
+            }
+            catch (Exception error) when (error is IOException or UnauthorizedAccessException or Microsoft.Data.Sqlite.SqliteException)
+            {
+                indexChanged = false; observedIndexVersion = index.Version;
+                Status.Text = "Settings weren't saved. Check access to Scout's data folder and selected folders, then try again.";
+            }
+            finally { uiRefresh.Start(); _ = model.WarmAsync(store.Settings); }
         }
         Query.Focus();
     }

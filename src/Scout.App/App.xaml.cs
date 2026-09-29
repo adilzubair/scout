@@ -12,7 +12,7 @@ public partial class App : Application
     private IndexService? index;
     private ModelHost? model;
     internal static string DataDirectory => Environment.GetEnvironmentVariable("SCOUT_DATA_DIR") ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Scout");
-    protected override void OnStartup(StartupEventArgs e)
+    protected override async void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
         var uiSmoke = e.Args.Contains("--ui-smoke-test");
@@ -73,15 +73,16 @@ public partial class App : Application
             tray.ContextMenuStrip.Items.Add("Settings", null, (_, _) => main.ShowSettings());
             tray.ContextMenuStrip.Items.Add("Quit", null, (_, _) => Shutdown());
             main.Show();
-            if (!smoke && !bluetooth) _ = index.ConfigureAsync(store.Settings);
-            else _ = index.LoadFixturesAsync();
+            var indexReady = !smoke && !bluetooth
+                ? ConfigureIndexAsync(index, store.Settings, diagnose || realworld ? null : main)
+                : index.LoadFixturesAsync();
             if (diagnose || realworld || bluetooth)
             {
                 var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };
                 timer.Tick += async (_, _) =>
                 {
                     timer.Stop();
-                    try { var report = bluetooth ? await main.DiagnoseBluetoothAsync() : realworld ? await main.DiagnoseRealWorldAsync() : await main.DiagnoseAsync(); File.WriteAllText(Path.Combine(DataDirectory, "desktop-diagnostics.json"), System.Text.Json.JsonSerializer.Serialize(report, new System.Text.Json.JsonSerializerOptions { WriteIndented = true })); }
+                    try { await indexReady; var report = bluetooth ? await main.DiagnoseBluetoothAsync() : realworld ? await main.DiagnoseRealWorldAsync() : await main.DiagnoseAsync(); File.WriteAllText(Path.Combine(DataDirectory, "desktop-diagnostics.json"), System.Text.Json.JsonSerializer.Serialize(report, new System.Text.Json.JsonSerializerOptions { WriteIndented = true })); }
                     catch (Exception error) { File.WriteAllText(Path.Combine(DataDirectory, "desktop-diagnostics.json"), System.Text.Json.JsonSerializer.Serialize(new { passed = false, error = error.ToString() })); Environment.ExitCode = 1; }
                     finally { Shutdown(); }
                 }; timer.Start();
@@ -94,6 +95,7 @@ public partial class App : Application
                     timer.Stop();
                     try
                     {
+                        await indexReady;
                         await main.SmokeCheck(uiSmoke);
                         // Keep offscreen WPF captures separate from the WinRT PDF renderer.
                         if (uiSmoke) await UiDiagnostics.Snapshot(main, "launcher");
@@ -105,10 +107,22 @@ public partial class App : Application
                     finally { Shutdown(); }
                 }; timer.Start();
             }
+            if (!smoke && !diagnose && !realworld && !bluetooth) await indexReady;
         }
         catch (Exception ex)
         {
             MessageBox.Show("Scout could not start. " + ex.Message, "Scout", MessageBoxButton.OK, MessageBoxImage.Error); Shutdown(1);
+        }
+    }
+    private static async Task ConfigureIndexAsync(IndexService index, ScoutSettings settings, Window? owner)
+    {
+        try { await index.ConfigureAsync(settings); }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException or Microsoft.Data.Sqlite.SqliteException)
+        {
+            if (owner == null) throw;
+            MessageBox.Show(owner,
+                "Scout couldn't update its content index. Check access to Scout's data folder, then restart Scout. Searching inside files will stay unavailable until this succeeds.",
+                "Scout content search", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
     }
     protected override void OnExit(ExitEventArgs e)
