@@ -163,8 +163,10 @@ public partial class MainWindow : Window
     private void ScheduleSearch(bool enrich)
     {
         search.Cancel(); search = new CancellationTokenSource(); var token = search.Token; var generation = ++revision;
-        Results.IsEnabled = false; ActionsButton.IsEnabled = false; judgment = null;
-        if (Results.ItemsSource is ResultRow[] previous) foreach (var row in previous) row.ClearReady();
+        // Keep showing the current rows while the next search runs: Enter and
+        // double-click already ignore stale generations through Selected, so
+        // disabling the list here only buys a visible flash on every keystroke.
+        judgment = null;
         localSearchTask = RunLocalSearch(generation, Query.Text, scope, enrich, token);
     }
     private void RefreshLocal() => ScheduleSearch(false);
@@ -187,7 +189,7 @@ public partial class MainWindow : Window
                 var members = RankingPolicy.Group(result);
                 if (members.Length >= 2) foreach (var member in members) group[member.Id] = member;
             }
-            UpdateGroup(); ApplyRows(result.Hits); Results.IsEnabled = true;
+            UpdateGroup(); ApplyRows(result.Hits);
             Status.Text = ResultStatus(result);
             refinementTask = RefineAsync(generation, enrich && requestedScope is Scope.All or Scope.Files, token);
         }
@@ -516,7 +518,6 @@ public partial class MainWindow : Window
         public string ReadyMark => ready ? "↵" : "";
         public bool IsReady => ready;
         public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
-        public void ClearReady() { ready = false; PropertyChanged?.Invoke(this, new(nameof(ReadyMark))); PropertyChanged?.Invoke(this, new(nameof(IsReady))); }
         private ImageSource? icon;
         private bool requestedIcon;
         public ImageSource? Icon { get { if (!requestedIcon && candidate.Kind is ItemKind.File or ItemKind.App or ItemKind.Automation or ItemKind.Folder) { requestedIcon = true; _ = LoadIcon(); } return icon; } }
