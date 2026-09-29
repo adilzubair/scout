@@ -6,7 +6,27 @@ namespace Scout.Core;
 
 public static class PreviewText
 {
-    public static string? Read(string path, CancellationToken token)
+    public static bool Supports(string path)
+    {
+        var extension = Path.GetExtension(path).ToLowerInvariant();
+        return extension is ".docx" or ".pptx" or ".xlsx" or ".odt" or ".odp" or ".ods" or ".txt" or ".md" or ".csv" or ".json" or ".xml" or ".yaml" or ".yml" or ".log" or ".cs" or ".py" or ".js" or ".ts" or ".tsx" or ".jsx" or ".html" or ".css" or ".ps1" or ".sql" or ".ini" or ".toml";
+    }
+
+    public static Task<string?> ReadAsync(string path, CancellationToken token) => Task.Run(() => Read(path, token), token);
+
+    /// <summary>Body text for local indexing. Returns null when the document has no extractable text so the index never stores Scout's own preview message.</summary>
+    public static Task<string?> ExtractAsync(string path, CancellationToken token) => Task.Run(() => Extract(path, token), token);
+
+    public static string? Read(string path, CancellationToken token) =>
+        Extract(path, token) ?? (IsOfficeDocument(path) ? "No text available in this document. Open it in its application to view the full layout." : null);
+
+    private static bool IsOfficeDocument(string path)
+    {
+        var extension = Path.GetExtension(path).ToLowerInvariant();
+        return extension is ".docx" or ".pptx" or ".xlsx" or ".odt" or ".odp" or ".ods";
+    }
+
+    private static string? Extract(string path, CancellationToken token)
     {
         var extension = Path.GetExtension(path).ToLowerInvariant();
         if (extension is ".docx" or ".pptx" or ".xlsx" or ".odt" or ".odp" or ".ods")
@@ -29,9 +49,9 @@ public static class PreviewText
                 }
                 output.AppendLine(); if (output.Length >= 64000) break;
             }
-            return output.Length == 0 ? "No text available in this document. Open it in its application to view the full layout." : output.ToString(0, Math.Min(64000, output.Length));
+            return output.Length == 0 ? null : output.ToString(0, Math.Min(64000, output.Length));
         }
-        if (extension is not (".txt" or ".md" or ".csv" or ".json" or ".xml" or ".yaml" or ".yml" or ".log" or ".cs" or ".py" or ".js" or ".ts" or ".tsx" or ".jsx" or ".html" or ".css" or ".ps1" or ".sql" or ".ini" or ".toml")) return null;
+        if (!Supports(path)) return null;
         using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
         using var text = new StreamReader(stream, Encoding.UTF8, true);
         var buffer = new char[64000]; var count = text.ReadBlock(buffer, 0, buffer.Length); token.ThrowIfCancellationRequested();
