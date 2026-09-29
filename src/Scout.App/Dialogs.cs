@@ -81,7 +81,7 @@ internal sealed class SettingsWindow : Window
         actions.Children.Add(new TextBlock { Text = "Changes apply when you save.", FontSize = 11, Foreground = WindowVisuals.Brush("Muted"), VerticalAlignment = VerticalAlignment.Center });
         var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
         var cancel = new Button { Content = "Cancel", IsCancel = true, Margin = new Thickness(0, 0, 8, 0) }; cancel.Click += (_, _) => Close(); buttons.Children.Add(cancel);
-        var save = new Button { Content = "Save settings", Style = WindowVisuals.Style("PrimaryButton") }; buttons.Children.Add(save); actions.Children.Add(buttons); footer.Children.Add(actions);
+        var save = new Button { Content = "Save settings", IsDefault = true, Style = WindowVisuals.Style("PrimaryButton") }; buttons.Children.Add(save); actions.Children.Add(buttons); footer.Children.Add(actions);
         var body = new Grid(); body.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(176) }); body.ColumnDefinitions.Add(new ColumnDefinition());
         var navigation = new StackPanel { Margin = new Thickness(14, 18, 12, 0) }; body.Children.Add(navigation);
         var pageHost = new ContentControl { HorizontalContentAlignment = HorizontalAlignment.Stretch, VerticalContentAlignment = VerticalAlignment.Stretch };
@@ -136,6 +136,14 @@ internal sealed class SettingsWindow : Window
 
         var search = Page("Folders", "\uE8B7", "Choose where Scout looks for your files and shortcuts.");
         Note(search, "Desktop, Documents, Downloads, and Pictures are included automatically. Add one full folder path per line below.");
+        Heading(search, "Content search");
+        var contentSearch = Check(search, "Search inside files in selected folders", settings.ContentSearchEnabled);
+        Note(search, "Off by default. Scout indexes supported text and Office files only; PDFs and OCR are not included. Extracted text stays on this PC. Saving with this off clears all persisted extracted text.");
+        var contentFolders = Field(search, "Content search folders", string.Join(Environment.NewLine, settings.ContentFolders), true);
+        contentFolders.IsEnabled = contentSearch.IsChecked == true;
+        contentSearch.Checked += (_, _) => contentFolders.IsEnabled = true;
+        contentSearch.Unchecked += (_, _) => contentFolders.IsEnabled = false;
+        Note(search, "Add one full, existing folder path per line. Only the folders listed here are included in content search.");
         var folders = Field(search, "Additional folders", string.Join(Environment.NewLine, settings.ExtraFolders), true);
         var excluded = Field(search, "Excluded folders", string.Join(Environment.NewLine, settings.Exclusions), true);
         var automations = Field(search, "Automation folders", string.Join(Environment.NewLine, settings.AutomationFolders), true);
@@ -196,12 +204,13 @@ internal sealed class SettingsWindow : Window
         save.Click += (_, _) =>
         {
             string[] Lines(string text) => text.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
-            var extra = Lines(folders.Text); var exclusions = Lines(excluded.Text); var automationFolders = Lines(automations.Text);
+            var extra = Lines(folders.Text); var exclusions = Lines(excluded.Text); var automationFolders = Lines(automations.Text); var indexedContentFolders = Lines(contentFolders.Text);
             foreach (var field in new[] { folders, excluded, automations })
                 if (Lines(field.Text).Any(p => !Path.IsPathFullyQualified(p) || !Directory.Exists(p))) { Error("Use existing, full folder paths, such as C:\\Users\\you\\Projects.", 1, field); return; }
+            if (contentSearch.IsChecked == true && indexedContentFolders.Any(p => !Path.IsPathFullyQualified(p) || !Directory.Exists(p))) { Error("Use existing, full folder paths, such as C:\\Users\\you\\Projects.", 1, contentFolders); return; }
             if (ai.IsChecked == true && !File.Exists(python.Text.Trim())) { Error("Choose the Python executable created by local AI setup.", 2, python); return; }
             if (!applyHotkey(shortcut.Text.Trim())) { Error("That shortcut is invalid or already in use. Try Ctrl+Alt+S.", 0, shortcut); return; }
-            Value = new ScoutSettings { ChromeHistory = chrome.IsChecked == true, EdgeHistory = edge.IsChecked == true, WindowsSearch = windows.IsChecked == true, RecentItems = recent.IsChecked == true, WebFallback = web.IsChecked == true, AutomationFolders = automationFolders, AiEnabled = ai.IsChecked == true, SemanticHelper = semanticHelper?.IsChecked == true, PythonPath = python.Text.Trim(), Model = (string)checkpoint.SelectedItem, Device = (string)device.SelectedItem, CpuThreads = settings.CpuThreads, Hotkey = shortcut.Text.Trim(), ExtraFolders = extra, Exclusions = exclusions };
+            Value = new ScoutSettings { ChromeHistory = chrome.IsChecked == true, EdgeHistory = edge.IsChecked == true, WindowsSearch = windows.IsChecked == true, RecentItems = recent.IsChecked == true, WebFallback = web.IsChecked == true, AutomationFolders = automationFolders, ContentSearchEnabled = contentSearch.IsChecked == true, ContentFolders = indexedContentFolders, AiEnabled = ai.IsChecked == true, SemanticHelper = semanticHelper?.IsChecked == true, PythonPath = python.Text.Trim(), Model = (string)checkpoint.SelectedItem, Device = (string)device.SelectedItem, CpuThreads = settings.CpuThreads, Hotkey = shortcut.Text.Trim(), ExtraFolders = extra, Exclusions = exclusions };
             DialogResult = true;
         };
         SelectPage(pages[0].Page);
