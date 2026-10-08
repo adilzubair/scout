@@ -1,0 +1,277 @@
+# Scout search index redesign — 2026-10-09
+
+Implemented on `feat/fsearch-index-redesign`, starting from the complete baseline
+`fd800451624bb7fa1d64751f917e9e36056385dc`. The branch is available for review;
+no merge, push or release was performed. Unrelated `.omo/` work was preserved.
+
+The design takes ideas from [fsearch](https://github.com/noahdunnagan/fsearch)
+and adapts them to Scout's C# application, existing ranking and SQLite stores.
+SQLite remains authoritative. The compact index is a disposable cache.
+
+## Identical-coverage measurements
+
+Both engines used the same frozen metadata, roots, query time and empty personal
+library in a common Release harness compiled against their respective Core DLLs.
+Each of eight queries received 10 warm-up passes and 30 measured passes.
+Two separate-process rounds alternated baseline/redesign and redesign/baseline.
+The table reports the median of the two rounds' aggregate percentiles. Ordered
+hits, recall pools and notices matched in every retained round.
+
+| Metadata corpus | Search p50, before → after | Search p95, before → after | Private memory, before → after | p50 reduction |
+|---|---:|---:|---:|---:|
+| Frozen 75,707 candidates | 25.78 → 9.07 ms | 35.18 → 31.05 ms | 146.9 → 67.9 MiB | 64.8% |
+| Synthetic 250,000 | 50.86 → 24.04 ms | 72.01 → 46.57 ms | 295.1 → 96.7 MiB | 52.7% |
+| Synthetic 1,000,000 | 213.58 → 97.88 ms | 286.33 → 197.54 ms | 1,131.9 → 332.3 MiB | 54.2% |
+
+Private memory falls 53.8% on the current corpus and 70.6% at one million entries.
+These are steady Core-process measurements after releasing the input JSON and
+candidate fixture and collecting garbage, before warming searches. They include
+the runtime and catalog, but exclude the WPF application and model. They are not
+peak memory measurements. Cache construction and fixture parsing together take
+3.06 → 2.57 seconds, 4.83 → 3.75 seconds and 20.35 → 13.46 seconds respectively;
+these timings are not filesystem crawl times.
+
+| Resource | Current corpus, before → after | 250,000, before → after | 1,000,000, before → after |
+|---|---:|---:|---:|
+| Managed live bytes | 127.0 → 48.2 MiB | 274.0 → 74.7 MiB | 1,097.9 → 300.9 MiB |
+| Mean allocations per measured search | 191.9 → 254.3 KiB | 7.35 → 0.33 MiB | 28.81 → 0.33 MiB |
+
+### Regressions and target status
+
+The 30% median improvement and 25% million-candidate private-memory reduction
+targets are met. Current-corpus memory also stays below its permitted 10% increase.
+Aggregate p95 meets the tolerance, but **the p95 target is missed for individual
+chronological queries**. An empty scope lookup also regresses proportionally:
+
+| Query | Corpus | p95 before → after |
+|---|---|---:|
+| `latest 3 files` | Current | 14.95 → 37.78 ms |
+| `latest 3 files` | 250,000 | 47.95 → 64.03 ms |
+| `latest 3 files` | 1,000,000 | 181.01 → 304.28 ms |
+| `notes in "C:\Benchmark\Project00001"` | Current, absent synthetic scope | 0.19 → 0.57 ms |
+
+The compact row access and restriction/ranking work still scan eligible rows for
+chronological queries; this remains an optimization opportunity. Current-corpus
+allocations rise 32.5%, about 62.4 KiB per search, despite lower live memory.
+Two rounds on one Windows machine are evidence for this workload, not a guarantee
+for every filesystem or query distribution.
+
+## Crawl, startup, persistence and desktop checks
+
+A common lifecycle harness created the same 1,000 physical synthetic text files
+for each build. Content indexing and the model were disabled. Thirty watcher
+samples cover ten creates, modifications and deletes.
+
+| Lifecycle measure | Baseline | Redesigned |
+|---|---:|---:|
+| Initial complete crawl | 369.3 ms | 483.3 ms |
+| First file available | 279.7 ms | 303.9 ms |
+| Cached files available | 111.9 ms | 86.5 ms |
+| Cached reconciliation complete | 396.3 ms | 99.5 ms |
+| Watcher p50 | 499.7 ms | 499.1 ms |
+| Watcher p95 | 514.3 ms | 527.8 ms |
+| Additional persisted compact base | none | 339,544 bytes |
+
+The final cold 1,000-file crawl is **30.9% slower**. Cached availability is 22.7% faster
+and reconciliation is 74.9% faster. Normal changes caused no full rescans; watcher
+p95 meets the two-second target. These are single lifecycle runs, not the paired
+30-pass search protocol.
+
+A separate million-entry synthetic persistence audit produced a 158,128,718-byte
+base (150.8 MiB). Base construction took 6.21 seconds and persistence 33.26 seconds.
+Five validated mapped reloads had p50 2.86 seconds and p95 3.36 seconds. Seeding the
+million-row authoritative SQLite database and change journal took 377.45 seconds.
+That setup cost is reported separately from reload and physical crawling. Reload
+still validates the checksum and reconstructs lexical/look-up structures; it is
+not an instant map of every in-memory structure.
+
+### Expanded drive coverage
+
+A normal, non-elevated `C:\` native enumeration found **346,795 eligible files**
+in **33.64 seconds**, with **90 unavailable directories** and at most four workers.
+It enumerated metadata only; it did not read 311.9 GB of logical file contents,
+extract document text, write SQLite rows or measure full application indexing.
+This expanded coverage is separate from the identical-coverage benchmark above.
+
+The final isolated application audit retained **346,839 cached files** and 184 apps.
+A cached restart reconciled the actual drive in **34.96 seconds**, with a sampled
+peak of **951.5 MiB private memory** (content/model disabled). The authoritative
+metadata database occupied 313,782,272 bytes (299.2 MiB). The active compact base
+occupied 122,159,577 bytes (116.5 MiB); all retained bases together occupied
+247,851,252 bytes (236.4 MiB). Retired files still held by snapshot leases can
+remain until collection or a subsequent compaction cleans them up. The drive
+contents changed slightly between audits, so these are expanded-coverage observations, not paired speed comparisons.
+
+The 20 ms WPF heartbeat had p95 gaps of **46.7 ms during reconciliation** and
+**80.5 ms during interaction**. Sixty rapid input changes plus the final result
+completed in **522 ms**. The audit passed stale-query protection and real watcher
+create/modify/delete checks; its largest watcher removal was one entry and no
+normal update caused a full rescan. Occasional dispatcher gaps remain: worst
+**234 ms during reconciliation** and **858 ms during interaction**. Cold app queries
+on the expanded catalog took 438–760 ms end to end. The p95 responsiveness check
+passes; these outliers prevent a claim that crawling or interaction never stalls.
+
+The first cold application attempt was stopped after cache-count instability,
+with peak private memory **2.18 GiB**. Defensive handling and regression tests were
+added for stale deletion notifications: existing roots retain their metadata, and
+recreated files update without a full rescan. Two subsequent completed drive audits
+retained coverage without large subtree removals. The original instability's cause
+was not conclusively captured; **a verified complete cold whole-drive indexing time
+is still unavailable**. The 33.64-second native enumeration is not a substitute
+for that missing measurement. This remains a validation limitation.
+
+A preceding desktop run timed out on physical global-hotkey injection. Final
+whole-drive audits explicitly used `SCOUT_TEST_HOTKEY=0` and report
+`globalHotkeySkipped=true`; physical hotkey behavior is unverified in this audit.
+The model and content extraction remained disabled throughout the drive tests.
+
+## Compatibility and new feature coverage
+
+The frozen 504-case corpus retains exactly the same ordered hits, recall pools,
+model shortlists, locations, notices and existing intent fields. Timestamp
+serialization changes to UTC preserve the original instants. The baseline and
+redesign both score 472/504 locally: 359/391 positive cases and 113/113 known-empty
+cases. All 391 positive targets appear in the shortlist. Scope and intent failures
+remain zero. Thus the redesign adds no false matches to these compatibility cases.
+
+The prospective authored task corpus has 80 cases and 75,807 candidates. Both
+engines recall 37/40 positive targets and reject all 40 negatives locally, but
+local final positive correctness remains 0/40. This redesign does not solve the
+existing semantic-description ranking problem. Model queries, candidate payloads,
+plural intent and context match the saved development/holdout requests exactly,
+so their saved English CPU predictions were reused for both builds. The ranker,
+prompts, checkpoint manifest and server are unchanged. Both model replays give
+5/40 positive correct, 31/40 negative correct and **9 existing false matches**,
+with no scope failures. No changed request was assigned an old prediction.
+
+New-feature coverage is tested independently with committed synthetic content and
+explicit expected matches; it is not counted as a speedup over unsupported baseline
+features. Examples:
+
+- `seng` can find `SearchEngine.cs` when ordinary eligible filename matches are
+  empty. Fallback is deliberately limited to one alphabetic term of 3–12 characters.
+  It is labeled an abbreviation match and cannot alone light the ready indicator.
+  Short terms, unrelated weak matches and scope violations are rejected.
+- `grep:"payment received" in:"C:\Selected" ext:txt size:<16mb mtime:<7d`
+  searches literal text in an enabled content folder. Lowercase patterns use
+  smart-case matching; uppercase patterns preserve case.
+- `regex:"Budget\s+[0-9]+" in:"C:\Selected" ext:txt` uses .NET non-backtracking
+  regex. Invalid or unsupported expressions return an explanation. Cancellation
+  or the 250 ms verification budget produces an explicit partial-results notice.
+- Up to three verified excerpts appear in the existing preview; plain-text files
+  include line numbers. Fresh edits cannot return a stale content match.
+
+Existing word-based content search remains available. Trigram shortlisting is
+conservative, particularly for Unicode and regex patterns without a provable
+required literal. Short patterns use bounded verification. Extraction keeps the
+16 MiB file and 64,000-character limits and existing Office/OpenDocument support.
+Content is separately opt-in for selected folders; drive selection does not enable
+content extraction. Content-only hits and document text stay out of model requests.
+
+## Implementation and validation
+
+The base stores packed metadata columns and shared name/token tables, with a small
+separate catalog for other item kinds. Directory ranges and direct-child postings
+constrain retrieval. Rich candidates are materialized for shortlists or explicit
+enumeration. Immutable overlays and deletions replace the full candidate dictionary.
+Shared name work has a 32 MiB bound and one-minute idle expiry. Only provably safe
+subsequence membership narrowing reuses an extended prefix; ordinary typo/synonym
+matching rescores or uses its exact semantic cache key. Final rankings are never cached.
+
+SQLite updates and generation journal entries share transactions. Mapped snapshots
+validate format, bounds, checksum, generation, journal floor and root/exclusion
+fingerprints. Unique snapshot files and atomically replaced manifests preserve
+search leases and changes arriving during compaction. The background threshold is
+`max(1000, min(50000, 5% of base))`; dirty state is also saved after ten idle minutes.
+Reconciliation writes deltas, keeps IDs/activity evidence and preserves unavailable
+locations instead of deleting their cached rows. Searches suppress offline coverage.
+
+Drive selection is disabled by default and lists ready local fixed drives. Native
+[Windows enumeration](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-findfirstfileexw)
+uses large-fetch when supported, cancellation and four workers. Hidden/system
+children, reparse points, offline placeholders, exclusions and inaccessible locations
+are skipped. Windows Hidden/System attributes on the volume root itself do not
+incorrectly mark a selected drive unavailable. Overflow, startup and 30-minute
+reconciliation restore watcher coverage; disabling the setting removes extra coverage.
+The separate private content database maintains word and
+[trigram FTS5](https://www.sqlite.org/fts5.html#the_trigram_tokenizer) tables transactionally.
+These tables add disk/storage cost proportional to enabled extracted text; a large
+real-document content-index size benchmark was not performed.
+
+Release compilation passes with zero warnings/errors, and **244/244 C# checks pass**.
+Coverage includes cached/uncached search, backspace, synonyms, typo thresholds,
+aliases, scopes, pins, content-only hits, corrupt/stale snapshots, restart replay,
+concurrent compaction, directory rename, normal watcher changes, overflow, settings,
+unavailable roots, Unicode/long paths, exclusions, content clearing, regex errors,
+partial searches, extraction limits and model-request privacy. Isolated desktop
+and UI smoke tests pass, including PDF/image/Office/text previews and the Folders
+settings page. The Python adapter/runtime suite passes 13 tests.
+
+**The real-checkpoint HTTP test remains failing on this machine:** its two-candidate
+CPU inference exceeds the unchanged two-second deadline (2.156 and 2.578 seconds
+in isolated attempts). Authentication, origin rejection and health checks passed
+before that assertion; later HTTP assertions were not reached. No deadline,
+model or prompt was relaxed to turn this failure into a pass. The server, ranker,
+model manifest and HTTP test sources are byte-equivalent to the baseline after
+newline normalization. This is an unresolved runtime timing limitation, not a
+claimed successful HTTP check.
+
+## Reproduction and private artifacts
+
+Private snapshots, filenames, content, binaries and raw reports remain under ignored
+`artifacts/diagnostics/fsearch-redesign`. `verified-paired/comparison.json` is the
+aggregate search report; `baseline-lifecycle.json`, `verified-lifecycle.json`,
+`snapshot-1000000.json`, `drive-enumeration.json` and `quality-differential.json`
+provide the corresponding audits. Earlier exploratory reports are not final evidence.
+The baseline app/test binaries and full commit SHA are retained in `baseline`.
+To compare the launchers manually, run `baseline/Scout.exe` and the rebuilt
+`src/Scout.App/bin/Release/net10.0-windows10.0.19041.0/Scout.exe` sequentially,
+each with a different isolated `SCOUT_DATA_DIR`. Use the same configured roots
+and a copied frozen database for compatibility comparisons; enable whole-disk
+coverage only for the separate expanded-coverage trial. Content mode examples
+require explicitly enabled content folders in the redesigned profile.
+
+Frozen SHA-256 values:
+
+| Fixture | SHA-256 |
+|---|---|
+| Existing metadata corpus | `9c11d7623f395043f5477347f498db3fd81fc73a598ccb74b3cc229b534e8a9b` |
+| Prospective task corpus | `b8bce644b7aa6abc8ebb962bc0716c81e50ba6723d57e6ce8bcd25527b2cc497` |
+| Synthetic 250,000 | `9917611863346210e6c9ff48ce5b5203f6df4c525e6e88a95346219898dad801` |
+| Synthetic 1,000,000 | `70cb8350918a12ce9ea8f11a3f87cd2f6f8e06f6d7746293745b69b47842054e` |
+
+The committed fixture generator is deterministic and refuses to overwrite an
+existing fixture. Synthetic metadata includes repeated names, nested directories,
+Unicode, aliases and timestamp ties; it provides no evidence of real crawl speed.
+
+```powershell
+dotnet build Scout.slnx -c Release -m:1
+dotnet run --project tests/Scout.Tests -c Release --no-build --no-restore
+.runtime/.venv/Scripts/python.exe runtime/test_runtime.py
+.runtime/.venv/Scripts/python.exe runtime/test_http.py
+```
+
+For the paired benchmark, build `tests/Scout.Benchmark` twice into separate ignored
+output directories, setting `ScoutCoreAssembly` to the preserved baseline Core DLL
+and then to the redesigned Release Core DLL. Use the same harness source for both:
+
+```powershell
+dotnet build tests/Scout.Benchmark -c Release -p:ScoutCoreAssembly=ABSOLUTE_CORE_DLL_PATH -o IGNORED_OUTPUT_DIRECTORY
+python runtime/index_comparison.py --baseline BASELINE_HARNESS_DLL --redesigned REDESIGNED_HARNESS_DLL --corpus FROZEN_CORPUS_JSON --corpus SCALE_250000_JSON --corpus SCALE_1000000_JSON --output IGNORED_REPORT_DIRECTORY
+```
+
+`--aggregate-only` rechecks retained reports without rerunning engines. The lifecycle
+harness similarly accepts `ScoutCoreAssembly` and `ScoutAppAssembly`. The test
+runner exposes `--index-fixture OUTPUT COUNT`, `--index-snapshot FIXTURE OUTPUT`,
+`--index-lifecycle OUTPUT` and `--index-crawl ROOT OUTPUT`. Real desktop diagnostics
+require an isolated `SCOUT_DATA_DIR` and `Scout.exe --diagnose`. Setting
+`SCOUT_TEST_HOTKEY=0` explicitly skips and records the physical hotkey check;
+`crawl-audit.jsonl` under the private snapshot directory records aggregate
+reconciliation/deletion counts in diagnostic mode.
+
+Local milestones: `e0c7ae5` benchmarks, `af9d74c` compact base, `79a5208` snapshots
+and replay, `41a8cbe` retrieval cache, `3885c46` checkpoint/tie protection,
+`09e6412` matching/content, `8eaf3b8` drive indexing, `e289fb1` excerpts/verification,
+`ad40a45` allocations, `6a3f809` volume-root correction, `a064f94` comparison tools,
+`647662f` base-size compaction thresholds and `604629c` stale-delete protection,
+diagnostic counters and background publication.
