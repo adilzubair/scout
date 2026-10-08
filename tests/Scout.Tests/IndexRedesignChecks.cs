@@ -8,6 +8,15 @@ internal static class IndexRedesignChecks
         var now = new DateTimeOffset(2026, 10, 8, 12, 0, 0, TimeSpan.Zero);
         Candidate File(string name, int age = 0) => new(Candidate.Key(ItemKind.File, @"C:\Test\" + name), ItemKind.File, name, @"C:\Test\" + name) { Detail = @"C:\Test", ModifiedAt = now.AddDays(-age), SizeBytes = 123 };
         var memory = new Dictionary<string, LibraryItem>();
+        test("Compaction threshold uses base size independently of overlay growth", () =>
+        {
+            var catalog = new SearchCatalog(Enumerable.Range(0,24000).Select(i => File($"Base{i}.txt")));
+            Check(catalog.CompactionThreshold == 1200);
+            var grown = catalog.WithChanges(Enumerable.Range(0,20000).Select(i => File($"New{i}.txt")), []);
+            Check(grown.CompactionThreshold == 1200 && grown.Count == 44000);
+            Check(grown.Compact().CompactionThreshold == 2200);
+            Check(SearchCatalog.Empty.CompactionThreshold == 1000);
+        });
         test("Folder scopes use filesystem paths independently of display details", () =>
         {
             var item = File("Report.pdf") with { Detail = "Documents" };

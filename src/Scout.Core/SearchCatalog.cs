@@ -23,6 +23,7 @@ public sealed class SearchCatalog
     internal double[] PrepareFuzzy(string term) => Base.Scores.Fuzzy(Base, term);
     public bool IsPersisted => Base.Rows.IsMapped;
     public int PendingCount => changes.Count + deleted.Count;
+    public int CompactionThreshold => Math.Max(1000, Math.Min(50000, (int)Math.Ceiling(Base.Rows.Length * .05)));
     public IEnumerable<Candidate> Candidates => Documents.Select(d => d.Candidate);
     internal IEnumerable<SearchEntry> Documents => Entries(null, false);
     public IDisposable Acquire() => new CatalogLease(Base, overlay);

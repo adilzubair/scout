@@ -275,7 +275,7 @@ internal sealed class IndexService : IDisposable
         lock (publishGate)
         {
         var snapshot = files.Snapshot;
-        var threshold = Math.Min(50000, Math.Max(1000, (int)Math.Ceiling(snapshot.Count * .05)));
+        var threshold = snapshot.CompactionThreshold;
         if (compaction is { IsCompleted: false }) return;
         var idle = DateTime.UtcNow - lastMutation >= TimeSpan.FromMinutes(10);
         if (!force && snapshot.PendingCount < threshold && (!idle || snapshot.PendingCount == 0 && store.IndexGeneration <= lastPersistedGeneration)) return;
