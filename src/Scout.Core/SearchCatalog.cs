@@ -11,13 +11,24 @@ public sealed class SearchCatalog
     private readonly ImmutableHashSet<string> deleted;
     private readonly CatalogData overlay;
     private readonly string[] roots, offline;
-    internal readonly NameScoreCache Scores = new();
+
     public FolderCatalog Folders { get; }
     public static SearchCatalog Empty { get; } = new([]);
     public int Count { get; }
+    public void ClearNameCache() => Base.Scores.Clear();
+    public void TrimNameCache() => Base.Scores.Trim();
+    internal Dictionary<CatalogData, double[][]> PrepareScores(string[] terms) => new() { [Base] = Base.Scores.Prepare(Base, terms), [overlay] = new NameScoreCache().Prepare(overlay, terms) };
+    internal Dictionary<CatalogData, bool[]> PrepareEligibility(string literal, string phrase, string[] terms, Dictionary<CatalogData, double[][]> prepared) => prepared.ToDictionary(pair => pair.Key, pair => (ReferenceEquals(pair.Key, Base) ? pair.Key.Scores : new NameScoreCache()).Eligibility(pair.Key, literal, phrase, terms, pair.Value));
+    internal double[] PrepareFuzzy(string term) => Base.Scores.Fuzzy(Base, term);
+    public bool IsPersisted => Base.Rows.IsMapped;
     public int PendingCount => changes.Count + deleted.Count;
     public IEnumerable<Candidate> Candidates => Documents.Select(d => d.Candidate);
     internal IEnumerable<SearchEntry> Documents => Entries(null, false);
+    public IDisposable Acquire() => new CatalogLease(Base, overlay);
+    private sealed class CatalogLease(params object[] owners) : IDisposable { public void Dispose() => GC.KeepAlive(owners); }
+    public bool TryGetCandidate(string id, out Candidate? candidate) { if (TryGet(id, out var doc)) { candidate = doc.Candidate; return true; } candidate = null; return false; }
+    public IEnumerable<Candidate> EvidenceCandidates => Documents.Where(d => d.OpenedAt != null || d.DownloadedAt != null).Select(d => d.Candidate);
+    public bool IsAvailable(Candidate c) => c.Kind != ItemKind.File || !offline.Any(r => IndexPolicy.Within(c.Target, r));
     public bool Contains(string id) => TryGet(id, out _);
     internal bool TryGet(string id, out SearchEntry d)
     {
@@ -33,7 +44,9 @@ public sealed class SearchCatalog
     private SearchCatalog(CatalogData data, ImmutableDictionary<string, Candidate> changes, ImmutableHashSet<string> deleted, string[] roots, string[] offline)
     {
         Base = data; this.changes = changes; this.deleted = deleted; this.roots = roots; this.offline = offline;
-        overlay = CatalogData.Build(changes.Values, data.Rows.Length);
+        overlay = CatalogData.Build(changes.Values.OrderBy(c => c.Id), data.Rows.Length);
+        for (var i = 0; i < overlay.Rows.Length; i++)
+            if (data.Ids.TryGetValue(overlay.Strings[overlay.Rows[i].Id], out var old)) overlay.SetOrder(i, data.Rows[old].Order);
         Count = data.Rows.Length - deleted.Count(id => data.Ids.ContainsKey(id)) + changes.Keys.Count(id => !data.Ids.ContainsKey(id));
         Folders = FolderCatalog.FromPaths(data.FolderPaths.Concat(overlay.FolderPaths).Where(p => !offline.Any(r => IndexPolicy.Within(p, r))), roots.Where(p => !offline.Any(r => IndexPolicy.Within(p, r))));
     }
@@ -45,25 +58,31 @@ public sealed class SearchCatalog
         return new(Base, next, dead, roots, offline);
     }
     public SearchCatalog WithRoots(IEnumerable<string> active, IEnumerable<string>? unavailable = null) => new(Base, changes, deleted, active.ToArray(), unavailable?.ToArray() ?? []);
-    public SearchCatalog Compact() => new SearchCatalog(Candidates, roots: roots).WithRoots(roots, offline);
-    private bool Available(SearchEntry d) => d.Kind != ItemKind.File || !offline.Any(r => IndexPolicy.Within(d.Detail, r));
-    internal IEnumerable<SearchEntry> Entries(string[]? locations, bool direct)
+    public SearchCatalog Compact() => new SearchCatalog(Entries(null, false, true).OrderBy(d => d.Order).Select(d => d.Candidate), roots: roots).WithRoots(roots, offline);
+    private bool Available(SearchEntry d)
     {
-        foreach (var i in Base.Select(locations, direct)) { var d = new SearchEntry(Base, i); if (!deleted.Contains(d.Id) && !changes.ContainsKey(d.Id) && Available(d)) yield return d; }
-        foreach (var i in overlay.Select(locations, direct)) { var d = new SearchEntry(overlay, i); if (Available(d)) yield return d; }
+        if (d.Kind != ItemKind.File || offline.Length == 0) return true;
+        foreach (var root in offline) if (IndexPolicy.Within(d.Target, root)) return false;
+        return true;
+    }
+    internal IEnumerable<SearchEntry> Entries(string[]? locations, bool direct, bool includeUnavailable = false)
+    {
+        foreach (var i in Base.Select(locations, direct)) { var d = new SearchEntry(Base, i); if ((deleted.Count == 0 || !deleted.Contains(d.Id)) && (changes.Count == 0 || !changes.ContainsKey(d.Id)) && (includeUnavailable || Available(d))) yield return d; }
+        foreach (var i in overlay.Select(locations, direct)) { var d = new SearchEntry(overlay, i); if (includeUnavailable || Available(d)) yield return d; }
     }
 }
-internal sealed record SearchText(string Name, string[] Words, string[] Aliases, string[] AliasWords, string Initials, string Extension);
+internal sealed record SearchText(string Name, string[] Words, string[] Aliases, string[] AliasWords, string Initials, string Extension, string Original, string[] Keywords, string FullTitle);
 internal struct CatalogRow
 {
-    public int Id, Title, Detail, Target, Source, AddedSource, OpenedSource, DownloadSource, Text, Folder, Order, Visits;
+    public int Id, Title, Detail, Target, Source, AddedSource, OpenedSource, DownloadSource, Text, Folder, Directory, Order, Visits;
     public ItemKind Kind;
     public long Modified, Created, Added, Opened, Downloaded, Visited, Size;
     public bool Screenshot;
 }
 internal sealed class CatalogData
 {
-    internal CatalogRow[] Rows = [];
+    internal readonly NameScoreCache Scores = new();
+    internal PackedRows Rows = new([]);
     internal string[] Strings = [];
     internal SearchText[] Texts = [];
     internal string[][] FolderWords = [];
@@ -89,22 +108,23 @@ internal sealed class CatalogData
                 names[key] = text = texts.Count;
                 var title = c.Kind == ItemKind.File ? Path.GetFileNameWithoutExtension(c.Title) : c.Title;
                 var parts = QueryParser.Tokenize(Camel.Replace(title, " ")); var aliases = c.Keywords.Select(k => k.ToLowerInvariant()).ToArray();
-                texts.Add(new(title.ToLowerInvariant(), QueryParser.Tokenize(title).Concat(parts).Distinct().ToArray(), aliases, aliases.SelectMany(QueryParser.Tokenize).Distinct().ToArray(), string.Concat(parts.Select(w => w[0])), Path.GetExtension(c.Target).ToLowerInvariant()));
+                texts.Add(new(title.ToLowerInvariant(), QueryParser.Tokenize(title).Concat(parts).Distinct().ToArray(), aliases, aliases.SelectMany(QueryParser.Tokenize).Distinct().ToArray(), string.Concat(parts.Select(w => w[0])), Path.GetExtension(c.Target).ToLowerInvariant(), title, c.Keywords.ToArray(), c.Title));
             }
             var context = c.Kind == ItemKind.File ? string.Join(' ', c.Detail.Split(['\\', '/'], StringSplitOptions.RemoveEmptyEntries).TakeLast(2)) : c.Kind == ItemKind.Link ? c.Detail : "";
             if (!folders.TryGetValue(context, out var folder)) { folders[context] = folder = words.Count; words.Add(QueryParser.Tokenize(context)); }
-            var row = new CatalogRow { Id = Intern(c.Id), Title = Intern(c.Title), Detail = Intern(c.Detail), Target = c.Kind == ItemKind.File && Path.Combine(c.Detail, c.Title) == c.Target ? -1 : Intern(c.Target), Source = Intern(c.Source), AddedSource = Intern(c.AddedSource), OpenedSource = Intern(c.OpenedSource), DownloadSource = Intern(c.DownloadSource), Kind = c.Kind, Text = text, Folder = folder, Order = first + rows.Count, Visits = c.VisitCount,
+            var row = new CatalogRow { Id = Intern(c.Id), Title = Intern(c.Title), Detail = Intern(c.Detail), Target = c.Kind == ItemKind.File && Path.Combine(c.Detail, c.Title) == c.Target ? -1 : Intern(c.Target), Source = Intern(c.Source), AddedSource = Intern(c.AddedSource), OpenedSource = Intern(c.OpenedSource), DownloadSource = Intern(c.DownloadSource), Kind = c.Kind, Text = text, Folder = folder, Directory = Intern(c.Kind == ItemKind.File ? Path.GetDirectoryName(c.Target) ?? c.Detail : ""), Order = first + rows.Count, Visits = c.VisitCount,
                 Modified = c.ModifiedAt?.UtcTicks ?? 0, Created = c.CreatedAt?.UtcTicks ?? 0, Added = c.AddedAt?.UtcTicks ?? 0, Opened = c.OpenedAt?.UtcTicks ?? 0, Downloaded = c.DownloadedAt?.UtcTicks ?? 0, Visited = c.VisitedAt?.UtcTicks ?? 0, Size = c.SizeBytes ?? -1, Screenshot = Screenshot.IsMatch(c.Target) };
             if (ids.TryGetValue(c.Id, out var old)) { row.Order = rows[old].Order; rows[old] = row; } else { ids[c.Id] = rows.Count; rows.Add(row); }
         }
-        var data = new CatalogData { Rows = rows.ToArray(), Strings = strings.ToArray(), Texts = texts.ToArray(), FolderWords = words.ToArray() }; data.Prepare(); return data;
+        var data = new CatalogData { Rows = new PackedRows(rows.OrderBy(r => r.Kind == ItemKind.File ? 0 : 1).ThenBy(r => r.Kind == ItemKind.File ? strings[r.Directory] : "", StringComparer.OrdinalIgnoreCase).ThenBy(r => r.Order).ToArray()), Strings = strings.ToArray(), Texts = texts.ToArray(), FolderWords = words.ToArray() }; data.Prepare(); return data;
     }
+    internal void SetOrder(int i, int order) => Rows.SetOrder(i, order);
     internal void Prepare()
     {
         Ids = Rows.Select((r, i) => (Id: Strings[r.Id], Index: i)).ToDictionary(p => p.Id, p => p.Index, StringComparer.Ordinal);
         Titles = Rows.Select((r, i) => (Title: Strings[r.Title], Index: i)).GroupBy(p => p.Title, StringComparer.OrdinalIgnoreCase).ToDictionary(g => g.Key, g => g.Select(p => p.Index).ToArray(), StringComparer.OrdinalIgnoreCase);
-        files = Enumerable.Range(0, Rows.Length).Where(i => Rows[i].Kind == ItemKind.File).OrderBy(i => Strings[Rows[i].Detail], StringComparer.OrdinalIgnoreCase).ThenBy(i => Rows[i].Order).ToArray();
-        FolderPaths = files.Select(i => Strings[Rows[i].Detail]).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        files = Enumerable.Range(0, Rows.Length).Where(i => Rows[i].Kind == ItemKind.File).OrderBy(i => Strings[Rows[i].Directory], StringComparer.OrdinalIgnoreCase).ThenBy(i => Rows[i].Order).ToArray();
+        FolderPaths = files.Select(i => Strings[Rows[i].Directory]).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
     }
     internal IEnumerable<int> Select(string[]? locations, bool direct)
     {
@@ -113,10 +133,10 @@ internal sealed class CatalogData
         foreach (var location in locations)
         {
             var folder = location.TrimEnd('\\', '/'); var a = 0; var b = files.Length;
-            while (a < b) { var m = (a + b) / 2; if (StringComparer.OrdinalIgnoreCase.Compare(Strings[Rows[files[m]].Detail], folder) < 0) a = m + 1; else b = m; }
+            while (a < b) { var m = (a + b) / 2; if (StringComparer.OrdinalIgnoreCase.Compare(Strings[Rows[files[m]].Directory], folder) < 0) a = m + 1; else b = m; }
             for (var k = a; k < files.Length; k++)
             {
-                var i = files[k]; var path = Strings[Rows[i].Detail];
+                var i = files[k]; var path = Strings[Rows[i].Directory];
                 if (!IndexPolicy.Within(path, folder)) { if (!path.StartsWith(folder, StringComparison.OrdinalIgnoreCase)) break; continue; }
                 if (!direct || path.Equals(folder, StringComparison.OrdinalIgnoreCase)) selected.Add(i);
             }
@@ -128,9 +148,10 @@ internal readonly struct SearchEntry
 {
     internal readonly CatalogData Data;
     internal readonly int Index;
-    internal SearchEntry(CatalogData data, int index) { Data = data; Index = index; }
-    private ref readonly CatalogRow Row => ref Data.Rows[Index];
-    private SearchText Text => Data.Texts[Row.Text];
+    internal SearchEntry(CatalogData data, int index) { Data = data; Index = index; Row = data.Rows[index]; Text = data.Texts[Row.Text]; }
+    private readonly CatalogRow Row;
+    private readonly SearchText Text;
+    internal int TextId => Row.Text;
     public string Id => Data.Strings[Row.Id];
     public string Title => Data.Strings[Row.Title];
     public string Detail => Data.Strings[Row.Detail];
@@ -138,6 +159,7 @@ internal readonly struct SearchEntry
     public ItemKind Kind => Row.Kind;
     public int Order => Row.Order;
     public string Name => Text.Name;
+    public string OriginalName => Text.Original;
     public string[] Words => Text.Words;
     public string[] Aliases => Text.Aliases;
     public string[] AliasWords => Text.AliasWords;
@@ -155,9 +177,83 @@ internal readonly struct SearchEntry
     public bool IsGroupable => Kind is ItemKind.File or ItemKind.App or ItemKind.Link or ItemKind.Folder;
     public bool InScope(Scope s) => s switch { Scope.All => true, Scope.Files => Kind is ItemKind.File or ItemKind.Folder, Scope.Apps => Kind is ItemKind.App or ItemKind.Automation, Scope.Links => Kind == ItemKind.Link, Scope.Workspaces => Kind == ItemKind.Workspace, _ => false };
     public DateTimeOffset? Date(RecencyBasis b) => Time(b switch { RecencyBasis.Modified => Row.Modified, RecencyBasis.Created => Row.Created, RecencyBasis.Added => Row.Added, RecencyBasis.Opened => Row.Opened, RecencyBasis.Downloaded => Row.Downloaded == 0 ? Row.Added : Row.Downloaded, RecencyBasis.Visited => Row.Visited, _ => 0 });
-    public Candidate Candidate => new(Id, Kind, Title, Target) { Detail = Detail, Source = Data.Strings[Row.Source], ModifiedAt = ModifiedAt, CreatedAt = CreatedAt, AddedAt = Time(Row.Added), OpenedAt = OpenedAt, DownloadedAt = DownloadedAt, VisitedAt = VisitedAt, AddedSource = Data.Strings[Row.AddedSource], OpenedSource = Data.Strings[Row.OpenedSource], DownloadSource = Data.Strings[Row.DownloadSource], Keywords = Text.Aliases, VisitCount = Row.Visits, SizeBytes = SizeBytes };
+    public Candidate Candidate => new(Id, Kind, Title, Target) { Detail = Detail, Source = Data.Strings[Row.Source], ModifiedAt = ModifiedAt, CreatedAt = CreatedAt, AddedAt = Time(Row.Added), OpenedAt = OpenedAt, DownloadedAt = DownloadedAt, VisitedAt = VisitedAt, AddedSource = Data.Strings[Row.AddedSource], OpenedSource = Data.Strings[Row.OpenedSource], DownloadSource = Data.Strings[Row.DownloadSource], Keywords = Text.Keywords, VisitCount = Row.Visits, SizeBytes = SizeBytes };
     internal static SearchEntry Create(Candidate c) => new(CatalogData.Build([c]), 0);
 }
-internal sealed class NameScoreCache { }
+internal sealed class NameScoreCache
+{
+    private readonly object gate = new();
+    private readonly Dictionary<string, bool[]> eligible = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, double[]> scores = new(StringComparer.Ordinal);
+    private long bytes;
+    private string fuzzyTerm = "";
+    private bool[]? fuzzyNames;
+    private DateTime used = DateTime.UtcNow;
+    internal double[][] Prepare(CatalogData data, string[] terms)
+    {
+        lock (gate)
+        {
+            TrimUnsafe();
+            used = DateTime.UtcNow;
+            return terms.Select(term =>
+            {
+                if (scores.TryGetValue(term, out var cached)) return cached;
+                var values = new double[data.Texts.Length];
+                for (var i = 0; i < values.Length; i++)
+                {
+                    var text = data.Texts[i]; double best = 0;
+                    foreach (var word in text.Words) best = Math.Max(best, SearchEngine.WordScore(term, word));
+                    foreach (var word in text.AliasWords) best = Math.Max(best, SearchEngine.WordScore(term, word));
+                    values[i] = best;
+                }
+                var size = (long)values.Length * sizeof(double) + 96 + term.Length * 2;
+                if (size <= 31 * 1024 * 1024)
+                {
+                    if (bytes + size > 31 * 1024 * 1024) { scores.Clear(); scores.TrimExcess(); eligible.Clear(); eligible.TrimExcess(); bytes = 0; fuzzyNames = null; fuzzyTerm = ""; }
+                    scores[term] = values; bytes += size;
+                }
+                return values;
+            }).ToArray();
+        }
+    }
+    internal bool[] Eligibility(CatalogData data, string literal, string phrase, string[] terms, double[][] prepared)
+    {
+        lock (gate)
+        {
+            TrimUnsafe(); used = DateTime.UtcNow;
+            var key = literal + "\0" + string.Join('\0', terms);
+            if (eligible.TryGetValue(key, out var cached)) return cached;
+            var mask = new bool[data.Texts.Length];
+            for (var i = 0; i < mask.Length; i++)
+            {
+                var text = data.Texts[i];
+                mask[i] = prepared.Any(values => values[i] > 0)
+                    || literal.Length >= 3 && text.Name.StartsWith(literal, StringComparison.Ordinal)
+                    || text.FullTitle.Equals(literal, StringComparison.OrdinalIgnoreCase)
+                    || text.Name == phrase || text.Aliases.Contains(literal) || text.Aliases.Contains(phrase)
+                    || terms.Length == 1 && phrase.Length >= 2 && text.Initials.StartsWith(phrase, StringComparison.Ordinal);
+            }
+            var size = mask.Length + 96L + key.Length * 2;
+            if (bytes + size <= 31 * 1024 * 1024) { eligible[key] = mask; bytes += size; }
+            return mask;
+        }
+    }
+    internal double[] Fuzzy(CatalogData data, string term)
+    {
+        lock (gate)
+        {
+            TrimUnsafe(); used = DateTime.UtcNow;
+            var narrow = fuzzyNames != null && term.StartsWith(fuzzyTerm, StringComparison.Ordinal);
+            var previous = fuzzyNames; var mask = new bool[data.Texts.Length]; var values = new double[mask.Length];
+            for (var i = 0; i < mask.Length; i++)
+                if ((!narrow || previous![i]) && SubsequenceMatcher.Contains(data.Texts[i].Original, term)) { mask[i] = true; values[i] = SubsequenceMatcher.Score(data.Texts[i].Original, term); }
+            if (mask.Length + 24 <= 1024 * 1024) { fuzzyTerm = term; fuzzyNames = mask; }
+            return values;
+        }
+    }
+    internal void Clear() { lock (gate) { scores.Clear(); scores.TrimExcess(); eligible.Clear(); eligible.TrimExcess(); bytes = 0; fuzzyNames = null; fuzzyTerm = ""; } }
+    internal void Trim() { lock (gate) TrimUnsafe(); }
+    private void TrimUnsafe() { if (DateTime.UtcNow - used >= TimeSpan.FromMinutes(1)) { scores.Clear(); scores.TrimExcess(); eligible.Clear(); eligible.TrimExcess(); bytes = 0; fuzzyNames = null; fuzzyTerm = ""; } }
+}
 
 

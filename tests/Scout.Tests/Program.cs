@@ -30,6 +30,7 @@ BluetoothChecks.Run(Test);
 SearchUpgradeChecks.Run(Test);
 ContentSearchChecks.Run(Test);
 IndexRaceChecks.Run(Test);
+SnapshotChecks.Run(Test);
 SettingsUiChecks.Run(Test);
 Candidate FileItem(string name, int hours) => new(Candidate.Key(ItemKind.File, name), ItemKind.File, name, "C:\\Documents\\" + name) { ModifiedAt = now.AddHours(-hours), Detail = "Documents" };
 var recent = FileItem("Roadmap.pdf", 1) with { AddedAt = now.AddMinutes(-5) };

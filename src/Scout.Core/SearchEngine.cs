@@ -10,6 +10,7 @@ public static class SearchEngine
     public static SearchResult Search(string query, Scope scope, SearchCatalog catalog, IReadOnlyDictionary<string, LibraryItem> library, DateTimeOffset now, int limit = 100, CancellationToken cancellationToken = default, IEnumerable<Candidate>? extra = null, IEnumerable<ContentMatch>? contentMatches = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        using var lease = catalog.Acquire();
         var timer = Stopwatch.StartNew();
         var literal = query.Trim().ToLowerInvariant();
         if (literal.Length >= 2 && literal[0] is '"' or '\'' && literal[^1] == literal[0]) literal = literal[1..^1];
@@ -52,11 +53,11 @@ public static class SearchEngine
         }
         if (intent.Count.HasValue) limit = Math.Min(limit, intent.Count.Value);
         var phrase = string.Join(' ', intent.Terms);
-        var position = 0;
+        var position = 0; var visited = 0;
         foreach (var doc in docs)
         {
-            if ((position++ & 127) == 0) cancellationToken.ThrowIfCancellationRequested();
-            var raw = doc;
+            if ((visited++ & 127) == 0) cancellationToken.ThrowIfCancellationRequested();
+            var raw = doc; position = doc.Order + 1;
             if (!raw.InScope(scope) || intent.Kind != null && raw.Kind != intent.Kind && !(intent.Kind == ItemKind.App && raw.Kind == ItemKind.Automation)) continue;
             if (intent.Extension != null && !FileTypes.Matches(doc.Extension, intent.Extension)) continue;
             if (intent.Screenshots && !doc.Screenshot) continue;
