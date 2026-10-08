@@ -49,17 +49,17 @@ public sealed class SearchSnapshot
     private const string Magic = "SCOUTIDX4";
     public static string Fingerprint(IEnumerable<string> roots, IEnumerable<string> exclusions) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(string.Join('\n', roots.Select(Path.GetFullPath).Select(p => p.ToUpperInvariant()).Order().Concat(["--"]).Concat(exclusions.Select(Path.GetFullPath).Select(p => p.ToUpperInvariant()).Order())))));
     internal sealed record Manifest(string File, long Generation, string Fingerprint);
-    public static SearchCatalog Load(ScoutStore store, string[] roots, string[] exclusions)
+    public static SearchCatalog Load(ScoutStore store, string[] roots, string[] exclusions, bool reconcileCoverage = false)
     {
-        lock (Gates.GetOrAdd(store.IndexDirectory, _ => new object())) return LoadCore(store, roots, exclusions);
+        lock (Gates.GetOrAdd(store.IndexDirectory, _ => new object())) return LoadCore(store, roots, exclusions, reconcileCoverage);
     }
-    private static SearchCatalog LoadCore(ScoutStore store, string[] roots, string[] exclusions)
+    private static SearchCatalog LoadCore(ScoutStore store, string[] roots, string[] exclusions, bool reconcileCoverage)
     {
         var fingerprint = Fingerprint(roots, exclusions);
         try
         {
             var manifest = JsonSerializer.Deserialize<Manifest>(File.ReadAllText(Path.Combine(store.IndexDirectory, "manifest.json")))!;
-            if (manifest.Fingerprint != fingerprint || manifest.Generation > store.IndexGeneration || Path.GetFileName(manifest.File) != manifest.File) throw new InvalidDataException();
+            if (manifest.Fingerprint != fingerprint || manifest.Generation > store.IndexGeneration || manifest.Generation < store.IndexJournalFloor || Path.GetFileName(manifest.File) != manifest.File) throw new InvalidDataException();
             var path = Path.Combine(store.IndexDirectory, manifest.File);
             using var input = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete);
             if (input.Length < 48 || input.Length > 8L * 1024 * 1024 * 1024) throw new InvalidDataException();
@@ -95,7 +95,16 @@ public sealed class SearchSnapshot
         }
         catch (Exception e) when (e is IOException or InvalidDataException or UnauthorizedAccessException or JsonException or ArgumentException or OverflowException or NullReferenceException)
         {
-            return new SearchCatalog(store.StreamCandidates().Where(c => c.Kind == ItemKind.File && !IndexPolicy.Excluded(c.Target, exclusions) && roots.Any(r => IndexPolicy.Within(c.Target, r))), roots: roots);
+            var removed = new List<string>();
+            bool Eligible(Candidate candidate)
+            {
+                if (candidate.Kind != ItemKind.File) return false;
+                if (!IndexPolicy.Excluded(candidate.Target, exclusions) && roots.Any(root => IndexPolicy.Within(candidate.Target,root))) return true;
+                removed.Add(candidate.Id); return false;
+            }
+            var rebuilt = new SearchCatalog(store.StreamCandidates().Where(Eligible), roots: roots);
+            if (reconcileCoverage && removed.Count > 0) store.UpdateIndex([],removed);
+            return rebuilt;
         }
     }
     public static void Save(ScoutStore store, SearchCatalog catalog, long generation, string[] roots, string[] exclusions)
@@ -106,6 +115,12 @@ public sealed class SearchSnapshot
     {
         Directory.CreateDirectory(store.IndexDirectory);
         var fingerprint = Fingerprint(roots, exclusions);
+        try
+        {
+            var published = JsonSerializer.Deserialize<Manifest>(File.ReadAllText(Path.Combine(store.IndexDirectory, "manifest.json")));
+            if (published?.Generation > generation) return; // A late compaction cannot move the checkpoint backwards.
+        }
+        catch (Exception e) when (e is IOException or JsonException) { }
         var file = $"index-{generation}-{Guid.NewGuid():N}.bin"; var path = Path.Combine(store.IndexDirectory, file); var temp = path + ".tmp";
         var data = catalog.Base;
         if (catalog.PendingCount != 0) data = catalog.Compact().Base;

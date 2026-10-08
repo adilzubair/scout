@@ -23,6 +23,21 @@ internal static class CacheChecks
             Check(old.Hits.Count == 0);
             Check(SearchEngine.Search("budget", Scope.Files, catalog.WithChanges([File("Budget.xlsx")], []), memory, now).Hits.Count == 1);
         });
+        test("Cached matching applies current personal boosts and content-only evidence", () =>
+        {
+            var a = File("Report.pdf"); var b = File("Report two.pdf"); var catalog = new SearchCatalog([a,b]);
+            SearchEngine.Search("report",Scope.Files,catalog,memory,now);
+            memory[b.Id] = new(b,true,9,now,["privatealias"]);
+            foreach (var query in new[] {"report", "privatealias", "rep", "reprot"})
+            {
+                var cached = SearchEngine.Search(query,Scope.Files,catalog,memory,now);
+                var fresh = SearchEngine.Search(query,Scope.Files,new SearchCatalog([a,b]),memory,now);
+                Check(cached.Hits.Select(h => (h.Candidate.Id,h.Score,h.Pinned)).SequenceEqual(fresh.Hits.Select(h => (h.Candidate.Id,h.Score,h.Pinned))));
+            }
+            var contentOnly = SearchEngine.Search("underwater",Scope.Files,catalog,memory,now,contentMatches:[new(a.Id,180)]);
+            Check(contentOnly.Hits.Single().Candidate.Id == a.Id && contentOnly.ModelShortlist.Count == 0);
+            memory.Clear(); catalog.ClearNameCache();
+        });
     }
     private static void Check(bool condition) { if (!condition) throw new InvalidOperationException("Index redesign assertion failed"); }
     private static void Fixture(Action<string, ScoutStore> run)

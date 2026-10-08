@@ -28,6 +28,8 @@ public sealed partial class ScoutStore
                 CREATE TABLE IF NOT EXISTS index_state(id INTEGER PRIMARY KEY CHECK(id=1), generation INTEGER NOT NULL);
                 INSERT OR IGNORE INTO index_state VALUES(1,0);
                 CREATE TABLE IF NOT EXISTS candidate_changes(generation INTEGER NOT NULL, id TEXT NOT NULL, json TEXT, PRIMARY KEY(generation,id));
+                CREATE TABLE IF NOT EXISTS index_checkpoint(id INTEGER PRIMARY KEY CHECK(id=1), generation INTEGER NOT NULL);
+                INSERT OR IGNORE INTO index_checkpoint VALUES(1,0);
                 PRAGMA user_version=2;
                 """;
             command.ExecuteNonQuery();
@@ -106,7 +108,7 @@ public sealed partial class ScoutStore
         command.CommandText = "DELETE FROM candidates WHERE id=$id";
         var id = command.Parameters.Add("$id", SqliteType.Text);
         foreach (var key in removals) { id.Value = key; command.ExecuteNonQuery(); }
-        command.CommandText = "INSERT OR REPLACE INTO candidates VALUES($id,$json)";
+        command.CommandText = "INSERT INTO candidates(id,json) VALUES($id,$json) ON CONFLICT(id) DO UPDATE SET json=excluded.json";
         var json = command.Parameters.Add("$json", SqliteType.Text);
         foreach (var item in updates) { id.Value = item.Id; json.Value = JsonSerializer.Serialize(item); command.ExecuteNonQuery(); }
         Journal(c, transaction, updates, removals);

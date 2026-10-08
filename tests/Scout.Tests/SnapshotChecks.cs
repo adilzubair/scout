@@ -51,6 +51,37 @@ internal static class SnapshotChecks
             Check(SearchSnapshot.Load(store, [@"C:\Test"], []).Contains(a.Id));
             Check(!SearchSnapshot.Load(store, [@"C:\Other"], []).Contains(a.Id));
         }));
+        test("Changes arriving during compaction survive publication and stale saves", () => Fixture((root,store) =>
+        {
+            var a = File("Report.pdf"); store.ReplaceIndex([a]); var generation = store.IndexGeneration;
+            var captured = new SearchCatalog([a]);
+            store.UpdateIndex([a with { ModifiedAt = now.AddHours(2) }, File("Budget.pdf")], []);
+            SearchSnapshot.Save(store,captured,generation,[@"C:\Test"],[]);
+            var replay = SearchSnapshot.Load(store,[@"C:\Test"],[]); Check(replay.Count == 2);
+            SearchSnapshot.Save(store,replay.Compact(),store.IndexGeneration,[@"C:\Test"],[]);
+            SearchSnapshot.Save(store,captured,generation,[@"C:\Test"],[]);
+            var newest = SearchSnapshot.Load(store,[@"C:\Test"],[]);
+            Check(newest.Count == 2 && newest.Candidates.Single(c => c.Id == a.Id).ModifiedAt == now.AddHours(2));
+        }));
+        test("New-file tie order survives later batches, compaction and restart", () => Fixture((root,store) =>
+        {
+            var a = File("Same z.pdf"); var b = File("Same a.pdf"); var c = File("Same m.pdf");
+            var before = new SearchCatalog([]).WithChanges([a,b],[]).WithChanges([c],[]);
+            var expected = SearchEngine.Search("same",Scope.Files,before,memory,now).Hits.Select(h => h.Candidate.Id).ToArray();
+            Check(expected.SequenceEqual(new[] {a.Id,b.Id,c.Id}));
+            Check(expected.SequenceEqual(SearchEngine.Search("same",Scope.Files,before.Compact(),memory,now).Hits.Select(h => h.Candidate.Id)));
+            store.UpdateIndex([a,b],[]); store.UpdateIndex([c,a with { Source = "Updated" }],[]);
+            var replay = SearchSnapshot.Load(store,[@"C:\Test"],[]);
+            Check(expected.SequenceEqual(SearchEngine.Search("same",Scope.Files,replay,memory,now).Hits.Select(h => h.Candidate.Id)));
+        }));
+        test("Removed directory scopes disappear while offline compaction preserves metadata", () =>
+        {
+            var path = @"C:\Test\Nested\Report.pdf"; var item = new Candidate(Candidate.Key(ItemKind.File,path),ItemKind.File,"Report.pdf",path) { Detail = @"C:\Test\Nested" };
+            var catalog = new SearchCatalog([item],roots:[@"C:\Test"]);
+            Check(catalog.WithChanges([], [item.Id]).Folders.Resolve("Nested").Length == 0);
+            var offline = catalog.WithRoots([@"C:\Test"],[@"C:\Test"]).Compact();
+            Check(!offline.Contains(item.Id) && offline.WithRoots([@"C:\Test"]).Contains(item.Id));
+        });
     }
     private static void Check(bool condition) { if (!condition) throw new InvalidOperationException("Index redesign assertion failed"); }
     private static void Fixture(Action<string, ScoutStore> run)
