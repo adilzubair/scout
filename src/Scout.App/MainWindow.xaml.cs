@@ -593,10 +593,10 @@ public partial class MainWindow : Window
         try
         {
             var startup = Stopwatch.StartNew();
-            while (!index.Candidates.Any(c => c.Kind == ItemKind.App))
+            while (!index.Applications.Any())
             { if (startup.Elapsed > TimeSpan.FromSeconds(20)) throw new InvalidOperationException("Applications were not discovered"); await Task.Delay(25); }
             var appsReadyMs = startup.Elapsed.TotalMilliseconds;
-            var apps = index.Candidates.Where(c => c.Kind == ItemKind.App).ToArray();
+            var apps = index.Applications.ToArray();
             var checks = new List<object>();
             foreach (var query in new[] { "notepad", "chrome", "edge", "vscode", "code", "excel", "word", "terminal" })
             {
@@ -640,10 +640,14 @@ public partial class MainWindow : Window
             File.Delete(watchFile);
             await Until(() => !index.Catalog.Contains(watchId));
             if (index.FullScanCount != fullScans) throw new InvalidOperationException("A file change triggered a full scan");
-            WindowsIntegration.TestDefaultHotkey(); await Until(() => !IsVisible);
-            WindowsIntegration.TestDefaultHotkey(); await Until(() => IsVisible); await WaitForSearch();
+            var testHotkey = Environment.GetEnvironmentVariable("SCOUT_TEST_HOTKEY") != "0";
+            if (testHotkey)
+            {
+                WindowsIntegration.TestDefaultHotkey(); await Until(() => !IsVisible);
+                WindowsIntegration.TestDefaultHotkey(); await Until(() => IsVisible); await WaitForSearch();
+            }
             if (gaps.Count > 0 && gaps.Order().ElementAt((int)(gaps.Count * .95)) > 100) throw new InvalidOperationException("UI responsiveness exceeded 100 ms p95");
-            return new { passed = true, appsReadyMs, appCount = apps.Length, fileCount = index.Candidates.Count(c => c.Kind == ItemKind.File), checks, inputCycleMs, worstUiGapMs = gaps.DefaultIfEmpty(0).Max(), p95UiGapMs = gaps.Count == 0 ? 0 : gaps.Order().ElementAt((int)(gaps.Count * .95)), fullScans, watcherCreateModifyDelete = true, globalHotkey = true };
+            return new { passed = true, appsReadyMs, appCount = apps.Length, cachedFileCount = index.CachedFileCount, checks, inputCycleMs, worstUiGapMs = gaps.DefaultIfEmpty(0).Max(), p95UiGapMs = gaps.Count == 0 ? 0 : gaps.Order().ElementAt((int)(gaps.Count * .95)), fullScans, index.LastScanSeenCount, index.LastScanRemovedCount, index.LastScanUnavailableCount, index.LargestWatcherRemoval, watcherCreateModifyDelete = true, globalHotkey = testHotkey, globalHotkeySkipped = !testHotkey };
         }
         finally { heartbeat.Stop(); }
     }

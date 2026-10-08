@@ -46,6 +46,15 @@ internal static class DriveIndexChecks
             await service.ConfigureAsync(settings); var id = Candidate.Key(ItemKind.File,path);
             Check(service.Catalog.Count(c => c.Kind == ItemKind.File) == 1);
             Check(service.Catalog.Contains(id) && store.Candidates.Count(c => c.Id == id) == 1);
+            // Simulate a stale root deletion delivered after watcher reset/recreation.
+            var beforeStale = service.FullScanCount;
+            typeof(IndexService).GetMethod("Queue",System.Reflection.BindingFlags.NonPublic|System.Reflection.BindingFlags.Instance)!.Invoke(service,[selected,false,true]);
+            await Until(() => service.FullScanCount > beforeStale);
+            Check(service.Catalog.Contains(id) && store.Candidates.Any(c => c.Id == id));
+            var beforeFileDelete = service.FullScanCount; var beforeVersion = service.Version;
+            typeof(IndexService).GetMethod("Queue",System.Reflection.BindingFlags.NonPublic|System.Reflection.BindingFlags.Instance)!.Invoke(service,[path,false,true]);
+            await Until(() => service.Version > beforeVersion);
+            Check(service.Catalog.Contains(id) && service.FullScanCount == beforeFileDelete);
             var moved = Path.Combine(selected,"renamed"); Directory.Move(child,moved); var renamed = Path.Combine(moved,"Budget.txt"); var renamedId = Candidate.Key(ItemKind.File,renamed);
             await Until(() => service.Catalog.Contains(renamedId) && !service.Catalog.Contains(id));
             await File.AppendAllTextAsync(renamed," edited"); await Until(() => service.Catalog.TryGetCandidate(renamedId,out var c) && c?.SizeBytes == 16);

@@ -60,6 +60,7 @@ public partial class App : Application
                     .ToArray();
                 store.ReplaceIndex(fixtures);
             }
+            if (diagnose) Environment.SetEnvironmentVariable("SCOUT_INDEX_AUDIT", "1");
             index = new IndexService(store); model = new ModelHost();
             if (!smoke && !diagnose && !bluetooth) _ = model.WarmAsync(store.Settings);
             var main = new MainWindow(store, index, model); MainWindow = main;
@@ -85,16 +86,20 @@ public partial class App : Application
                 var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };
                 timer.Tick += async (_, _) =>
                 {
-                    timer.Stop();
+                    timer.Stop(); double? initialCrawlMs = null;
                     try
                     {
-                        await indexReady; startupHeartbeat.Stop(); var initialCrawlMs = startupClock.Elapsed.TotalMilliseconds;
+                        await indexReady; startupHeartbeat.Stop(); initialCrawlMs = startupClock.Elapsed.TotalMilliseconds;
                         var report = bluetooth ? await main.DiagnoseBluetoothAsync() : realworld ? await main.DiagnoseRealWorldAsync() : await main.DiagnoseAsync();
                         File.WriteAllText(Path.Combine(DataDirectory, "desktop-diagnostics.json"), System.Text.Json.JsonSerializer.Serialize(report, new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
-                        if (diagnose) File.WriteAllText(Path.Combine(DataDirectory,"startup-responsiveness.json"),System.Text.Json.JsonSerializer.Serialize(new { initialCrawlMs, samples=startupGaps.Count, p95UiGapMs=startupGaps.Count==0?0:startupGaps.Order().ElementAt((int)(startupGaps.Count*.95)), worstUiGapMs=startupGaps.DefaultIfEmpty(0).Max() }));
                     }
                     catch (Exception error) { File.WriteAllText(Path.Combine(DataDirectory, "desktop-diagnostics.json"), System.Text.Json.JsonSerializer.Serialize(new { passed = false, error = error.ToString() })); Environment.ExitCode = 1; }
-                    finally { Shutdown(); }
+                    finally
+                    {
+                        startupHeartbeat.Stop();
+                        if (diagnose) File.WriteAllText(Path.Combine(DataDirectory,"startup-responsiveness.json"),System.Text.Json.JsonSerializer.Serialize(new { initialCrawlMs, samples=startupGaps.Count, p95UiGapMs=startupGaps.Count==0?0:startupGaps.Order().ElementAt((int)(startupGaps.Count*.95)), worstUiGapMs=startupGaps.DefaultIfEmpty(0).Max() }));
+                        Shutdown();
+                    }
                 }; timer.Start();
             }
             if (smoke)

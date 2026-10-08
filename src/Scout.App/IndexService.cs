@@ -39,7 +39,13 @@ internal sealed class IndexService : IDisposable
     public SearchCatalog Catalog => Volatile.Read(ref catalog);
     public long Version => Interlocked.Read(ref version);
     public IEnumerable<Candidate> Candidates => Catalog.Candidates;
+    internal IEnumerable<Candidate> Applications => Volatile.Read(ref apps).Where(c => c.Kind == ItemKind.App);
+    internal int CachedFileCount => files.Count;
     public int FullScanCount { get; private set; }
+    internal int LastScanSeenCount { get; private set; }
+    internal int LastScanRemovedCount { get; private set; }
+    internal int LastScanUnavailableCount { get; private set; }
+    internal int LargestWatcherRemoval { get; private set; }
     public string[] Roots => Volatile.Read(ref roots);
     private IEnumerable<string> TraversalRoots => Roots.Where(r => !Roots.Any(other => !r.Equals(other, StringComparison.OrdinalIgnoreCase) && IndexPolicy.Within(r, other)));
     private bool Excluded(string path) => IndexPolicy.Excluded(path, settings.Exclusions)
@@ -84,7 +90,7 @@ internal sealed class IndexService : IDisposable
                 var refreshTask = RefreshCoreAsync(forceHistory: false);
                 await Task.WhenAll(refreshTask, appTask);
                 apps = appTask.Result;
-                Publish();
+                await Task.Run(Publish, lifetime.Token);
                 if (!refreshTask.Result)
                 {
                     lifetime.Token.ThrowIfCancellationRequested();
@@ -181,8 +187,11 @@ internal sealed class IndexService : IDisposable
                     ResetWatchers(); failed.Clear();
                     var seen = new HashSet<string>(StringComparer.Ordinal);
                     foreach (var root in TraversalRoots) Scan(root, seen, token);
+                    Audit("scan-complete",seen.Count,0);
+                    LastScanSeenCount = seen.Count; LastScanRemovedCount = 0; LastScanUnavailableCount = failed.Count;
                     foreach (var c in files.Values)
-                        if (!seen.Contains(c.Id) && !failed.Keys.Any(path => IndexPolicy.Within(c.Target, path))) files.TryRemove(c.Id, out _);
+                        if (!seen.Contains(c.Id) && !failed.Keys.Any(path => IndexPolicy.Within(c.Target, path))) { files.TryRemove(c.Id, out _); LastScanRemovedCount++; }
+                    Audit("reconciled",seen.Count,LastScanRemovedCount);
                     FullScanCount++; lastScan = DateTime.UtcNow;
                     Publish(); ScheduleCompaction(!files.Snapshot.IsPersisted);
 
@@ -196,8 +205,19 @@ internal sealed class IndexService : IDisposable
                     if (!Roots.Any(root => Directory.Exists(root) && IndexPolicy.Within(change.Path, root))) continue;
                     if (change.Deleted)
                     {
+                        // A queued delete can become stale after recreation or a watcher reset.
+                        // Reconcile existing paths rather than erasing their cached subtree.
+                        if (File.Exists(change.Path))
+                        {
+                            if (ReadFile(change.Path,false) is { } recreated) { files[recreated.Id] = recreated; updates[recreated.Id] = recreated; removed.Remove(recreated.Id); }
+                            continue;
+                        }
+                        if (Directory.Exists(change.Path)) { Interlocked.Exchange(ref dirty, 1); continue; }
+                        var previousRemoved = removed.Count;
                         foreach (var pair in files.UnderPath(change.Path))
                         { files.TryRemove(pair.Id, out _); updates.Remove(pair.Id); removed.Add(pair.Id); }
+                        LargestWatcherRemoval = Math.Max(LargestWatcherRemoval, removed.Count - previousRemoved);
+                        if (removed.Count - previousRemoved >= 1000) Audit("watcher-subtree-removal",0,removed.Count - previousRemoved);
                     }
                     else if (Directory.Exists(change.Path))
                     {
@@ -254,6 +274,12 @@ internal sealed class IndexService : IDisposable
             };
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException) { return null; }
+    }
+    private void Audit(string stage,int seen,int removed)
+    {
+        if (Environment.GetEnvironmentVariable("SCOUT_INDEX_AUDIT") != "1") return;
+        Directory.CreateDirectory(store.IndexDirectory);
+        File.AppendAllText(Path.Combine(store.IndexDirectory,"crawl-audit.jsonl"),System.Text.Json.JsonSerializer.Serialize(new { stage, seen, removed, cached=files.Count, unavailable=failed.Count, FullScanCount, generation=store.IndexGeneration }) + Environment.NewLine);
     }
     private void Scan(string root, HashSet<string> seen, CancellationToken token)
     {
