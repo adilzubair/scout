@@ -52,12 +52,19 @@ public static class SearchEngine
             else docs = catalog.Entries(locations, folderFilter.DirectOnly).Where(d => additions == null || !additions.ContainsKey(d.Id)).Concat(additions?.Values.Where(c => c.Kind == ItemKind.File && locations.Any(path => folderFilter.DirectOnly ? Path.GetDirectoryName(c.Target)?.Equals(path, StringComparison.OrdinalIgnoreCase) == true : IndexPolicy.Within(c.Target, path))).Select(SearchEntry.Create) ?? []);
         }
         if (intent.Count.HasValue) limit = Math.Min(limit, intent.Count.Value);
+        var nameScores = catalog.PrepareScores(intent.Terms);
         var phrase = string.Join(' ', intent.Terms);
+        // A zero title score cannot become an ordinary hit merely through folder context.
+        // Keep broad recall, exact names, initials, personal aliases and content eligible.
+        var canPruneNames = !emptyQuery && intent.Terms.Length > 0 && intent.Extension == null && intent.Kind is not (ItemKind.App or ItemKind.Link);
+        var aliasIds = canPruneNames ? library.Values.Where(m => intent.Recency == RecencyBasis.None && intent.Window == null && m.Aliases.Any(a => a.Equals(literal, StringComparison.OrdinalIgnoreCase))).Select(m => m.Candidate.Id).ToHashSet(StringComparer.Ordinal) : [];
+        var eligibleNames = canPruneNames ? catalog.PrepareEligibility(literal, phrase, intent.Terms, nameScores) : [];
         var position = 0; var visited = 0;
         foreach (var doc in docs)
         {
             if ((visited++ & 127) == 0) cancellationToken.ThrowIfCancellationRequested();
             var raw = doc; position = doc.Order + 1;
+            if (canPruneNames && eligibleNames.TryGetValue(doc.Data, out var eligible) && !eligible[doc.TextId] && !aliasIds.Contains(doc.Id) && !content.ContainsKey(doc.Id)) continue;
             if (!raw.InScope(scope) || intent.Kind != null && raw.Kind != intent.Kind && !(intent.Kind == ItemKind.App && raw.Kind == ItemKind.Automation)) continue;
             if (intent.Extension != null && !FileTypes.Matches(doc.Extension, intent.Extension)) continue;
             if (intent.Screenshots && !doc.Screenshot) continue;
@@ -81,11 +88,14 @@ public static class SearchEngine
             {
                 var matches = true;
                 var titleMatches = 0;
+                var termIndex = 0;
+                nameScores.TryGetValue(doc.Data, out var prepared);
                 foreach (var term in intent.Terms)
                 {
                     var best = 0d;
-                    foreach (var word in doc.Words) best = Math.Max(best, WordScore(term, word));
-                    foreach (var alias in doc.AliasWords) best = Math.Max(best, WordScore(term, alias));
+                    if (prepared != null) best = prepared[termIndex][doc.TextId];
+                    else { foreach (var word in doc.Words) best = Math.Max(best, WordScore(term, word)); foreach (var alias in doc.AliasWords) best = Math.Max(best, WordScore(term, alias)); }
+                    termIndex++;
                     if (best > 0) titleMatches++;
                     else foreach (var word in doc.FolderWords)
                         if (word == term || term.Length >= 3 && word.StartsWith(term, StringComparison.Ordinal)) { best = 12; break; }
@@ -104,10 +114,9 @@ public static class SearchEngine
                         var broad = intent.Extension != null || intent.Kind is ItemKind.App or ItemKind.Link || intent.Terms.Length >= 2 && titleMatches > 0;
                         if (broad && raw.IsGroupable && literal.Length >= 3)
                         {
-                            var recalledCandidate = opened == raw.OpenedAt ? raw.Candidate : raw.Candidate with { OpenedAt = opened, OpenedSource = "Scout launch history" };
                             var recallPriority = (score, (date ?? raw.CreatedAt ?? raw.VisitedAt ?? raw.ModifiedAt)?.ToUnixTimeMilliseconds() ?? 0, -position);
                             if (recall.Count < 128 || recallPriority.CompareTo(recall.PeekPriority()) > 0)
-                            { recall.Enqueue(new(recalledCandidate, score), recallPriority); if (recall.Count > 128) recall.Dequeue(); }
+                            { var recalledCandidate = opened == raw.OpenedAt ? raw.Candidate : raw.Candidate with { OpenedAt = opened, OpenedSource = "Scout launch history" }; recall.Enqueue(new(recalledCandidate, score), recallPriority); if (recall.Count > 128) recall.Dequeue(); }
                         }
                         continue;
                     }
