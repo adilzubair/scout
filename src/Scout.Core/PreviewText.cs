@@ -18,7 +18,7 @@ public static class PreviewText
     public static Task<string?> ExtractAsync(string path, CancellationToken token) => Task.Run(() => Extract(path, token), token);
 
     public static string? Read(string path, CancellationToken token) =>
-        Extract(path, token) ?? (IsOfficeDocument(path) ? "No text available in this document. Open it in its application to view the full layout." : null);
+        Extract(path, token, preview:true) ?? (IsOfficeDocument(path) ? "No text available in this document. Open it in its application to view the full layout." : null);
 
     private static bool IsOfficeDocument(string path)
     {
@@ -26,7 +26,7 @@ public static class PreviewText
         return extension is ".docx" or ".pptx" or ".xlsx" or ".odt" or ".odp" or ".ods";
     }
 
-    private static string? Extract(string path, CancellationToken token)
+    private static string? Extract(string path, CancellationToken token, bool preview = false)
     {
         var extension = Path.GetExtension(path).ToLowerInvariant();
         if (extension is ".docx" or ".pptx" or ".xlsx" or ".odt" or ".odp" or ".ods")
@@ -55,6 +55,6 @@ public static class PreviewText
         using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
         using var text = new StreamReader(stream, Encoding.UTF8, true);
         var buffer = new char[64000]; var count = text.ReadBlock(buffer, 0, buffer.Length); token.ThrowIfCancellationRequested();
-        return new string(buffer, 0, count) + (text.EndOfStream ? "" : "\n\n… Preview limited to 64,000 characters.");
+        return new string(buffer, 0, count) + (preview && !text.EndOfStream ? "\n\n… Preview limited to 64,000 characters." : "");
     }
 }

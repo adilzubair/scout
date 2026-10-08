@@ -23,7 +23,7 @@ internal sealed class PreviewWindow : Window
     private uint page;
     private MediaElement? media;
     private bool rendering;
-    public PreviewWindow(Candidate item)
+    public PreviewWindow(Candidate item, ContentExcerpt[]? matches = null)
     {
         this.item = item; Title = item.Title; Width = 850; Height = 660; MinWidth = 600; MinHeight = 380; WindowStartupLocation = WindowStartupLocation.CenterOwner;
         WindowVisuals.Configure(this, WindowSurface.Document);
@@ -31,6 +31,11 @@ internal sealed class PreviewWindow : Window
         var heading = WindowVisuals.Header(this, item.Title); DockPanel.SetDock(heading, Dock.Top); dock.Children.Add(heading);
         status.Foreground = WindowVisuals.Brush("Muted"); status.FontSize = 11; status.TextTrimming = TextTrimming.CharacterEllipsis; status.Margin = new Thickness(24, 0, 24, 14);
         DockPanel.SetDock(status, Dock.Top); dock.Children.Add(status);
+        if (matches is { Length: > 0 })
+        {
+            var excerpts = new TextBox { Text = string.Join(Environment.NewLine, matches.Select(m => (m.Line is { } line ? $"Line {line}: " : "") + m.Text)), IsReadOnly = true, TextWrapping = TextWrapping.Wrap, MaxHeight = 160, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Margin = new Thickness(24, 0, 24, 12), FontFamily = new FontFamily("Cascadia Mono, Consolas") };
+            DockPanel.SetDock(excerpts, Dock.Top); dock.Children.Add(excerpts);
+        }
         var controls = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(24, 16, 24, 20) }; DockPanel.SetDock(controls, Dock.Bottom); dock.Children.Add(controls);
         void Button(string label, Action action) { var b = new Button { Content = label, Margin = new Thickness(0, 0, 8, 0), Style = WindowVisuals.Style(label == "Open file" ? "PrimaryButton" : "QuietButton") }; b.Click += (_, _) => action(); controls.Children.Add(b); }
         Button("Open file", () => { try { WindowsIntegration.Open(item); } catch (Exception e) when (e is IOException or System.ComponentModel.Win32Exception) { status.Text = e.Message; } });

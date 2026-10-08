@@ -177,9 +177,13 @@ public partial class MainWindow : Window
             await Task.Delay(30, token);
             var catalog = index.Catalog;
             var library = store.Library;
-            var extra = enriched.Concat(store.Workspaces.Select(w => w.ToCandidate())).Concat(library.Values.Where(l => (l.Pinned || l.LastLaunch != null) && l.Candidate.IsPinnable && !catalog.Contains(l.Candidate.Id)).Select(l => l.Candidate)).ToArray();
+            var extra = enriched.Concat(store.Workspaces.Select(w => w.ToCandidate())).Concat(library.Values.Where(l => (l.Pinned || l.LastLaunch != null) && l.Candidate.IsPinnable && catalog.IsAvailable(l.Candidate) && !catalog.Contains(l.Candidate.Id)).Select(l => l.Candidate)).ToArray();
             var now = DateTimeOffset.Now;
-            var result = await Task.Run(() => SearchEngine.Search(query, requestedScope, catalog, library, now, cancellationToken: token, extra: extra, contentMatches: index.SearchContent(query, requestedScope, now, token)), token);
+            var result = await Task.Run(() => {
+                var content = index.SearchContentResponse(query, requestedScope, now, token);
+                var found = SearchEngine.Search(query, requestedScope, catalog, library, now, cancellationToken: token, extra: extra, contentMatches: content.Matches);
+                return found with { Notice = string.Join(" ", new[] { found.Notice, content.Notice }.Where(n => n.Length > 0)) };
+            }, token);
             if (token.IsCancellationRequested || generation != revision) return;
             current = result; appliedRevision = generation;
             judgment = null;
@@ -258,7 +262,7 @@ public partial class MainWindow : Window
             effective.Insert(0, new(new Candidate("group:current", ItemKind.Group, $"Open all {group.Count} {noun}", "") { Detail = string.Join(", ", group.Values.Take(3).Select(c => c.Title)) + (group.Count > 3 ? ", …" : ""), Source = "Group" }, 2000));
         }
         var ready = current != null && RankingPolicy.Ready(current, effective, judgment);
-        var rows = effective.Select((h, i) => new ResultRow(h.Candidate, h.Pinned, group.ContainsKey(h.Candidate.Id), current?.Intent.Recency ?? RecencyBasis.None, i == 0 && (ready || h.Candidate.Kind == ItemKind.Group), group.Count > 0)).ToArray();
+        var rows = effective.Select((h, i) => new ResultRow(h.Candidate, h.Pinned, group.ContainsKey(h.Candidate.Id), current?.Intent.Recency ?? RecencyBasis.None, i == 0 && (ready || h.Candidate.Kind == ItemKind.Group), group.Count > 0, h.MatchKind, h.Evidence)).ToArray();
         Results.ItemsSource = rows;
         lastRenderedQuery = Query.Text;
         lastRenderedIds = rows.Select(row => row.Candidate.Id).ToHashSet();
@@ -410,7 +414,7 @@ public partial class MainWindow : Window
         if (!group.Remove(row.Candidate.Id) && group.Count < 25) group[row.Candidate.Id] = row.Candidate;
         groupChoices[row.Candidate.Id] = group.ContainsKey(row.Candidate.Id); UpdateGroup(); ApplyRows(displayedHits); e.Handled = true;
     }
-    private void Preview(Candidate item) { if (item.Kind == ItemKind.File) new PreviewWindow(item) { Owner = this }.ShowDialog(); }
+    private void Preview(Candidate item) { if (item.Kind == ItemKind.File) new PreviewWindow(item, displayedHits.FirstOrDefault(h => h.Candidate.Id == item.Id)?.Excerpts) { Owner = this }.ShowDialog(); }
     private void UpdateGroup() { GroupBar.Visibility = expanded && (group.Count > 0 || editingWorkspace != null) ? Visibility.Visible : Visibility.Collapsed; GroupLabel.Text = $"{group.Count} selected"; UpdateExpansion(); }
     private void ActionsClick(object sender, RoutedEventArgs e) => ShowActions();
     private void ShowActions()
@@ -510,7 +514,7 @@ public partial class MainWindow : Window
         else return;
         e.Handled = true;
     }
-    private sealed class ResultRow(Candidate candidate, bool pinned, bool grouped, RecencyBasis basis, bool ready, bool membership) : System.ComponentModel.INotifyPropertyChanged
+    private sealed class ResultRow(Candidate candidate, bool pinned, bool grouped, RecencyBasis basis, bool ready, bool membership, SearchMatchKind matchKind = SearchMatchKind.Metadata, string matchEvidence = "") : System.ComponentModel.INotifyPropertyChanged
     {
         public Candidate Candidate => candidate;
         public bool Grouped => grouped;
@@ -524,9 +528,10 @@ public partial class MainWindow : Window
         private async Task LoadIcon() { icon = await NativeIcons.Get(candidate.Target); PropertyChanged?.Invoke(this, new(nameof(Icon))); PropertyChanged?.Invoke(this, new(nameof(GlyphVisibility))); PropertyChanged?.Invoke(this, new(nameof(IconBackground))); }
         public Visibility GlyphVisibility => icon == null ? Visibility.Visible : Visibility.Collapsed;
         public string Title => Candidate.Title;
-        public string Detail => Candidate.Date(basis) is { } date
+        private string MetadataDetail => Candidate.Date(basis) is { } date
             ? $"{(basis == RecencyBasis.Downloaded && Candidate.DownloadedAt == null ? "Arrived" : basis)} {Age(date)} · {Candidate.Detail}" : Candidate.Detail.Length > 0 ? Candidate.Detail : Candidate.Source;
-        public string Evidence => Candidate.Evidence(basis) + (Candidate.Date(basis) is { } date ? $"\n{date.LocalDateTime:F}" : "") + "\n" + Candidate.Target;
+        public string Detail => matchKind == SearchMatchKind.Subsequence ? "Filename abbreviation · " + MetadataDetail : matchKind is SearchMatchKind.LiteralContent or SearchMatchKind.RegexContent ? "Verified contents · " + MetadataDetail : MetadataDetail;
+        public string Evidence => (matchEvidence.Length > 0 ? matchEvidence + "\n" : "") + Candidate.Evidence(basis) + (Candidate.Date(basis) is { } date ? $"\n{date.LocalDateTime:F}" : "") + "\n" + Candidate.Target;
         private static string Age(DateTimeOffset date)
         {
             var span = DateTimeOffset.Now - date;

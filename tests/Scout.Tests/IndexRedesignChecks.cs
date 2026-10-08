@@ -72,6 +72,10 @@ internal static class IndexRedesignChecks
             var matched = Search("grep:\"Budget\""); var result = SearchEngine.Search("grep:\"Budget\"",Scope.Files,catalog,memory,now,contentMatches:matched.Matches);
             Check(result.Hits.Single().Excerpts.Length == 3 && result.LocalOnlyIds.Contains(candidate.Id) && result.ModelShortlist.Count == 0);
             System.IO.File.WriteAllText(path,"edited: no old content remains"); Check(Search("grep:\"Budget\"").Matches.Length == 0);
+            System.IO.File.WriteAllText(path,""); Check(Search("regex:\"^$\"").Matches.Single().Excerpts.Single().Line == 1);
+            System.IO.File.WriteAllText(path,new string('x',65000));
+            Check(PreviewText.ExtractAsync(path,CancellationToken.None).GetAwaiter().GetResult()?.Length == 64000);
+            Check(PreviewText.ReadAsync(path,CancellationToken.None).GetAwaiter().GetResult()!.Contains("Preview limited"));
             store.ContentIndex.Clear(); Check(Search("grep:\"Budget\"").Matches.Length == 0);
         }));
         test("Replay filters journal rows outside active roots and retains rich metadata", () => Fixture((root,store) =>
