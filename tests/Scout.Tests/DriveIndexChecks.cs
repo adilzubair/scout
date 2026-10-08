@@ -7,6 +7,11 @@ internal static class DriveIndexChecks
 {
     public static void Run(Action<string, Action> test)
     {
+        test("Ready fixed volume roots remain available despite Windows Hidden/System flags", () =>
+        {
+            foreach (var drive in DriveInfo.GetDrives().Where(d => d.DriveType == DriveType.Fixed && d.IsReady))
+                Check(NativeFileCrawler.IsAvailable(drive.RootDirectory.FullName));
+        });
         test("Native enumeration preserves Unicode, byte sizes and long paths while excluding attributes", () =>
         {
             var root = Path.Combine(Path.GetTempPath(), "scout-native-" + Guid.NewGuid().ToString("N")); Directory.CreateDirectory(root);

@@ -27,7 +27,12 @@ internal static class NativeFileCrawler
     {
         try
         {
-            if (!Directory.Exists(root) || (File.GetAttributes(root) & (FileAttributes.Hidden | FileAttributes.System | FileAttributes.ReparsePoint | FileAttributes.Offline)) != 0) return false;
+            if (!Directory.Exists(root)) return false;
+            // Windows marks volume roots Hidden/System; those flags still exclude children.
+            var isVolumeRoot = Path.GetFullPath(root).TrimEnd('\\', '/').Equals(Path.GetPathRoot(Path.GetFullPath(root))?.TrimEnd('\\', '/'), StringComparison.OrdinalIgnoreCase);
+            var rejected = FileAttributes.ReparsePoint | FileAttributes.Offline;
+            if (!isVolumeRoot) rejected |= FileAttributes.Hidden | FileAttributes.System;
+            if ((File.GetAttributes(root) & rejected) != 0) return false;
             var search = Extended(Path.Combine(root,"*")); var handle = First(search,1,out _,0,0,2);
             if (handle == -1 && Marshal.GetLastWin32Error() is 87 or 50) handle = First(search,1,out _,0,0,0);
             if (handle == -1) return Marshal.GetLastWin32Error() == 2;
