@@ -143,6 +143,15 @@ internal sealed class SettingsWindow : Window
 
         var search = Page("Folders", "\uE8B7", "Choose where Scout looks for your files and shortcuts.");
         Note(search, "Desktop, Documents, Downloads, and Pictures are included automatically. Add one full folder path per line below, or choose Browse… under a list.");
+        Heading(search, "Whole-disk search");
+        var wholeDisk = Check(search, "Index file names on selected drives", settings.WholeDiskSearchEnabled);
+        Note(search, "Off by default. Searches readable files under your Windows account. Hidden, system, offline and excluded files are skipped. File contents still use only the content folders below.");
+        var drives = new StackPanel(); search.Children.Add(drives);
+        var availableDrives = DriveInfo.GetDrives().Where(d => d.DriveType == DriveType.Fixed && d.IsReady).Select(d => d.RootDirectory.FullName).Concat(settings.WholeDiskRoots).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        var driveChecks = availableDrives.ToDictionary(root => root, root => Check(drives, root + (Directory.Exists(root) ? "" : " (unavailable)"), settings.WholeDiskRoots.Contains(root, StringComparer.OrdinalIgnoreCase)), StringComparer.OrdinalIgnoreCase);
+        drives.IsEnabled = wholeDisk.IsChecked == true;
+        wholeDisk.Checked += (_, _) => drives.IsEnabled = true;
+        wholeDisk.Unchecked += (_, _) => drives.IsEnabled = false;
         Heading(search, "Content search");
         var contentSearch = Check(search, "Search inside files in selected folders", settings.ContentSearchEnabled);
         Note(search, "Off by default. Scout indexes supported text and Office files only; PDFs and OCR are not included. Extracted text stays on this PC. Saving with this off clears all persisted extracted text.");
@@ -221,7 +230,9 @@ internal sealed class SettingsWindow : Window
             if (contentSearch.IsChecked == true && indexedContentFolders.Any(p => !Path.IsPathFullyQualified(p) || !Directory.Exists(p))) { Error("Use existing, full folder paths, such as C:\\Users\\you\\Projects.", 1, contentFolders); return; }
             if (ai.IsChecked == true && !File.Exists(python.Text.Trim())) { Error("Choose the Python executable created by local AI setup.", 2, python); return; }
             if (!applyHotkey(shortcut.Text.Trim())) { Error("That shortcut is invalid or already in use. Try Ctrl+Alt+S.", 0, shortcut); return; }
-            Value = new ScoutSettings { ChromeHistory = chrome.IsChecked == true, EdgeHistory = edge.IsChecked == true, WindowsSearch = windows.IsChecked == true, RecentItems = recent.IsChecked == true, WebFallback = web.IsChecked == true, AutomationFolders = automationFolders, ContentSearchEnabled = contentSearch.IsChecked == true, ContentFolders = indexedContentFolders, AiEnabled = ai.IsChecked == true, SemanticHelper = semanticHelper?.IsChecked == true, PythonPath = python.Text.Trim(), Model = (string)checkpoint.SelectedItem, Device = (string)device.SelectedItem, CpuThreads = settings.CpuThreads, Hotkey = shortcut.Text.Trim(), ExtraFolders = extra, Exclusions = exclusions };
+            var selectedDrives = driveChecks.Where(pair => pair.Value.IsChecked == true).Select(pair => pair.Key).ToArray();
+            if (wholeDisk.IsChecked == true && selectedDrives.Length == 0) { Error("Select at least one drive for whole-disk search.", 1, wholeDisk); return; }
+            Value = new ScoutSettings { WholeDiskSearchEnabled = wholeDisk.IsChecked == true, WholeDiskRoots = selectedDrives, ChromeHistory = chrome.IsChecked == true, EdgeHistory = edge.IsChecked == true, WindowsSearch = windows.IsChecked == true, RecentItems = recent.IsChecked == true, WebFallback = web.IsChecked == true, AutomationFolders = automationFolders, ContentSearchEnabled = contentSearch.IsChecked == true, ContentFolders = indexedContentFolders, AiEnabled = ai.IsChecked == true, SemanticHelper = semanticHelper?.IsChecked == true, PythonPath = python.Text.Trim(), Model = (string)checkpoint.SelectedItem, Device = (string)device.SelectedItem, CpuThreads = settings.CpuThreads, Hotkey = shortcut.Text.Trim(), ExtraFolders = extra, Exclusions = exclusions };
             DialogResult = true;
         };
         SelectPage(pages[0].Page);
