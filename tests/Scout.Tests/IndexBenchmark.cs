@@ -18,17 +18,20 @@ internal static class IndexBenchmark
         File.WriteAllText(output, JsonSerializer.Serialize(new SearchEvaluation.Dataset(now, [@"C:\Benchmark"], candidates, []), Json));
         return 0;
     }
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+    private static (SearchCatalog Catalog, DateTimeOffset Now) Prepare(string input)
+    {
+        var fixture = JsonSerializer.Deserialize<SearchEvaluation.Dataset>(File.ReadAllText(input), Json)!;
+        return (new SearchCatalog(fixture.Candidates, roots: fixture.Roots), fixture.Now);
+    }
     public static int Run(string input, string output)
     {
         var timer = Stopwatch.StartNew();
-        var dataset = JsonSerializer.Deserialize<SearchEvaluation.Dataset>(File.ReadAllText(input), Json)!;
-        var now = dataset.Now;
+        var (catalog, now) = Prepare(input);
         var queries = new[] { "report", "budget", "accounts", "résumé", "latest 3 files", "notes in \"C:\\Benchmark\\Project00001\"", "client billing", "zzzxqv nonexistent" };
-        var catalog = new SearchCatalog(dataset.Candidates, roots: dataset.Roots);
         var prepareMs = timer.Elapsed.TotalMilliseconds;
         var count = catalog.Count;
-        dataset = null!;
-        GC.Collect(); GC.WaitForPendingFinalizers(); GC.Collect();
+        GC.Collect(GC.MaxGeneration, GCCollectionMode.Aggressive, true, true); GC.WaitForPendingFinalizers(); GC.Collect(GC.MaxGeneration, GCCollectionMode.Aggressive, true, true);
         var managedBytes = GC.GetTotalMemory(true);
         var process = Process.GetCurrentProcess(); process.Refresh();
         var privateBytes = process.PrivateMemorySize64;

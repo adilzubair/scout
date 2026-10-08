@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><ScoutCoreAssembly Condition="'$(ScoutCoreAssembly)' == ''">$(MSBuildProjectDirectory)/../../src/Scout.Core/bin/Release/net10.0/Scout.Core.dll</ScoutCoreAssembly><OutputType>Exe</OutputType><TargetFramework>net10.0-windows10.0.19041.0</TargetFramework></PropertyGroup>
+  <ItemGroup>
+    <Reference Include="Scout.Core"><HintPath>$(ScoutCoreAssembly)</HintPath><Private>true</Private></Reference>
+    <Compile Include="../Scout.Tests/IndexBenchmark.cs" Link="IndexBenchmark.cs" />
+  </ItemGroup>
+</Project>

@@ -3,6 +3,9 @@ using System.Text.Json;
 using Microsoft.Data.Sqlite;
 using Scout.Core;
 
+if (args.Length == 3 && args[0] == "--index-snapshot") return SnapshotAudit.Run(args[1],args[2]);
+if (args.Length == 3 && args[0] == "--index-crawl") return NativeCrawlAudit.Run(args[1],args[2]);
+if (args.Length == 2 && args[0] == "--index-lifecycle") return LifecycleAudit.Run(args[1]);
 if (args.Length == 3 && args[0] == "--index-benchmark") return IndexBenchmark.Run(args[1], args[2]);
 if (args.Length == 3 && args[0] == "--index-fixture") return IndexBenchmark.Generate(args[1], int.Parse(args[2]));
 if (args.Length == 3 && args[0] == "--profile") return SearchProfiler.Run(args[1], args[2]);
