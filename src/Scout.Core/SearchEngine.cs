@@ -20,6 +20,7 @@ public static class SearchEngine
         var recall = new PriorityQueue<SearchHit, (double Score, long Date, int Order)>();
         var docs = catalog.Documents.AsEnumerable();
         var additions = extra?.DistinctBy(c => c.Id).ToDictionary(c => c.Id);
+        var excerpts = contentMatches?.GroupBy(m => m.CandidateId).ToDictionary(g => g.Key,g => g.MaxBy(m => m.Score)!.Excerpts) ?? [];
         var content = contentMatches?.Where(match => catalog.TryGet(match.CandidateId, out _)).GroupBy(match => match.CandidateId).ToDictionary(group => group.Key, group => group.Max(match => match.Score)) ?? [];
         var contentHitIds = new HashSet<string>(StringComparer.Ordinal);
         if (additions is { Count: > 0 }) docs = docs.Where(d => !additions.ContainsKey(d.Id)).Concat(additions.Values.Select(SearchEntry.Create));
@@ -68,7 +69,7 @@ public static class SearchEngine
             if (canPruneNames && eligibleNames.TryGetValue(doc.Data, out var eligible) && !eligible[doc.TextId] && !aliasIds.Contains(doc.Id) && !content.ContainsKey(doc.Id)) continue;
             if (!raw.InScope(scope) || intent.Kind != null && raw.Kind != intent.Kind && !(intent.Kind == ItemKind.App && raw.Kind == ItemKind.Automation)) continue;
             if (intent.Extension != null && !FileTypes.Matches(doc.Extension, intent.Extension)) continue;
-            if (intent.ExplicitExtensions.Length > 0 && !intent.ExplicitExtensions.Any(ext => FileTypes.Matches(doc.Extension, ext))) continue;
+            if (intent.ExplicitExtensions.Length > 0 && !MatchesExtension(doc.Extension,intent.ExplicitExtensions)) continue;
             if (intent.MinimumSize is { } min && (raw.SizeBytes == null || raw.SizeBytes < min) || intent.MaximumSize is { } max && (raw.SizeBytes == null || raw.SizeBytes > max)) continue;
             if (intent.ModifiedWindow is { } mw && (raw.ModifiedAt == null || raw.ModifiedAt < mw.Since || raw.ModifiedAt >= mw.Until)) continue;
             if (intent.ContentPattern != null && !content.ContainsKey(raw.Id)) continue;
@@ -83,7 +84,7 @@ public static class SearchEngine
             var contentEvidence = false;
             if (intent.ContentPattern != null)
             {
-                if (intent.Terms.Any(term => !doc.Words.Any(word => WordScore(term, word) > 0) && !doc.AliasWords.Any(word => WordScore(term, word) > 0) && !doc.FolderWords.Contains(term))) continue;
+                if (!MatchesDescription(doc,intent.Terms)) continue;
                 score = content[raw.Id] * .5; contentEvidence = true;
             }
             else if (emptyQuery)
@@ -151,7 +152,7 @@ public static class SearchEngine
                 candidate = candidate with { Source = "File contents" };
                 contentHitIds.Add(candidate.Id);
             }
-            queue.Enqueue(new(candidate, score, memory?.Pinned == true) { MatchKind = contentEvidence ? intent.ContentPattern == null ? SearchMatchKind.IndexedContent : intent.ContentRegex ? SearchMatchKind.RegexContent : SearchMatchKind.LiteralContent : SearchMatchKind.Metadata, Excerpts = contentEvidence ? contentMatches?.FirstOrDefault(m => m.CandidateId == raw.Id)?.Excerpts ?? [] : [], Evidence = contentEvidence ? intent.ContentPattern != null ? "Verified file contents" : "Matched indexed file contents" : "" }, priority);
+            queue.Enqueue(new(candidate, score, memory?.Pinned == true) { MatchKind = contentEvidence ? intent.ContentPattern == null ? SearchMatchKind.IndexedContent : intent.ContentRegex ? SearchMatchKind.RegexContent : SearchMatchKind.LiteralContent : SearchMatchKind.Metadata, Excerpts = contentEvidence ? excerpts.GetValueOrDefault(raw.Id) ?? [] : [], Evidence = contentEvidence ? intent.ContentPattern != null ? "Verified file contents" : "Matched indexed file contents" : "" }, priority);
             if (queue.Count > limit) queue.Dequeue();
         }
         var hits = new List<SearchHit>(queue.Count);
@@ -166,7 +167,7 @@ public static class SearchEngine
                 cancellationToken.ThrowIfCancellationRequested();
                 if (intent.Screenshots && !doc.Screenshot) continue;
                 if (doc.Kind != ItemKind.File || !doc.InScope(scope) || intent.Extension != null && !FileTypes.Matches(doc.Extension, intent.Extension)) continue;
-                if (intent.ExplicitExtensions.Length > 0 && !intent.ExplicitExtensions.Any(ext => FileTypes.Matches(doc.Extension, ext))) continue;
+                if (intent.ExplicitExtensions.Length > 0 && !MatchesExtension(doc.Extension,intent.ExplicitExtensions)) continue;
                 if (intent.MinimumSize is { } min && (doc.SizeBytes == null || doc.SizeBytes < min) || intent.MaximumSize is { } max && (doc.SizeBytes == null || doc.SizeBytes > max)) continue;
                 if (intent.ModifiedWindow is { } w && (doc.ModifiedAt == null || doc.ModifiedAt < w.Since || doc.ModifiedAt >= w.Until)) continue;
                 var score = ReferenceEquals(doc.Data, catalog.Base) ? fuzzyScores[doc.TextId] : SubsequenceMatcher.Score(doc.OriginalName, term);
@@ -183,6 +184,23 @@ public static class SearchEngine
         extraHits.Reverse();
         cancellationToken.ThrowIfCancellationRequested();
         return new(query, intent, hits, timer.Elapsed.TotalMilliseconds) { Recall = extraHits, Locations = locations, LocalOnlyIds = contentHitIds };
+    }
+    private static bool MatchesExtension(string extension,string[] extensions)
+    {
+        foreach (var requested in extensions) if (FileTypes.Matches(extension,requested)) return true;
+        return false;
+    }
+    private static bool MatchesDescription(SearchEntry doc,string[] terms)
+    {
+        foreach (var term in terms)
+        {
+            var found = false;
+            foreach (var word in doc.Words) if (WordScore(term,word)>0) { found=true;break; }
+            if (!found) foreach (var word in doc.AliasWords) if (WordScore(term,word)>0) { found=true;break; }
+            if (!found) foreach (var word in doc.FolderWords) if (word==term) { found=true;break; }
+            if (!found) return false;
+        }
+        return true;
     }
     private static TPriority PeekPriority<TElement, TPriority>(this PriorityQueue<TElement, TPriority> queue) { queue.TryPeek(out _, out var priority); return priority!; }
     internal static double WordScore(string query, string word)
