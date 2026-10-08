@@ -13,7 +13,8 @@ public static partial class QueryParser
     public static QueryIntent Parse(string text, DateTimeOffset now, TimeZoneInfo? zone = null, Scope scope = Scope.All)
     {
         zone ??= TimeZoneInfo.Local;
-        var q = text.Trim().ToLowerInvariant();
+        var advanced = AdvancedQuery.Parse(text, now);
+        var q = advanced.Text.Trim().ToLowerInvariant();
         var actionText = q;
         var explorer = q.Contains("in explorer", StringComparison.Ordinal);
         var location = FolderQuery.Extract(explorer ? q.Replace("in explorer", "") : q);
@@ -103,10 +104,13 @@ public static partial class QueryParser
         var terms = Tokenize(stripped).Where(w => w is not ("most" or "working" or "top") && (!Filler.Contains(w) || appIntent && w is "pdf" or "file" or "image" or "images") && !(extension == ".pptx" && w == "powerpoint") && !(extension == ".xlsx" && w == "excel") && !(extension == ".docx" && w == "word") && !(extension == ".md" && w is "markdown" or "md") && !(extension == ".txt" && w is "text" or "txt") && !typeWords.Contains(w) && !(typed.Success && w == typed.Groups[1].Value)).ToArray();
         // Command names such as "show hidden files" and "copy" must retain their discriminating words.
         if (SystemCommands.LooksLikeCommand(q)) { terms = Tokenize(q).Where(w => w is not ("the" or "please" or "can" or "you")).ToArray(); kind = scope == Scope.All ? ItemKind.System : kind; basis = RecencyBasis.None; }
+        if (advanced.Pattern != null) kind = ItemKind.File;
         return new(text.Trim(), terms, extension, kind, basis, window, count > 1 || count == null && Has("all", "every", "files", "links", "pages", "apps", "documents", "pdfs", "presentations", "decks", "spreadsheets", "photos", "images", "videos") && !Has("last", "latest", "newest", "oldest", "first"))
         {
+            ContentPattern = advanced.Pattern, ContentRegex = advanced.Regex, ExplicitExtensions = advanced.Extensions ?? [],
+            MinimumSize = advanced.MinimumSize, MaximumSize = advanced.MaximumSize, ModifiedWindow = advanced.ModifiedWindow, QueryError = advanced.Error ?? "",
             Oldest = Has("oldest", "first"), Latest = latest,
-            Folder = location.Folder, Count = count, Screenshots = extension == "image" && Has("screenshot", "screenshots"),
+            Folder = advanced.Folder != null ? new FolderFilter(advanced.Folder) : location.Folder, Count = count, Screenshots = extension == "image" && Has("screenshot", "screenshots"),
             Action = Regex.IsMatch(actionText, @"^(?:please\s+)?preview\b") ? ItemAction.Preview : Regex.IsMatch(actionText, @"^(?:please\s+)?(?:reveal|locate)\b") || explorer ? ItemAction.Reveal : Regex.IsMatch(actionText, @"^(?:please\s+)?copy\b") ? ItemAction.Copy : ItemAction.Open
         };
     }

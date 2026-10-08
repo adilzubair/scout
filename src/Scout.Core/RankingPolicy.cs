@@ -33,6 +33,7 @@ public static class RankingPolicy
         if (shown.Count == 0 || string.IsNullOrWhiteSpace(local.Query)) return false;
         if (local.Locations.Length > 1) return false;
         var top = shown[0];
+        if (top.MatchKind == SearchMatchKind.Subsequence) return false;
         if (top.Candidate.Kind == ItemKind.Calculation) return true;
         if (top.Candidate.Kind == ItemKind.WebSearch) return top.Candidate.Source == "Web address";
         if (local.Intent.Recency != RecencyBasis.None && (local.Intent.Latest || local.Intent.Oldest || local.Intent.Terms.Length == 0))

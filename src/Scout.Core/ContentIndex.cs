@@ -2,9 +2,9 @@ using Microsoft.Data.Sqlite;
 
 namespace Scout.Core;
 
-public sealed record ContentMatch(string CandidateId, double Score);
+public sealed record ContentMatch(string CandidateId, double Score) { public ContentExcerpt[] Excerpts { get; init; } = []; }
 
-public sealed class ContentIndex
+public sealed partial class ContentIndex
 {
     private static readonly Version MinimumSecureDeleteVersion = new(3, 42, 0);
     private readonly string databasePath;
@@ -53,6 +53,7 @@ public sealed class ContentIndex
         text.Parameters.AddWithValue("$id", candidateId);
         text.Parameters.AddWithValue("$body", body);
         text.ExecuteNonQuery();
+        text.CommandText = "INSERT INTO content_trigram(candidate_id,body) VALUES($id,$body)"; text.ExecuteNonQuery();
         transaction.Commit();
         return 0;
     });
@@ -132,6 +133,7 @@ public sealed class ContentIndex
         text.CommandText = "DELETE FROM content_fts WHERE candidate_id=$id";
         text.Parameters.AddWithValue("$id", candidateId);
         text.ExecuteNonQuery();
+        text.CommandText = "DELETE FROM content_trigram WHERE candidate_id=$id"; text.ExecuteNonQuery();
         using var state = connection.CreateCommand();
         state.Transaction = transaction;
         state.CommandText = "DELETE FROM content_files WHERE candidate_id=$id";
@@ -178,6 +180,7 @@ public sealed class ContentIndex
                 modified_ticks INTEGER NOT NULL,
                 length INTEGER NOT NULL
             );
+            CREATE VIRTUAL TABLE IF NOT EXISTS content_trigram USING fts5(candidate_id UNINDEXED, body, tokenize='trigram');
             CREATE VIRTUAL TABLE IF NOT EXISTS content_fts USING fts5(
                 candidate_id UNINDEXED,
                 body,
@@ -188,6 +191,8 @@ public sealed class ContentIndex
         using var secureFts = connection.CreateCommand();
         secureFts.CommandText = "INSERT INTO content_fts(content_fts,rank) VALUES('secure-delete',1)";
         secureFts.ExecuteNonQuery();
+        secureFts.CommandText = "INSERT INTO content_trigram(content_trigram,rank) VALUES('secure-delete',1)"; secureFts.ExecuteNonQuery();
+        using var seed = connection.CreateCommand(); seed.CommandText = "INSERT INTO content_trigram(candidate_id,body) SELECT candidate_id,body FROM content_fts WHERE NOT EXISTS (SELECT 1 FROM content_trigram)"; seed.ExecuteNonQuery();
     }
 
     private SqliteConnection OpenConnection()

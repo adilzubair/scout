@@ -56,8 +56,11 @@ public sealed record Workspace(string Id, string Name, Candidate[] Members)
 {
     public Candidate ToCandidate() => new(Id, ItemKind.Workspace, Name, Id) { Detail = $"{Members.Length} items", Source = "Workspace" };
 }
+public enum SearchMatchKind { Metadata, Subsequence, LiteralContent, RegexContent, IndexedContent }
 public sealed record SearchHit(Candidate Candidate, double Score, bool Pinned = false)
 {
+    public SearchMatchKind MatchKind { get; init; }
+    public ContentExcerpt[] Excerpts { get; init; } = [];
     public string Evidence { get; init; } = "";
 }
 public sealed record SearchResult(string Query, QueryIntent Intent, IReadOnlyList<SearchHit> Hits, double ElapsedMs)
@@ -72,6 +75,13 @@ public sealed record SearchResult(string Query, QueryIntent Intent, IReadOnlyLis
 public sealed record TimeWindow(DateTimeOffset Since, DateTimeOffset Until, string Description);
 public sealed record QueryIntent(string Text, string[] Terms, string? Extension, ItemKind? Kind, RecencyBasis Recency, TimeWindow? Window, bool Plural)
 {
+    public string? ContentPattern { get; init; }
+    public bool ContentRegex { get; init; }
+    public string[] ExplicitExtensions { get; init; } = [];
+    public long? MinimumSize { get; init; }
+    public long? MaximumSize { get; init; }
+    public TimeWindow? ModifiedWindow { get; init; }
+    public string QueryError { get; init; } = "";
     public bool Oldest { get; init; }
     public bool Latest { get; init; }
     public ItemAction Action { get; init; }
@@ -85,6 +95,8 @@ public sealed class ScoutSettings
 {
     public bool ChromeHistory { get; set; }
     public bool EdgeHistory { get; set; }
+    public bool WholeDiskSearchEnabled { get; set; }
+    public string[] WholeDiskRoots { get; set; } = [];
     public bool WindowsSearch { get; set; } = true;
     public bool RecentItems { get; set; } = true;
     public bool WebFallback { get; set; } = true;
@@ -115,4 +127,3 @@ public interface IRanker
 {
     Task<RankResult> RankAsync(string query, IReadOnlyList<Candidate> candidates, CancellationToken cancellationToken);
 }
-

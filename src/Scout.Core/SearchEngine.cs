@@ -27,6 +27,7 @@ public static class SearchEngine
         // and 'today' that also have a meaning in natural-language queries.
         if (catalog.HasTitle(literal, scope) || additions?.Values.Any(c => c.Title.Equals(literal, StringComparison.OrdinalIgnoreCase) && c.InScope(scope)) == true)
             intent = new(query, QueryParser.Tokenize(literal), null, null, RecencyBasis.None, null, false) { Literal = true };
+        if (intent.QueryError.Length > 0) return new(query, intent, [], timer.Elapsed.TotalMilliseconds) { Notice = intent.QueryError };
         string[] Resolve(string folder) => catalog.Folders.IsPreferred(folder) ? catalog.Folders.Resolve(folder) : catalog.Folders.Resolve(folder).Concat(additions is { Count: > 0 } ? new FolderCatalog(additions.Values).Resolve(folder) : []).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
         if (Path.IsPathFullyQualified(literal))
         {
@@ -56,7 +57,7 @@ public static class SearchEngine
         var phrase = string.Join(' ', intent.Terms);
         // A zero title score cannot become an ordinary hit merely through folder context.
         // Keep broad recall, exact names, initials, personal aliases and content eligible.
-        var canPruneNames = !emptyQuery && intent.Terms.Length > 0 && intent.Extension == null && intent.Kind is not (ItemKind.App or ItemKind.Link);
+        var canPruneNames = !emptyQuery && intent.Terms.Length > 0 && intent.Extension == null && intent.Kind is not (ItemKind.App or ItemKind.Link) && intent.ContentPattern == null;
         var aliasIds = canPruneNames ? library.Values.Where(m => intent.Recency == RecencyBasis.None && intent.Window == null && m.Aliases.Any(a => a.Equals(literal, StringComparison.OrdinalIgnoreCase))).Select(m => m.Candidate.Id).ToHashSet(StringComparer.Ordinal) : [];
         var eligibleNames = canPruneNames ? catalog.PrepareEligibility(literal, phrase, intent.Terms, nameScores) : [];
         var position = 0; var visited = 0;
@@ -67,6 +68,10 @@ public static class SearchEngine
             if (canPruneNames && eligibleNames.TryGetValue(doc.Data, out var eligible) && !eligible[doc.TextId] && !aliasIds.Contains(doc.Id) && !content.ContainsKey(doc.Id)) continue;
             if (!raw.InScope(scope) || intent.Kind != null && raw.Kind != intent.Kind && !(intent.Kind == ItemKind.App && raw.Kind == ItemKind.Automation)) continue;
             if (intent.Extension != null && !FileTypes.Matches(doc.Extension, intent.Extension)) continue;
+            if (intent.ExplicitExtensions.Length > 0 && !intent.ExplicitExtensions.Any(ext => FileTypes.Matches(doc.Extension, ext))) continue;
+            if (intent.MinimumSize is { } min && (raw.SizeBytes == null || raw.SizeBytes < min) || intent.MaximumSize is { } max && (raw.SizeBytes == null || raw.SizeBytes > max)) continue;
+            if (intent.ModifiedWindow is { } mw && (raw.ModifiedAt == null || raw.ModifiedAt < mw.Since || raw.ModifiedAt >= mw.Until)) continue;
+            if (intent.ContentPattern != null && !content.ContainsKey(raw.Id)) continue;
             if (intent.Screenshots && !doc.Screenshot) continue;
             library.TryGetValue(raw.Id, out var memory);
             var opened = memory?.LastLaunch is { } lastOpened && (raw.OpenedAt == null || lastOpened > raw.OpenedAt) ? lastOpened : raw.OpenedAt;
@@ -76,7 +81,12 @@ public static class SearchEngine
             if (intent.Window is { } w && (date == null || date < w.Since || date >= w.Until)) continue;
             double score = 0;
             var contentEvidence = false;
-            if (emptyQuery)
+            if (intent.ContentPattern != null)
+            {
+                if (intent.Terms.Any(term => !doc.Words.Any(word => WordScore(term, word) > 0) && !doc.AliasWords.Any(word => WordScore(term, word) > 0) && !doc.FolderWords.Contains(term))) continue;
+                score = content[raw.Id] * .5; contentEvidence = true;
+            }
+            else if (emptyQuery)
             {
                 if (memory is not { Pinned: true } && memory?.LastLaunch == null && raw.Kind != ItemKind.Workspace) continue;
             }
@@ -141,12 +151,33 @@ public static class SearchEngine
                 candidate = candidate with { Source = "File contents" };
                 contentHitIds.Add(candidate.Id);
             }
-            queue.Enqueue(new(candidate, score, memory?.Pinned == true) { Evidence = contentEvidence ? "Matched indexed file contents" : "" }, priority);
+            queue.Enqueue(new(candidate, score, memory?.Pinned == true) { MatchKind = contentEvidence ? intent.ContentPattern == null ? SearchMatchKind.IndexedContent : intent.ContentRegex ? SearchMatchKind.RegexContent : SearchMatchKind.LiteralContent : SearchMatchKind.Metadata, Excerpts = contentEvidence ? contentMatches?.FirstOrDefault(m => m.CandidateId == raw.Id)?.Excerpts ?? [] : [], Evidence = contentEvidence ? intent.ContentPattern != null ? "Verified file contents" : "Matched indexed file contents" : "" }, priority);
             if (queue.Count > limit) queue.Dequeue();
         }
         var hits = new List<SearchHit>(queue.Count);
         while (queue.TryDequeue(out var hit, out _)) hits.Add(hit);
         hits.Reverse();
+        if (hits.Count == 0 && !intent.Literal && intent.ContentPattern == null && intent.Terms.Length == 1 && intent.Terms[0].Length is >= 3 and <= 12 && intent.Terms[0].All(char.IsLetter) && intent.Kind is null or ItemKind.File && scope is Scope.All or Scope.Files && intent.Recency == RecencyBasis.None && intent.Window == null)
+        {
+            var term = intent.Terms[0]; var fuzzyScores = catalog.PrepareFuzzy(term);
+            var fuzzy = new PriorityQueue<SearchHit, (double Score, int Order)>();
+            foreach (var doc in docs)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (intent.Screenshots && !doc.Screenshot) continue;
+                if (doc.Kind != ItemKind.File || !doc.InScope(scope) || intent.Extension != null && !FileTypes.Matches(doc.Extension, intent.Extension)) continue;
+                if (intent.ExplicitExtensions.Length > 0 && !intent.ExplicitExtensions.Any(ext => FileTypes.Matches(doc.Extension, ext))) continue;
+                if (intent.MinimumSize is { } min && (doc.SizeBytes == null || doc.SizeBytes < min) || intent.MaximumSize is { } max && (doc.SizeBytes == null || doc.SizeBytes > max)) continue;
+                if (intent.ModifiedWindow is { } w && (doc.ModifiedAt == null || doc.ModifiedAt < w.Since || doc.ModifiedAt >= w.Until)) continue;
+                var score = ReferenceEquals(doc.Data, catalog.Base) ? fuzzyScores[doc.TextId] : SubsequenceMatcher.Score(doc.OriginalName, term);
+                if (score <= 0) continue;
+                var priority = (score, -doc.Order);
+                if (fuzzy.Count >= limit && priority.CompareTo(fuzzy.PeekPriority()) <= 0) continue;
+                fuzzy.Enqueue(new(doc.Candidate, score, library.GetValueOrDefault(doc.Id)?.Pinned == true) { MatchKind = SearchMatchKind.Subsequence, Evidence = "Matched filename abbreviation" }, priority);
+                if (fuzzy.Count > limit) fuzzy.Dequeue();
+            }
+            while (fuzzy.TryDequeue(out var hit, out _)) hits.Add(hit); hits.Reverse();
+        }
         var extraHits = new List<SearchHit>();
         while (recall.TryDequeue(out var recalled, out _)) extraHits.Add(recalled);
         extraHits.Reverse();

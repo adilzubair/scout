@@ -11,8 +11,9 @@ public static class IndexPolicy
     { ".pyc", ".pyo", ".obj", ".o", ".pdb", ".dll", ".lib", ".class", ".tmp", ".crdownload", ".part" };
     public static bool Within(string path, string root) => path.Equals(root.TrimEnd('\\', '/'), StringComparison.OrdinalIgnoreCase) || path.StartsWith(root.TrimEnd('\\', '/') + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
     public static string[] ActiveRoots(IEnumerable<string> metadataRoots, ScoutSettings settings) => metadataRoots
+        .Concat(settings.WholeDiskSearchEnabled ? settings.WholeDiskRoots : [])
         .Concat(settings.ContentSearchEnabled ? settings.ContentFolders : [])
-        .Where(Directory.Exists)
+        .Where(path => Directory.Exists(path) || settings.WholeDiskSearchEnabled && settings.WholeDiskRoots.Contains(path, StringComparer.OrdinalIgnoreCase))
         .Where(path => !Excluded(path, settings.Exclusions))
         .Distinct(StringComparer.OrdinalIgnoreCase)
         .ToArray();
