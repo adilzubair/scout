@@ -3,6 +3,8 @@ using System.Text.Json;
 using Microsoft.Data.Sqlite;
 using Scout.Core;
 
+if (args.Length == 3 && args[0] == "--index-benchmark") return IndexBenchmark.Run(args[1], args[2]);
+if (args.Length == 3 && args[0] == "--index-fixture") return IndexBenchmark.Generate(args[1], int.Parse(args[2]));
 if (args.Length == 3 && args[0] == "--profile") return SearchProfiler.Run(args[1], args[2]);
 if (args.Length == 3 && args[0] == "--realworld") return RealWorldAudit.Run(args[1], args[2]);
 if (args.Length is 4 or 5 && args[0] == "--search-eval") return SearchEvaluation.Run(args[1], args[2], args[3], args.Length == 5 ? args[4] : null);
