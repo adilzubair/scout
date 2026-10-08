@@ -11,6 +11,7 @@ public enum ItemAction { Open, Preview, Reveal, Copy }
 
 public sealed record Candidate(string Id, ItemKind Kind, string Title, string Target)
 {
+    public long? SizeBytes { get; init; }
     public string Detail { get; init; } = "";
     public string Source { get; init; } = "";
     public DateTimeOffset? ModifiedAt { get; init; }
@@ -114,3 +115,4 @@ public interface IRanker
 {
     Task<RankResult> RankAsync(string query, IReadOnlyList<Candidate> candidates, CancellationToken cancellationToken);
 }
+

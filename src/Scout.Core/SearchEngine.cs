@@ -21,7 +21,7 @@ public static class SearchEngine
         var additions = extra?.DistinctBy(c => c.Id).ToDictionary(c => c.Id);
         var content = contentMatches?.Where(match => catalog.TryGet(match.CandidateId, out _)).GroupBy(match => match.CandidateId).ToDictionary(group => group.Key, group => group.Max(match => match.Score)) ?? [];
         var contentHitIds = new HashSet<string>(StringComparer.Ordinal);
-        if (additions is { Count: > 0 }) docs = docs.Where(d => !additions.ContainsKey(d.Candidate.Id)).Concat(additions.Values.Select(SearchDocument.Create));
+        if (additions is { Count: > 0 }) docs = docs.Where(d => !additions.ContainsKey(d.Id)).Concat(additions.Values.Select(SearchEntry.Create));
         // A real, fully named item takes priority over words such as 'copy', 'website'
         // and 'today' that also have a meaning in natural-language queries.
         if (catalog.HasTitle(literal, scope) || additions?.Values.Any(c => c.Title.Equals(literal, StringComparison.OrdinalIgnoreCase) && c.InScope(scope)) == true)
@@ -48,9 +48,7 @@ public static class SearchEngine
             if (locations.Length == 0) intent = intent with { Folder = null, Terms = intent.Terms.Concat(QueryParser.Tokenize(folderFilter.Text)).ToArray() };
             else if (intent.Kind == ItemKind.Folder)
                 return new(query, intent, locations.Select(path => new Candidate(Candidate.Key(ItemKind.Folder, path), ItemKind.Folder, Path.GetFileName(path), path) { Detail = Path.GetDirectoryName(path) ?? "", Source = "Folder" }).Where(c => c.InScope(scope)).Take(limit).Select(c => new SearchHit(c, locations.Length == 1 ? 1000 : 200, library.GetValueOrDefault(c.Id)?.Pinned == true)).ToArray(), timer.Elapsed.TotalMilliseconds) { Locations = locations };
-            else docs = docs.Where(d => d.Candidate.Kind == ItemKind.File && locations.Any(path => folderFilter.DirectOnly
-                ? Path.GetDirectoryName(d.Candidate.Target)?.Equals(path, StringComparison.OrdinalIgnoreCase) == true
-                : IndexPolicy.Within(d.Candidate.Target, path)));
+            else docs = catalog.Entries(locations, folderFilter.DirectOnly).Where(d => additions == null || !additions.ContainsKey(d.Id)).Concat(additions?.Values.Where(c => c.Kind == ItemKind.File && locations.Any(path => folderFilter.DirectOnly ? Path.GetDirectoryName(c.Target)?.Equals(path, StringComparison.OrdinalIgnoreCase) == true : IndexPolicy.Within(c.Target, path))).Select(SearchEntry.Create) ?? []);
         }
         if (intent.Count.HasValue) limit = Math.Min(limit, intent.Count.Value);
         var phrase = string.Join(' ', intent.Terms);
@@ -58,7 +56,7 @@ public static class SearchEngine
         foreach (var doc in docs)
         {
             if ((position++ & 127) == 0) cancellationToken.ThrowIfCancellationRequested();
-            var raw = doc.Candidate;
+            var raw = doc;
             if (!raw.InScope(scope) || intent.Kind != null && raw.Kind != intent.Kind && !(intent.Kind == ItemKind.App && raw.Kind == ItemKind.Automation)) continue;
             if (intent.Extension != null && !FileTypes.Matches(doc.Extension, intent.Extension)) continue;
             if (intent.Screenshots && !doc.Screenshot) continue;
@@ -105,7 +103,7 @@ public static class SearchEngine
                         var broad = intent.Extension != null || intent.Kind is ItemKind.App or ItemKind.Link || intent.Terms.Length >= 2 && titleMatches > 0;
                         if (broad && raw.IsGroupable && literal.Length >= 3)
                         {
-                            var recalledCandidate = opened == raw.OpenedAt ? raw : raw with { OpenedAt = opened, OpenedSource = "Scout launch history" };
+                            var recalledCandidate = opened == raw.OpenedAt ? raw.Candidate : raw.Candidate with { OpenedAt = opened, OpenedSource = "Scout launch history" };
                             var recallPriority = (score, (date ?? raw.CreatedAt ?? raw.VisitedAt ?? raw.ModifiedAt)?.ToUnixTimeMilliseconds() ?? 0, -position);
                             if (recall.Count < 128 || recallPriority.CompareTo(recall.PeekPriority()) > 0)
                             { recall.Enqueue(new(recalledCandidate, score), recallPriority); if (recall.Count > 128) recall.Dequeue(); }
@@ -127,7 +125,7 @@ public static class SearchEngine
             if (!chronological && raw.Kind == ItemKind.Link && Uri.TryCreate(raw.Target, UriKind.Absolute, out var uri)) primary -= Math.Min(1, uri.AbsolutePath.Count(c => c == '/') * .01);
             var priority = (evidence, primary, chronological && intent.Oldest ? -sortDate : sortDate, -position);
             if (queue.Count >= limit && priority.CompareTo(queue.PeekPriority()) <= 0) continue;
-            var candidate = opened == raw.OpenedAt ? raw : raw with { OpenedAt = opened, OpenedSource = "Scout launch history" };
+            var candidate = opened == raw.OpenedAt ? raw.Candidate : raw.Candidate with { OpenedAt = opened, OpenedSource = "Scout launch history" };
             if (contentEvidence)
             {
                 candidate = candidate with { Source = "File contents" };
@@ -146,7 +144,7 @@ public static class SearchEngine
         return new(query, intent, hits, timer.Elapsed.TotalMilliseconds) { Recall = extraHits, Locations = locations, LocalOnlyIds = contentHitIds };
     }
     private static TPriority PeekPriority<TElement, TPriority>(this PriorityQueue<TElement, TPriority> queue) { queue.TryPeek(out _, out var priority); return priority!; }
-    private static double WordScore(string query, string word)
+    internal static double WordScore(string query, string word)
     {
         if (query == word) return 120;
         if (word.StartsWith(query, StringComparison.Ordinal)) return 90;

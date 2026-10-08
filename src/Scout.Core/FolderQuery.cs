@@ -60,6 +60,15 @@ public static class FolderQuery
 /// <summary>Folder names are a distinct index; ordinary filename queries never match whole ancestor trees.</summary>
 public sealed class FolderCatalog
 {
+    public static FolderCatalog FromPaths(IEnumerable<string> paths, IEnumerable<string> roots) => new(paths, roots);
+    private FolderCatalog(IEnumerable<string> paths, IEnumerable<string> roots)
+    {
+        var knownRoots = roots.Select(p => p.TrimEnd('\\', '/')).ToArray();
+        foreach (var root in knownRoots) Add(root);
+        preferred = knownRoots.GroupBy(p => Normalize(Path.GetFileName(p)), StringComparer.OrdinalIgnoreCase).ToDictionary(g => g.Key, g => g.ToArray(), StringComparer.OrdinalIgnoreCase);
+        foreach (var path in paths) Add(path);
+        exact = entries.Values.GroupBy(e => Normalize(e.Name), StringComparer.OrdinalIgnoreCase).ToDictionary(g => g.Key, g => g.Select(e => e.Path).ToArray(), StringComparer.OrdinalIgnoreCase);
+    }
     private sealed record Entry(string Path, string Name, string[] Words);
     private readonly Dictionary<string, Entry> entries = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, string[]> exact;
