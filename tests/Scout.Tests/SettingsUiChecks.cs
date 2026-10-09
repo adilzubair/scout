@@ -13,7 +13,16 @@ internal static class SettingsUiChecks
             Check(IndexProgress.Starting.ShowInLauncher && (ready with { Phase = IndexPhase.Contents }).ShowInLauncher);
             Check((ready with { Phase = IndexPhase.Incomplete }).ShowInLauncher);
             var unavailable = ready with { Folders = [new(@"C:\Docs", 1, 0, FolderPhase.Unavailable, false, false)] };
-            Check(unavailable.ShowInLauncher && unavailable.LauncherSummary == "Some folders need attention");
+            Check(unavailable.ShowInLauncher && unavailable.LauncherSummary == "1 location unavailable · other files ready");
+        });
+        test("Skipped folder summaries count distinct failures across overlapping roots", () =>
+        {
+            var parent = new FolderIndexProgress(@"C:\Docs", 100, 2, FolderPhase.Partial, true, true) { SkippedPaths = [@"C:\Docs\Project\Denied", @"C:\Docs\Other"] };
+            var child = new FolderIndexProgress(@"C:\Docs\Project", 10, 1, FolderPhase.Partial, true, true) { SkippedPaths = [@"C:\Docs\Project\Denied"] };
+            var progress = new IndexProgress(IndexPhase.Ready, 100, 2, 2, [parent, child], []);
+            Check(progress.SkippedFolders == 2 && progress.LauncherSummary == "2 folders skipped · other files ready" && parent.NamesText == "100 file names ready · 2 folders skipped");
+            Check((progress with { Folders = [child] }).LauncherSummary == "1 folder skipped · other files ready");
+            Check((progress with { Folders = [parent, new(@"D:\", 0, 0, FolderPhase.Unavailable, false, false)] }).LauncherSummary == "1 location unavailable · 2 folders skipped · other files ready");
         });
         test("Unified folders preserve content opt-in and deduplicate legacy lists", () =>
         {

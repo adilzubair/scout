@@ -44,6 +44,7 @@ internal static class NativeFileCrawler
     internal static async Task ScanAsync(string root, Func<string, bool> excluded, Action<Entry> accept, Action<string> unavailable, CancellationToken token, Action<Entry>? acceptDirectory = null)
     {
         token.ThrowIfCancellationRequested();
+        if (excluded(root)) return;
         if (!IsAvailable(root)) { unavailable(root); return; }
         var queue = Channel.CreateUnbounded<(string Path, Entry? Metadata)>(new() { SingleWriter = false, SingleReader = false });
         Entry? rootMetadata = null;

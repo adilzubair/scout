@@ -91,7 +91,9 @@ Folder descriptions are restrictions on the results and model candidates. Names 
 
 Optional slash filters work alongside normal search: `/folder projects`, `/image holiday`, `/pdf roadmap`, or `/folder` to list indexed directories, including empty folders. Type `/` for the filter list. Other filters cover files, video, audio, documents, spreadsheets, presentations, archives, apps, links and workspaces. Words after a slash filter match names; operators such as `in:`, `ext:`, `size:`, `mtime:` and explicit file-content patterns remain available. Existing filename and natural-language queries continue to work. Filters respect the selected scope tab and configured indexing locations.
 
-The launcher shows indexing progress while work is running or a location needs attention. Once indexing completes, the launcher stays quiet; Settings → Folders retains per-folder readiness and filename/content counts.
+The launcher shows indexing progress while work is running or a location needs attention. Once indexing completes, the launcher stays quiet; Settings → Folders retains per-folder readiness and filename/content counts. Unreadable subfolders show a skipped-folder count; hover their status in Settings to see the paths.
+
+Filename and content indexing automatically skip folders named `temp` or `tmp` (case-insensitive), generated `pytest-of-*` folders, and any folder starting with `.`. Existing dependency/build exclusions also apply. Names such as `Templates` and `Temperature` remain searchable. Older cached entries from newly excluded folders are removed automatically when the updated app starts.
 
 `latest` uses modification dates unless another activity is named. Matching latest/oldest searches use recorded dates immediately without waiting for Laya. `latest 3 files` limits both the results and the suggested group; groups remain capped at 25 items. Screenshot searches require screenshot evidence in the filename or folder and cannot match every image. Images with arbitrary names outside such folders may need a normal image/name search.
 

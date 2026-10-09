@@ -37,6 +37,7 @@ ContentSearchChecks.Run(Test);
 IndexRaceChecks.Run(Test);
 IndexProgressChecks.Run(Test);
 FolderIndexChecks.Run(Test);
+ExclusionChecks.Run(Test);
 SnapshotChecks.Run(Test);
 CacheChecks.Run(Test);
 ChronologicalChecks.Run(Test);

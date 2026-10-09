@@ -47,7 +47,7 @@ public sealed class SearchSnapshot
 {
     private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, object> Gates = new(StringComparer.OrdinalIgnoreCase);
     private const string Magic = "SCOUTIDX4";
-    public static string Fingerprint(IEnumerable<string> roots, IEnumerable<string> exclusions) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(string.Join('\n', roots.Select(Path.GetFullPath).Select(p => p.ToUpperInvariant()).Order().Concat(["--"]).Concat(exclusions.Select(Path.GetFullPath).Select(p => p.ToUpperInvariant()).Order())))));
+    public static string Fingerprint(IEnumerable<string> roots, IEnumerable<string> exclusions) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(string.Join('\n', roots.Select(Path.GetFullPath).Select(p => p.ToUpperInvariant()).Order().Prepend($"policy:{IndexPolicy.CacheVersion}").Concat(["--"]).Concat(exclusions.Select(Path.GetFullPath).Select(p => p.ToUpperInvariant()).Order())))));
     internal sealed record Manifest(string File, long Generation, string Fingerprint);
     public static SearchCatalog Load(ScoutStore store, string[] roots, string[] exclusions, bool reconcileCoverage = false)
     {

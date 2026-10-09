@@ -419,6 +419,40 @@ previous paired performance results and missed targets above remain unchanged.
 Evidence and the verified test executable are under ignored
 `artifacts/diagnostics/folder-search`; the running user instance was left open.
 
+## Temporary-folder exclusions and clearer status follow-up
+
+Default metadata/content exclusions now include exact folder names `temp` and `tmp`
+(case-insensitive), and generated `pytest-of-*` trees. Any dot-prefixed folder was
+already excluded; regression checks now cover it explicitly. The checks preserve
+ordinary names such as Templates, Temperature, Temporary Plans and temp-report.pdf.
+Excluded roots are rejected before native availability probing and directory
+traversal, and excluded watcher notifications are discarded. Renaming an indexed
+folder into an excluded name removes its old metadata and extracted content.
+
+The snapshot fingerprint includes the default exclusion policy version. Updating
+therefore rebuilds older cached snapshots from filtered SQLite metadata before
+publishing cached results, removes excluded candidate records, then persists a new
+base. This incurs a one-time rebuild. Personal pins remain stored, but excluded
+pinned files/folders cannot re-enter launcher results. Content synchronization
+continues to enforce the same exclusions and clears obsolete extracted text.
+
+For genuine incomplete coverage the launcher now reports a distinct skipped-folder
+count, such as "2 folders skipped · other files ready", or unavailable locations.
+Overlapping configured roots do not double-count the same skipped path. Settings
+shows per-folder counts and a tooltip with up to 20 unreadable paths. Successful
+indexing remains quiet. Expected exclusions do not generate these warnings.
+
+Validation: Release build with zero warnings/errors, **295/295 C# checks**, and the
+isolated desktop smoke passed. Checks cover legacy snapshot invalidation/cleanup,
+preserved-but-suppressed pins, native root skipping, initial crawl, content rules,
+watcher events, excluded renames, explicit root selection and skipped-path counts.
+A read-only native rescan of the affected configured folders reduced unreadable
+folders from **15 to zero** with the new policy. That audit did not modify the live
+index or user files; its raw paths/settings remain under ignored artifacts. This is
+an intentional coverage change, not a paired performance comparison. Evidence and
+the test executable are under `artifacts/diagnostics/temp-exclusions`; the separate
+before/after enumeration reports are under `artifacts/diagnostics/folder-attention`.
+
 ## Reproduction and private artifacts
 
 Private snapshots, filenames, content, binaries and raw reports remain under ignored

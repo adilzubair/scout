@@ -80,7 +80,7 @@ internal sealed class FolderSelectionView : StackPanel
         AutomationProperties.SetLabeledBy(PathField, caption); Children.Add(caption);
         Children.Add(add);
         Children.Add(rows);
-        Children.Add(new TextBlock { Text = "Content search supports text and Office files up to 16 MB. PDFs, images and empty or unreadable documents are skipped. Removing Search contents clears that folder's extracted text when you save.", TextWrapping = TextWrapping.Wrap, Foreground = WindowVisuals.Brush("Muted"), FontSize = 12, LineHeight = 18, Margin = new Thickness(0, 10, 0, 16) });
+        Children.Add(new TextBlock { Text = "Temporary folders (temp, tmp and pytest-of-*), folders starting with a dot, and dependency/build folders are excluded automatically. Content search supports text and Office files up to 16 MB. PDFs, images and empty or unreadable documents are skipped. Removing Search contents clears that folder's extracted text when you save.", TextWrapping = TextWrapping.Wrap, Foreground = WindowVisuals.Brush("Muted"), FontSize = 12, LineHeight = 18, Margin = new Thickness(0, 10, 0, 16) });
         Render();
         var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(400) };
         timer.Tick += (_, _) => RefreshStatuses();
@@ -125,6 +125,8 @@ internal sealed class FolderSelectionView : StackPanel
             var known = snapshot?.FindFolder(choice.Path);
             var excluded = IndexPolicy.Excluded(choice.Path, snapshot?.Exclusions);
             var changed = known != null && known.ContentsSelected != selected;
+            status.ToolTip = known?.SkippedPaths is { Length: > 0 } skipped ? "Could not read these folders:\n" + string.Join("\n", skipped.Take(20))
+                + (skipped.Length > 20 ? $"\n…and {skipped.Length - 20:N0} more." : "") : null;
             status.Text = excluded ? "Excluded from search" : known == null ? choice.Saved ? snapshot?.Phase == IndexPhase.Ready ? "Location unavailable or outside the active index" : "Waiting for indexing" : "Save settings to start indexing" : known.NamesText
                 + (selected ? "\n" + (changed ? "Contents will be indexed after saving" : known.ContentsText + (inherited ? " (from parent folder)" : "")) : changed ? "\nContents will be removed after saving" : "");
         }

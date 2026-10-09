@@ -50,6 +50,7 @@ internal sealed class IndexService : IDisposable
     public SearchCatalog Catalog => Volatile.Read(ref catalog);
     public long Version => Interlocked.Read(ref version);
     public IEnumerable<Candidate> Candidates => Catalog.Candidates;
+    internal bool IsSearchable(Candidate candidate) => Catalog.IsAvailable(candidate) && (candidate.Kind is not (ItemKind.File or ItemKind.Folder) || !Excluded(candidate.Target));
     internal IEnumerable<Candidate> Applications => Volatile.Read(ref apps).Where(c => c.Kind == ItemKind.App);
     internal int CachedFileCount => files.FileCount;
     public int FullScanCount { get; private set; }
@@ -334,11 +335,12 @@ internal sealed class IndexService : IDisposable
             {
                 var complete = completedRoots.Any(parent => IndexPolicy.Within(root, parent));
                 var unavailable = !availableRoots.Contains(root, StringComparer.OrdinalIgnoreCase);
-                var partial = failed.Keys.Any(path => IndexPolicy.Within(path, root) || IndexPolicy.Within(root, path));
+                var skipped = failed.Keys.Where(path => IndexPolicy.Within(path, root) || IndexPolicy.Within(root, path)).Order(StringComparer.OrdinalIgnoreCase).ToArray();
+                var partial = skipped.Length > 0;
                 var state = unavailable ? FolderPhase.Unavailable : !complete ? FolderPhase.Indexing : partial ? FolderPhase.Partial : FolderPhase.Ready;
                 var contents = settings.ContentSearchEnabled && settings.ContentFolders.Any(parent => IndexPolicy.Within(root, parent));
                 return new FolderIndexProgress(root, folderFiles.GetValueOrDefault(root), folderDocuments.GetValueOrDefault(root), state, contents,
-                    contents && progressPhase == IndexPhase.Ready && Volatile.Read(ref contentReady) && !unavailable);
+                    contents && progressPhase == IndexPhase.Ready && Volatile.Read(ref contentReady) && !unavailable) { SkippedPaths = skipped };
             }).ToArray();
             snapshot = new(progressPhase, files.FileCount, folderDocuments.Where(p => !Roots.Any(other => !p.Key.Equals(other, StringComparison.OrdinalIgnoreCase) && IndexPolicy.Within(p.Key, other))).Sum(p => p.Value), contentProcessed, folders, settings.Exclusions.ToArray(), detail);
             Volatile.Write(ref progress, snapshot);

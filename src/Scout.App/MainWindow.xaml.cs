@@ -179,7 +179,7 @@ public partial class MainWindow : Window
             await Task.Delay(30, token);
             var catalog = index.Catalog;
             var library = store.Library;
-            var extra = enriched.Concat(store.Workspaces.Select(w => w.ToCandidate())).Concat(library.Values.Where(l => (l.Pinned || l.LastLaunch != null) && l.Candidate.IsPinnable && catalog.IsAvailable(l.Candidate) && !catalog.Contains(l.Candidate.Id)).Select(l => l.Candidate)).ToArray();
+            var extra = enriched.Concat(store.Workspaces.Select(w => w.ToCandidate())).Concat(library.Values.Where(l => (l.Pinned || l.LastLaunch != null) && l.Candidate.IsPinnable && index.IsSearchable(l.Candidate) && !catalog.Contains(l.Candidate.Id)).Select(l => l.Candidate)).ToArray();
             var now = DateTimeOffset.Now;
             var result = await Task.Run(() => {
                 var content = index.SearchContentResponse(query, requestedScope, now, token);
