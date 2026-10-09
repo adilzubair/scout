@@ -8,7 +8,7 @@ The design takes ideas from [fsearch](https://github.com/noahdunnagan/fsearch)
 and adapts them to Scout's C# application, existing ranking and SQLite stores.
 SQLite remains authoritative. The compact index is a disposable cache.
 
-## Identical-coverage measurements
+## Initial redesign: identical-coverage measurements
 
 Both engines used the same frozen metadata, roots, query time and empty personal
 library in a common Release harness compiled against their respective Core DLLs.
@@ -38,10 +38,12 @@ these timings are not filesystem crawl times.
 
 ### Regressions and target status
 
-The 30% median improvement and 25% million-candidate private-memory reduction
-targets are met. Current-corpus memory also stays below its permitted 10% increase.
-Aggregate p95 meets the tolerance, but **the p95 target is missed for individual
-chronological queries**. An empty scope lookup also regresses proportionally:
+In the initial comparison, the 30% median improvement and 25% million-candidate
+private-memory reduction targets were met. Current-corpus memory also stayed
+below its permitted 10% increase.
+The initial redesign meets aggregate p95 tolerance, but **missed the p95 target
+for individual chronological queries**. The follow-up slice below addresses this.
+An empty scope lookup also regressed proportionally:
 
 | Query | Corpus | p95 before → after |
 |---|---|---:|
@@ -50,11 +52,79 @@ chronological queries**. An empty scope lookup also regresses proportionally:
 | `latest 3 files` | 1,000,000 | 181.01 → 304.28 ms |
 | `notes in "C:\Benchmark\Project00001"` | Current, absent synthetic scope | 0.19 → 0.57 ms |
 
-The compact row access and restriction/ranking work still scan eligible rows for
-chronological queries; this remains an optimization opportunity. Current-corpus
-allocations rise 32.5%, about 62.4 KiB per search, despite lower live memory.
+These initial measurements preceded the chronological optimization below.
+Current-corpus allocations rose 32.5%, about 62.4 KiB per search, despite lower live memory.
 Two rounds on one Windows machine are evidence for this workload, not a guarantee
 for every filesystem or query distribution.
+
+## Follow-up slice: chronological selection (`266f79f`)
+
+Unconstrained date-only searches now scan timestamp ticks directly in the packed
+base and overlay, retaining only a bounded queue of finalists. Ordinary scoring
+then supplies their original scores, pins and rich payloads. Folder/type/size and
+other restricted date-only queries apply their existing restrictions before a
+tick-based queue rejection. Exact filenames, download evidence, opening history,
+calendar endpoints, offline roots, deletion markers and stable ties are preserved.
+The snapshot format and persistent catalog memory layout are unchanged.
+
+This comparison measured the original `fd80045` baseline, previous redesign
+`e20f071` and slice `266f79f` in the same Release harness. Two rounds used
+baseline/previous/slice, then slice/previous/baseline; every query still received
+10 warm-up and 30 measured passes. All three frozen fixtures retained their hashes.
+Ordered hits, recall and notices matched across all 18 process runs.
+
+| `latest 3 files` | Original p95 | Previous redesign p95 | Slice p95 | Reduction from previous |
+|---|---:|---:|---:|---:|
+| Frozen 75,707 | 20.44 ms | 31.47 ms | 1.91 ms | 93.9% |
+| Synthetic 250,000 | 49.66 ms | 85.54 ms | 4.98 ms | 94.2% |
+| Synthetic 1,000,000 | 205.34 ms | 420.06 ms | 20.57 ms | 95.1% |
+
+The measured chronological query now meets the p95 tolerance on all three corpora.
+This does not establish the same gain for every filtered or described recency query.
+
+| All eight queries | Original p50 / p95 | Previous p50 / p95 | Slice p50 / p95 |
+|---|---:|---:|---:|
+| Frozen 75,707 | 30.01 / 43.47 ms | 10.77 / 29.02 ms | 17.48 / 29.06 ms |
+| Synthetic 250,000 | 56.14 / 75.59 ms | 37.66 / 70.47 ms | 31.88 / 48.44 ms |
+| Synthetic 1,000,000 | 211.43 / 309.04 ms | 197.67 / 349.75 ms | 160.65 / 258.94 ms |
+
+**The overall 30% median target is missed at one million entries in this run:**
+211.43 → 160.65 ms is a 24.0% reduction. The current and 250,000-entry reductions
+are 41.7% and 43.2%; aggregate p95 is within baseline tolerance for all three.
+The stronger median gains in the initial comparison above were not reproduced
+consistently. The first current-corpus aggregate median also regressed versus the
+previous redesign, 10.77 → 17.48 ms, despite the chronological gain.
+
+An additional two-round current-corpus comparison checked that regression.
+Its aggregate p50 was 10.66 → 9.25 ms and p95 25.55 → 20.27 ms. All results again
+matched. Combining all four previous/slice current-corpus rounds gives p50
+10.66 → 10.22 ms and p95 27.12 → 21.19 ms.
+The inconsistency warrants further controlled profiling of ordinary-query timings;
+this slice establishes a repeatable chronological gain, not a uniform improvement
+across every query.
+
+In the full three-build comparison, slice private memory was 68.2, 98.3 and
+331.1 MiB, versus 67.9, 97.5 and 331.0 MiB for the previous redesign. The original
+million-entry baseline used 1,134.8 MiB: the 25% memory-reduction target still passes.
+No date postings or extra full catalog were added; selection uses O(result limit)
+temporary memory. Allocations remain approximately 252.6, 339.1 and 339.1 KiB per
+search. The additional small-corpus repeat measured about 329.1 MiB private memory
+in both builds, substantially above the primary run; the cause of this process
+retention difference was not established and is not attributed to index growth.
+
+Release compilation has zero warnings/errors and 256/256 C# checks pass. Twelve
+added checks cover date bases, tick ties, window endpoints, evidence priority,
+launch-derived opening payloads, aliases/pins, restrictions, overlays/extras,
+offline roots and mapped replay/compaction. The 504 compatibility cases and 80
+prospective cases match the previous redesign in full ordered results, scores,
+notices, intents, shortlists and model payloads, excluding elapsed time. Existing
+predictions therefore remain valid; model/checkpoint/prompt settings are unchanged.
+
+Raw evidence is retained under ignored `chronological-slice/`: `paired/`,
+`frozen-repeat/`, `checks.txt`, `differential.json`, `builds.json` and
+`slice-summary.json`. Earlier crawl, desktop and HTTP limitations above remain;
+this query-only slice did not rerun physical crawling, desktop smoke or the
+unchanged model adapter/HTTP suites.
 
 ## Crawl, startup, persistence and desktop checks
 
@@ -198,7 +268,8 @@ The separate private content database maintains word and
 These tables add disk/storage cost proportional to enabled extracted text; a large
 real-document content-index size benchmark was not performed.
 
-Release compilation passes with zero warnings/errors, and **244/244 C# checks pass**.
+Release compilation passes with zero warnings/errors, and **256/256 C# checks pass**
+after the chronological follow-up slice.
 Coverage includes cached/uncached search, backspace, synonyms, typo thresholds,
 aliases, scopes, pins, content-only hits, corrupt/stale snapshots, restart replay,
 concurrent compaction, directory rename, normal watcher changes, overflow, settings,
@@ -260,8 +331,9 @@ dotnet build tests/Scout.Benchmark -c Release -p:ScoutCoreAssembly=ABSOLUTE_CORE
 python runtime/index_comparison.py --baseline BASELINE_HARNESS_DLL --redesigned REDESIGNED_HARNESS_DLL --corpus FROZEN_CORPUS_JSON --corpus SCALE_250000_JSON --corpus SCALE_1000000_JSON --output IGNORED_REPORT_DIRECTORY
 ```
 
-`--aggregate-only` rechecks retained reports without rerunning engines. The lifecycle
-harness similarly accepts `ScoutCoreAssembly` and `ScoutAppAssembly`. The test
+`--previous INTERMEDIATE_HARNESS_DLL` adds a third build to the same alternating
+rounds. `--aggregate-only` rechecks retained reports without rerunning engines.
+The lifecycle harness similarly accepts `ScoutCoreAssembly` and `ScoutAppAssembly`. The test
 runner exposes `--index-fixture OUTPUT COUNT`, `--index-snapshot FIXTURE OUTPUT`,
 `--index-lifecycle OUTPUT` and `--index-crawl ROOT OUTPUT`. Real desktop diagnostics
 require an isolated `SCOUT_DATA_DIR` and `Scout.exe --diagnose`. Setting
