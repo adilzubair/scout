@@ -3,121 +3,171 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#ffffff">
-  <meta name="description" content="Scout is a fast Windows launcher for finding files, opening apps, and returning to your work. One shortcut, everything in reach.">
-  <title>Scout — Find anything. Keep moving.</title>
+  <meta name="theme-color" content="#0d0d0d">
+  <meta name="description" content="Find files by what you remember, control everyday Windows settings, and reopen saved workspaces. Scout brings your work and PC controls into one shortcut.">
+  <title>Scout — Find your work. Control your PC.</title>
   <link rel="icon" href="favicon.ico" sizes="any">
-  <link rel="stylesheet" href="styles.css">
+  <link rel="preload" href="fonts/UncutSans-Variable.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="styles.css?v=9">
+  <script src="script.js?v=2" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to content</a>
-
   <header class="site-header">
     <div class="shell header-inner">
-      <a class="brand" href="#top" aria-label="Scout home">
-        <svg class="brand-icon" viewBox="0 0 32 32" fill="none" aria-hidden="true">
-          <rect x="1.5" y="1.5" width="29" height="29" rx="6" stroke="currentColor" stroke-width="2"/>
-          <path d="m20.8 10.1-3.9 7.1-5.7 4.7 3.2-7.8 6.4-4Z" fill="currentColor"/>
-        </svg>
-        <span>Scout</span>
-      </a>
+      <a class="brand" href="#top" aria-label="Scout home"><span class="brand-icon"><svg viewBox="0 0 32 32" fill="none" aria-hidden="true"><path d="m24 8-6 13-10 3 4-13 12-3Z" fill="currentColor"/><circle cx="16" cy="16" r="2" fill="#2f6bff"/></svg></span><span>Scout</span></a>
       <nav class="primary-nav" aria-label="Main navigation">
-        <a href="#features">Features</a>
-        <a href="#privacy">Privacy</a>
+        <a href="#demo">How it works</a><a href="#why-scout">Why Scout</a><a href="#capabilities">Features</a><a href="#privacy">Privacy</a><a href="#faq-title">FAQ</a>
       </nav>
-      <a class="header-download" href="#download">Get Scout <span aria-hidden="true">↗</span></a>
+      <div class="header-actions">
+        <a class="button button-small" href="#download"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M4 17v4h16v-4"/></svg><span>Download</span></a>
+        <a class="icon-link" href="https://github.com/adilzubair/scout-site/releases" aria-label="Scout releases on GitHub"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48v-1.86c-2.78.6-3.37-1.18-3.37-1.18-.46-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.61.07-.61 1 .07 1.53 1.03 1.53 1.03.89 1.53 2.34 1.09 2.91.83.09-.65.35-1.09.64-1.34-2.22-.25-4.55-1.11-4.55-4.94 0-1.09.39-1.99 1.03-2.69-.1-.26-.45-1.28.1-2.66 0 0 .84-.27 2.75 1.03A9.58 9.58 0 0 1 12 6.82c.85 0 1.71.12 2.51.34 1.91-1.3 2.75-1.03 2.75-1.03.55 1.38.2 2.4.1 2.66.64.7 1.03 1.6 1.03 2.69 0 3.84-2.34 4.68-4.57 4.93.36.31.68.92.68 1.85v2.75c0 .27.18.58.69.48A10 10 0 0 0 12 2Z"/></svg></a>
+        <details class="mobile-menu">
+          <summary aria-label="Navigation menu"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></summary>
+          <nav aria-label="Mobile navigation"><a href="#demo">How it works</a><a href="#why-scout">Why Scout</a><a href="#capabilities">Features</a><a href="#privacy">Privacy</a><a href="#faq-title">FAQ</a></nav>
+        </details>
+      </div>
     </div>
   </header>
-
-  <main id="main">
+  <main id="main" tabindex="-1">
     <section class="hero shell" id="top" aria-labelledby="hero-title">
-      <p class="eyebrow">A simpler way around your PC</p>
-      <h1 id="hero-title">Find anything.<br>Keep moving.</h1>
-      <p class="hero-description">Remember downloading a file, but not its name? Describe what happened. Scout brings the right result forward and helps you get back to work.</p>
-      <div class="hero-actions">
-        <a class="button button-primary" href="https://github.com/adilzubair/scout-site/releases/download/v0.1.0-beta.1/Scout-Setup.exe">Download Scout for Windows <span aria-hidden="true">↓</span></a>
-        <span>Free beta for Windows 11</span>
+      <div class="hero-copy">
+        <div class="hero-context"><span class="context-item"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="m2 5 9-1.2V11H2V5Zm10-1.4L22 2v9H12V3.6ZM2 12h9v7.2L2 18v-6Zm10 0h10v10l-10-1.6V12Z"/></svg> Windows 11 x64</span><span class="context-item"><span class="local-dot" aria-hidden="true"></span> Local by default</span></div>
+        <h1 id="hero-title">Find your work.<br>Control your PC.</h1>
+        <p class="hero-description">Your files, apps, and everyday settings.<br>One shortcut to bring it all together.</p>
+        <div class="hero-actions"><a class="button button-hero" href="https://github.com/adilzubair/scout-site/releases/download/v0.1.0-beta.2/Scout-Setup.exe"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="m2 5 9-1.2V11H2V5Zm10-1.4L22 2v9H12V3.6ZM2 12h9v7.2L2 18v-6Zm10 0h10v10l-10-1.6V12Z"/></svg> Download for Windows</a><a class="button button-hero button-secondary" href="#demo">Explore Scout</a></div>
+        <p class="release-note">Free beta 2 · Unsigned installer · No admin access needed</p>
+        <div class="shortcut-note"><span>Already installed? Open Scout with</span><span class="key-combination"><kbd>Ctrl</kbd><span>+</span><kbd>Alt</kbd><span>+</span><kbd>Space</kbd></span></div>
       </div>
-      <figure class="product-preview">
-        <img src="scout-arrival-3x.png" width="720" height="490" alt="Scout searching for the PDF just downloaded, with Product Roadmap.pdf first and its download time shown" fetchpriority="high">
-        <figcaption>Search by what you remember: “the pdf I just downloaded.”</figcaption>
-      </figure>
+      <figure class="hero-preview"><div class="product-panel product-panel-hero" role="img" aria-label="Illustrative Scout search: the pdf I just downloaded. Product Roadmap.pdf is selected with its completed download time."><div class="product-windowbar"><span class="product-window-brand"><svg viewBox="0 0 32 32" fill="none" aria-hidden="true"><path d="m24 8-6 13-10 3 4-13 12-3Z" fill="currentColor"/><circle cx="16" cy="16" r="2" fill="#2f6bff"/></svg> Scout</span><span>Find what you remember</span><span class="window-controls" aria-hidden="true">− &nbsp; □ &nbsp; ×</span></div><div class="product-query"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="10" cy="10" r="6.5"/><path d="m15 15 5 5"/></svg><span>the pdf I just downloaded</span><span class="product-escape" aria-hidden="true">esc</span></div><div class="product-scopes" aria-hidden="true"><span class="selected-scope">All</span><span>Files</span><span>Apps</span><span>Links</span><span>Workspaces</span></div><p class="product-results-label">Results</p><div class="product-results"><div class="product-row selected"><span class="product-file-icon"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9l-6-6Z"/><path d="M14 3v6h6"/></svg></span><div class="product-file-copy"><strong>Product Roadmap.pdf</strong><span>Downloaded 1 min ago · Documents</span></div><span class="product-kind">PDF</span><span class="product-row-key" aria-hidden="true">↵</span></div><div class="product-row"><span class="product-file-icon"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9l-6-6Z"/><path d="M14 3v6h6"/></svg></span><div class="product-file-copy"><strong>Research Notes.pdf</strong><span>Arrived 2 min ago · Documents</span></div><span class="product-kind">PDF</span><span class="product-row-key" aria-hidden="true"></span></div><div class="product-row"><span class="product-file-icon"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9l-6-6Z"/><path d="M14 3v6h6"/></svg></span><div class="product-file-copy"><strong>Quarterly Review.pdf</strong><span>Arrived 3 min ago · Documents</span></div><span class="product-kind">PDF</span><span class="product-row-key" aria-hidden="true"></span></div></div><div class="product-footer"><span>Scout</span><span>Open <kbd>↵</kbd> <span class="footer-divider"></span> Actions <kbd>Ctrl K</kbd></span></div></div><figcaption>Illustrative Scout interface. Search by a moment, a name, or a command.</figcaption></figure>
     </section>
 
-    <section class="features shell" id="features" aria-labelledby="features-title">
-      <div class="section-intro">
-        <p class="eyebrow">The essentials, in one place</p>
-        <h2 id="features-title">Less time looking.<br>More time doing.</h2>
+    <section class="demo-section section shell" id="demo" aria-labelledby="demo-title">
+      <div class="section-heading">
+        <h2 id="demo-title">One place to find, control, and resume.</h2>
+        <p>From a file you just downloaded to a quieter PC, start with what you want to do.</p>
       </div>
-      <div class="feature-grid">
-        <article>
-          <span class="feature-index">01</span>
-          <h3>Search naturally</h3>
-          <p>Find a file by name, type, folder, or when it arrived. Search apps and links from the same place.</p>
+      <div class="demo-switcher" role="group" aria-label="Choose a Scout example" hidden>
+        <button type="button" id="find-button" aria-pressed="true" aria-controls="find-panel" data-example="find-panel">Find</button>
+        <button type="button" id="control-button" aria-pressed="false" aria-controls="control-panel" data-example="control-panel">Control</button>
+        <button type="button" id="resume-button" aria-pressed="false" aria-controls="resume-panel" data-example="resume-panel">Resume</button>
+      </div>
+      <p class="demo-disclaimer">Illustrative examples of Scout. These previews do not search your PC or run commands.</p>
+      <div class="demo-panels">
+        <article class="demo-panel" id="find-panel" aria-labelledby="find-title">
+          <div class="demo-copy">
+            <h3 id="find-title">Find the file. Even when the name escapes you.</h3>
+            <p>Search by name, folder, type, or activity. Scout can distinguish when a file was modified, downloaded, or opened, using the records available on your PC.</p>
+            <blockquote>“the pdf I just downloaded”</blockquote>
+            <p>Optional Chrome or Edge integration provides completed-download evidence. Without it, Scout labels file-arrival estimates so you can tell the difference.</p>
+            <p class="detail-note">Try “files I opened this morning.” Matches depend on recorded Windows Recent Items or successful Scout launches.</p>
+          </div>
+          <figure class="demo-preview">
+            <div class="product-panel" role="img" aria-label="Illustrative Scout search: the pdf I just downloaded. Product Roadmap.pdf is selected with its completed download time."><div class="product-query"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="10" cy="10" r="6.5"/><path d="m15 15 5 5"/></svg><span>the pdf I just downloaded</span><span class="product-escape" aria-hidden="true">esc</span></div><div class="product-scopes" aria-hidden="true"><span class="selected-scope">All</span><span>Files</span><span>Apps</span><span>Links</span><span>Workspaces</span></div><p class="product-results-label">Results</p><div class="product-results"><div class="product-row selected"><span class="product-file-icon"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9l-6-6Z"/><path d="M14 3v6h6"/></svg></span><div class="product-file-copy"><strong>Product Roadmap.pdf</strong><span>Downloaded 1 min ago · Documents</span></div><span class="product-kind">PDF</span><span class="product-row-key" aria-hidden="true">↵</span></div><div class="product-row"><span class="product-file-icon"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9l-6-6Z"/><path d="M14 3v6h6"/></svg></span><div class="product-file-copy"><strong>Research Notes.pdf</strong><span>Arrived 2 min ago · Documents</span></div><span class="product-kind">PDF</span><span class="product-row-key" aria-hidden="true"></span></div><div class="product-row"><span class="product-file-icon"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9l-6-6Z"/><path d="M14 3v6h6"/></svg></span><div class="product-file-copy"><strong>Quarterly Review.pdf</strong><span>Arrived 3 min ago · Documents</span></div><span class="product-kind">PDF</span><span class="product-row-key" aria-hidden="true"></span></div></div><div class="product-footer"><span>Scout</span><span>Open <kbd>↵</kbd> <span class="footer-divider"></span> Actions <kbd>Ctrl K</kbd></span></div></div>
+            <figcaption>A folder and timestamp give each match context.</figcaption>
+          </figure>
         </article>
-        <article>
-          <span class="feature-index">02</span>
-          <h3>See before you open</h3>
-          <p>Preview a result, reveal it in its folder, or copy its path. You decide what opens.</p>
+        <article class="demo-panel" id="control-panel" aria-labelledby="control-title">
+          <div class="demo-copy">
+            <h3 id="control-title">Small tasks. Fewer steps.</h3>
+            <p>Type a supported command, review the action, and press Enter. Everyday controls are right beside your files and apps.</p>
+            <ul class="command-list">
+              <li><code>wifi off</code><span>Turn Wi-Fi off</span></li>
+              <li><code>bluetooth off</code><span>Turn Bluetooth off</span></li>
+              <li><code>mute</code><span>Mute your sound</span></li>
+              <li><code>volume up</code><span>Raise output volume</span></li>
+              <li><code>brightness down</code><span>Lower display brightness</span></li>
+              <li><code>dark</code><span>Toggle light / dark appearance</span></li>
+              <li><code>lock screen</code><span>Lock your Windows session</span></li>
+            </ul>
+            <p class="detail-note">Also turn Wi-Fi or Bluetooth on, unmute, and lower volume. Brightness controls require a supported integrated display; Windows policies and hardware can limit controls.</p>
+          </div>
+          <figure class="demo-preview command-preview">
+            <div class="launcher-illustration" role="img" aria-label="Scout command illustration: wifi off selects Turn Wi-Fi off, Disable the wireless radio. Enter to run.">
+              <div class="launcher-query"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="10" cy="10" r="6.5"/><path d="m15 15 5 5"/></svg><span>wifi off</span><span class="illustration-escape">esc</span></div>
+              <div class="launcher-scopes" aria-hidden="true"><span class="active-scope">All</span><span>Files</span><span>Apps</span><span>Links</span></div>
+              <p class="launcher-label">Results</p>
+              <div class="launcher-result">
+                <span class="command-icon" aria-hidden="true"><svg viewBox="0 0 32 32" fill="none"><path d="M5 12a18 18 0 0 1 22 0M9 17a11 11 0 0 1 14 0M13 22a5 5 0 0 1 6 0"/><circle cx="16" cy="27" r="1"/></svg></span>
+                <div><strong>Turn Wi-Fi off</strong><span>Disable the wireless radio</span></div>
+                <span class="illustration-enter" aria-hidden="true">↵</span>
+              </div>
+              <div class="launcher-footer"><span>Windows</span><span>Enter to run <kbd>↵</kbd></span></div>
+            </div>
+            <figcaption>You choose when the action runs.</figcaption>
+          </figure>
         </article>
-        <article>
-          <span class="feature-index">03</span>
-          <h3>Pick up together</h3>
-          <p>Collect related results into a workspace and return to them when you need them.</p>
+        <article class="demo-panel" id="resume-panel" aria-labelledby="resume-title">
+          <div class="demo-copy">
+            <h3 id="resume-title">Bring the pieces of your work together.</h3>
+            <p>Ask for “latest three files in Downloads.” Review the group, choose its members, and open them together.</p>
+            <p>Save a workspace with the files, apps, and links you use for a project. Search its name when you want to return to that set.</p>
+            <p class="detail-note">Workspaces reopen saved items. They do not restore unsaved document edits or an app’s previous window layout.</p>
+          </div>
+          <figure class="demo-preview">
+            <div class="product-panel" role="img" aria-label="Illustrative Scout search: latest 3 files in downloads. Three selected files can be reviewed and saved as a workspace."><div class="product-query"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="10" cy="10" r="6.5"/><path d="m15 15 5 5"/></svg><span>latest 3 files in downloads</span><span class="product-escape" aria-hidden="true">esc</span></div><div class="product-scopes" aria-hidden="true"><span class="selected-scope">All</span><span>Files</span><span>Apps</span><span>Links</span><span>Workspaces</span></div><p class="product-results-label">Results</p><div class="product-results"><div class="product-group"><span class="product-file-icon"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9l-6-6Z"/><path d="M14 3v6h6"/></svg></span><div><strong>Open all 3 files</strong><span>Presentation, spreadsheet, and mockup</span></div><span aria-hidden="true">↵</span></div><div class="product-row"><span class="product-file-icon"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9l-6-6Z"/><path d="M14 3v6h6"/></svg></span><div class="product-file-copy"><strong>Q4 Product Launch.pptx</strong><span>Modified 2 min ago · Downloads</span></div><span class="product-kind">PPTX</span><span class="product-row-key" aria-hidden="true">✓</span></div><div class="product-row"><span class="product-file-icon"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9l-6-6Z"/><path d="M14 3v6h6"/></svg></span><div class="product-file-copy"><strong>Campaign Budget.xlsx</strong><span>Modified 5 min ago · Downloads</span></div><span class="product-kind">XLSX</span><span class="product-row-key" aria-hidden="true">✓</span></div><div class="product-row"><span class="product-file-icon"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9l-6-6Z"/><path d="M14 3v6h6"/></svg></span><div class="product-file-copy"><strong>Landing Page Mockup.png</strong><span>Modified 8 min ago · Downloads</span></div><span class="product-kind">PNG</span><span class="product-row-key" aria-hidden="true">✓</span></div></div><div class="product-footer"><span>3 selected</span><span>Review group · Save workspace</span></div></div>
+            <figcaption>Review a group now. Save a workspace for later.</figcaption>
+          </figure>
         </article>
       </div>
     </section>
 
-    <section class="workspace-section shell" aria-labelledby="workspace-title">
-      <div class="workspace-image">
-        <img src="scout-download-group-3x.png" width="720" height="546" alt="Scout searching for the latest three files in Downloads and grouping a presentation, spreadsheet, and mockup" loading="lazy">
-      </div>
-      <div class="workspace-copy">
-        <p class="eyebrow">A little more room to work</p>
-        <h2 id="workspace-title">Your work, ready when you are.</h2>
-        <p>Ask for the latest three files in Downloads. Scout gathers the presentation, spreadsheet, and mockup into one group. Review them, open them together, or save the set as a workspace.</p>
+    <section class="comparison-section section" id="why-scout" aria-labelledby="comparison-title">
+      <div class="shell">
+        <div class="section-heading"><h2 id="comparison-title">Why choose Scout?</h2><p>Choose the tool that fits how you work. Scout brings activity-based search, visible result evidence, and mixed workspaces into one launcher.</p></div>
+        <div class="comparison-scroll" role="region" aria-label="Search tool comparison" tabindex="0">
+          <table>
+            <caption>Where each tool fits</caption>
+            <thead><tr><th scope="col">Tool</th><th scope="col">Its focus</th><th scope="col">Where Scout fits</th></tr></thead>
+            <tbody>
+              <tr><th scope="row"><a href="https://support.microsoft.com/en-us/windows/experience/storage-filemanagement/find-your-files-and-apps-in-windows">Windows Search</a></th><td>Built-in search for files, apps, and settings. Copilot+ PCs also offer semantic search.</td><td>Find work through supported activity phrases, inspect the evidence, then review groups or save workspaces.</td></tr>
+              <tr><th scope="row"><a href="https://www.voidtools.com/support/everything/">Everything</a></th><td>Fast filename search and indexing, with an offline, local design.</td><td>Combine file retrieval with apps, optional browser links, everyday PC controls, and saved workspaces.</td></tr>
+              <tr><th scope="row"><a href="https://learn.microsoft.com/en-us/windows/powertoys/command-palette/overview">PowerToys Command Palette</a><a class="secondary-source" href="https://learn.microsoft.com/en-us/windows/powertoys/run">Also: PowerToys Run</a></th><td>Keyboard launchers for apps, files, and commands. Command Palette supports extensions.</td><td>Use Scout’s combination of activity-based queries, result evidence, and workspaces containing files, apps, and links.</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="comparison-note">Tool names link to official documentation. This is a workflow comparison, not a speed or accuracy benchmark. Windows features vary by device; extensions can add capabilities to other launchers.</p>
       </div>
     </section>
 
-    <section class="privacy-section" id="privacy" aria-labelledby="privacy-title">
+    <section class="capabilities-section section shell" id="capabilities" aria-labelledby="capabilities-title">
+      <div class="section-heading"><h2 id="capabilities-title">The everyday essentials, within reach.</h2><p>Find something, check it, and take the next step without leaving the launcher.</p></div>
+      <div class="capability-grid">
+        <article><span class="capability-icon"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg></span><h3>Look before you open</h3><p>Preview PDFs, images, supported text, and Office document text. Reveal a file in Explorer or copy its path.</p><p class="capability-example"><kbd>Ctrl</kbd> + <kbd>Space</kbd> to preview</p></article>
+        <article><span class="capability-icon"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 4h18l-7 8v7l-4 2V12L3 4Z"/></svg></span><h3>Narrow the search</h3><p>Search selected locations, filter by file type, and find folders—including empty ones. Optional content search covers supported documents and source files.</p><p class="capability-example"><code>/pdf roadmap</code> · <code>/folder projects</code></p></article>
+        <article><span class="capability-icon"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="5" y="2" width="14" height="20" rx="3"/><path d="M8 6h8M8 11h2m4 0h2m-8 4h2m4 0h2m-8 4h2m4 0h2"/></svg></span><h3>Calculate and copy</h3><p>Work out a percentage or a quick calculation. Press Enter to copy the result into whatever you’re working on.</p><p class="capability-example"><code>15% of 240</code> <span aria-hidden="true">=</span> <strong>36</strong></p></article>
+        <article><span class="capability-icon"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="3"/><circle cx="15" cy="17" r="3"/></svg></span><h3>Control your PC</h3><p>Manage Wi-Fi, Bluetooth, sound, supported display brightness, and appearance. Lock your screen or open Windows notification settings.</p><p class="capability-example"><code>unmute</code> · <code>bluetooth on</code></p></article>
+      </div>
+    </section>
+
+    <section class="privacy-section section" id="privacy" aria-labelledby="privacy-title">
       <div class="shell privacy-inner">
-        <div>
-          <p class="eyebrow">Made for your own computer</p>
-          <h2 id="privacy-title">Private by design.</h2>
-          <p class="privacy-lede">Your index, pins, workspaces, and launch history stay on your PC. Scout indexes file names and metadata, not the contents of your documents.</p>
-        </div>
-        <div class="privacy-details">
-          <p><strong>Browser history is optional.</strong> Include it only if you choose to in Settings.</p>
-          <p><strong>Local AI is optional.</strong> Its runtime and model are separate downloads, and inference runs on your PC.</p>
-          <p><strong>You choose the action.</strong> A search result never opens just because Scout suggested it.</p>
-        </div>
+        <div><h2 id="privacy-title">Your PC.<br><span>Your choices.</span></h2><p class="privacy-lede">Your index, pins, workspaces, and launch history stay on your PC. Choose the folders Scout searches and the optional features you enable.</p><p class="privacy-footnote">Core search and system commands work without optional AI. Every launch or command requires Enter or an explicit Open action.</p></div>
+        <dl class="privacy-details">
+          <div><dt>Browser history is optional</dt><dd>Enable Chrome and Edge separately to include visited links and completed downloads. Scout does not read incognito data or cookies.</dd></div>
+          <div><dt>Content search is optional</dt><dd>Supported document and source text is indexed only in selected folders. Extracted body text stays local and is never sent to the model. Turning content search off clears its index.</dd></div>
+          <div><dt>Local AI is optional</dt><dd>The runtime and model are separate downloads. Inference runs on your PC after setup. Performance depends on your hardware; descriptive matches can be imperfect.</dd></div>
+        </dl>
       </div>
     </section>
 
-    <section class="download-section shell" id="download" aria-labelledby="download-title">
-      <p class="eyebrow">Scout for Windows</p>
-      <h2 id="download-title">Ready to find your way back?</h2>
-      <p>One download and a short setup. Scout installs for your Windows account and opens when setup finishes.</p>
-      <a class="button button-primary" href="https://github.com/adilzubair/scout-site/releases/download/v0.1.0-beta.1/Scout-Setup.exe">Download Scout-Setup.exe <span aria-hidden="true">↓</span></a>
-      <span class="download-note">Windows 11 x64 · No admin access needed · <a href="https://github.com/adilzubair/scout-site/releases/download/v0.1.0-beta.1/Scout-Setup.exe.sha256">Installer checksum</a></span>
-      <ol class="install-steps">
-        <li><span aria-hidden="true">01</span><div><strong>Open the installer</strong><p>Run Scout-Setup.exe and follow the prompts. Scout opens when setup finishes and is available from Start afterward.</p></div></li>
-        <li><span aria-hidden="true">02</span><div><strong>Start searching</strong><p>Press <kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>Space</kbd> to open Scout. Press <kbd>Ctrl</kbd> + <kbd>Q</kbd> when you want to quit.</p></div></li>
-      </ol>
-      <div class="download-details">
-        <p><strong>Want the portable version?</strong> <a href="https://github.com/adilzubair/scout-site/releases/download/v0.1.0-beta.1/Scout-win-x64.zip">Download the ZIP</a> and extract it before running Scout.exe. <a href="https://github.com/adilzubair/scout-site/releases/download/v0.1.0-beta.1/Scout-win-x64.zip.sha256">ZIP checksum</a></p>
-        <p>This beta is unsigned, so Windows may show an unknown-publisher or SmartScreen warning. Check that the file came from our GitHub release before choosing to run it.</p>
-        <p>Updates are manual: quit Scout and run a newer installer. Uninstall Scout from Start or Windows Settings → Apps.</p>
+    <section class="download-section section shell" id="download" aria-labelledby="download-title">
+      <div class="download-intro">
+        <div><h2 id="download-title">Make room for your next task.</h2><p>Install Scout for your Windows account, then press <span class="inline-shortcut">Ctrl + Alt + Space</span> to get started.</p></div>
+        <div class="download-actions"><a class="button" href="https://github.com/adilzubair/scout-site/releases/download/v0.1.0-beta.2/Scout-Setup.exe"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="m2 5 9-1.2V11H2V5Zm10-1.4L22 2v9H12V3.6ZM2 12h9v7.2L2 18v-6Zm10 0h10v10l-10-1.6V12Z"/></svg> Download for Windows</a><span>Free beta 2 · Windows 11 x64</span><a class="text-link" href="https://github.com/adilzubair/scout-site/releases/download/v0.1.0-beta.2/Scout-Setup.exe.sha256">Installer checksum</a></div>
+      </div>
+      <p class="beta-notice"><strong>Unsigned beta.</strong> Windows may show an unknown-publisher or SmartScreen warning. Download from the Scout GitHub release and check the checksum before choosing to proceed. Updates are manual.</p>
+      <div class="faq" aria-labelledby="faq-title">
+        <h3 id="faq-title">A few things to know</h3>
+        <details><summary>How do I install, open, and quit Scout?</summary><div class="faq-answer"><p>Run Scout-Setup.exe and follow the prompts. Setup installs for your account without admin access, adds Scout to Start, and opens it when finished.</p><p>Press <kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>Space</kbd> to open the panel. Closing the panel leaves Scout in the notification area. Press <kbd>Ctrl</kbd> + <kbd>Q</kbd> or choose Quit to exit.</p></div></details>
+        <details><summary>Can I use a portable version?</summary><div class="faq-answer"><p><a href="https://github.com/adilzubair/scout-site/releases/download/v0.1.0-beta.2/Scout-win-x64.zip">Download the portable ZIP</a>, extract the entire archive, and run Scout.exe. It uses the same local settings storage as the installer. <a href="https://github.com/adilzubair/scout-site/releases/download/v0.1.0-beta.2/Scout-win-x64.zip.sha256">ZIP checksum</a></p></div></details>
+        <details><summary>Do I need AI or a Copilot+ PC?</summary><div class="faq-answer"><p>No. Core search, supported folder and activity queries, calculations, system commands, and workspaces work without optional AI on Windows 11 x64. Local AI is off by default and requires separate runtime and model downloads with several GB of storage.</p><p>CPU inference is available but can be slow on ordinary laptops. CUDA requires a supported NVIDIA GPU. AI helps refine candidates; it does not guarantee a match or read document body text.</p></div></details>
+        <details><summary>What can content search and previews read?</summary><div class="faq-answer"><p>Optional content indexing covers supported text/source, Office, and OpenDocument files in selected folders. PDF body text and OCR are not indexed. Files larger than 16 MiB are skipped, and extraction is limited to 64,000 characters per file.</p><p>PDF page previews are available separately. Office and OpenDocument previews show text rather than the full application layout.</p></div></details>
+        <details><summary>Will every PC control work on my device?</summary><div class="faq-answer"><p>Radio, sound, and display controls depend on Windows policy, drivers, and hardware support. Scout reports failures. Brightness commands target supported integrated displays; external monitors commonly do not support them.</p><p>The <code>dark</code> command toggles appearance. Notification commands open Windows notification settings. Commands run only when you explicitly choose them.</p></div></details>
+        <details><summary>How do I update or uninstall?</summary><div class="faq-answer"><p>Updates are manual. Quit Scout, then run the newer installer. For a portable copy, replace the extracted application folder with the newer ZIP’s contents.</p><p>Uninstall through Start or Windows Settings → Apps → Installed apps. Settings and workspaces remain in <code>%LOCALAPPDATA%\Scout</code> for a later reinstall. <a href="https://github.com/adilzubair/scout-site/releases/tag/v0.1.0-beta.2">Read the beta 2 release notes</a>.</p></div></details>
       </div>
     </section>
   </main>
-
-  <footer class="site-footer">
-    <div class="shell footer-inner">
-      <a class="brand" href="#top">Scout</a>
-      <span>Find what matters. Keep moving.</span>
-      <a href="https://github.com/adilzubair/scout-site/releases">Release notes <span aria-hidden="true">↗</span></a>
-    </div>
-  </footer>
+  <footer class="site-footer"><div class="shell footer-inner"><a class="brand" href="#top"><span class="brand-icon"><svg viewBox="0 0 32 32" fill="none" aria-hidden="true"><path d="m24 8-6 13-10 3 4-13 12-3Z" fill="currentColor"/><circle cx="16" cy="16" r="2" fill="#2f6bff"/></svg></span>Scout</a><span>Find. Control. Resume.</span><a href="https://github.com/adilzubair/scout-site/releases">Releases and downloads</a></div></footer>
 </body>
 </html>
