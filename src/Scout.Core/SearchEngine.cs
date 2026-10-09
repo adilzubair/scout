@@ -15,22 +15,24 @@ public static class SearchEngine
         var literal = query.Trim().ToLowerInvariant();
         if (literal.Length >= 2 && literal[0] is '"' or '\'' && literal[^1] == literal[0]) literal = literal[1..^1];
         var intent = QueryParser.Parse(query, now, scope: scope);
-        var emptyQuery = literal.Length == 0;
+        if (intent.SlashFilter != null) literal = SlashQuery.Parse(query).Text.Trim().Trim('"', (char)39).ToLowerInvariant();
+        var emptyQuery = literal.Length == 0 && intent.SlashFilter == null;
         var queue = new PriorityQueue<SearchHit, (int Evidence, double Score, long Date, int Order)>();
         var recall = new PriorityQueue<SearchHit, (double Score, long Date, int Order)>();
         var docs = catalog.Documents.AsEnumerable();
         var additions = extra?.DistinctBy(c => c.Id).ToDictionary(c => c.Id);
+        if (intent.SlashFilter != null && intent.ContentPattern == null) contentMatches = null;
         var excerpts = contentMatches?.GroupBy(m => m.CandidateId).ToDictionary(g => g.Key,g => g.MaxBy(m => m.Score)!.Excerpts) ?? [];
         var content = contentMatches?.Where(match => catalog.TryGet(match.CandidateId, out _)).GroupBy(match => match.CandidateId).ToDictionary(group => group.Key, group => group.Max(match => match.Score)) ?? [];
         var contentHitIds = new HashSet<string>(StringComparer.Ordinal);
         if (additions is { Count: > 0 }) docs = docs.Where(d => !additions.ContainsKey(d.Id)).Concat(additions.Values.Select(SearchEntry.Create));
         // A real, fully named item takes priority over words such as 'copy', 'website'
         // and 'today' that also have a meaning in natural-language queries.
-        if (catalog.HasTitle(literal, scope) || additions?.Values.Any(c => c.Title.Equals(literal, StringComparison.OrdinalIgnoreCase) && c.InScope(scope)) == true)
+        if (intent.SlashFilter == null && (catalog.HasTitle(literal, scope) || additions?.Values.Any(c => c.Title.Equals(literal, StringComparison.OrdinalIgnoreCase) && c.InScope(scope)) == true))
             intent = new(query, QueryParser.Tokenize(literal), null, null, RecencyBasis.None, null, false) { Literal = true };
         if (intent.QueryError.Length > 0) return new(query, intent, [], timer.Elapsed.TotalMilliseconds) { Notice = intent.QueryError };
         string[] Resolve(string folder) => catalog.Folders.IsPreferred(folder) ? catalog.Folders.Resolve(folder) : catalog.Folders.Resolve(folder).Concat(additions is { Count: > 0 } ? new FolderCatalog(additions.Values).Resolve(folder) : []).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
-        if (Path.IsPathFullyQualified(literal))
+        if (intent.SlashFilter == null && Path.IsPathFullyQualified(literal))
         {
             var directories = Resolve(literal);
             intent = directories.Length > 0
@@ -49,9 +51,9 @@ public static class SearchEngine
             if (locations.Length == 0 && folderFilter.Required)
                 return new(query, intent, [], timer.Elapsed.TotalMilliseconds) { Notice = $"Folder “{folderFilter.Text}” isn’t indexed. Add its location in Settings." };
             if (locations.Length == 0) intent = intent with { Folder = null, Terms = intent.Terms.Concat(QueryParser.Tokenize(folderFilter.Text)).ToArray() };
-            else if (intent.Kind == ItemKind.Folder)
+            else if (intent.Kind == ItemKind.Folder && intent.SlashFilter == null)
                 return new(query, intent, locations.Select(path => new Candidate(Candidate.Key(ItemKind.Folder, path), ItemKind.Folder, Path.GetFileName(path), path) { Detail = Path.GetDirectoryName(path) ?? "", Source = "Folder" }).Where(c => c.InScope(scope)).Take(limit).Select(c => new SearchHit(c, locations.Length == 1 ? 1000 : 200, library.GetValueOrDefault(c.Id)?.Pinned == true)).ToArray(), timer.Elapsed.TotalMilliseconds) { Locations = locations };
-            else docs = catalog.Entries(locations, folderFilter.DirectOnly).Where(d => additions == null || !additions.ContainsKey(d.Id)).Concat(additions?.Values.Where(c => c.Kind == ItemKind.File && locations.Any(path => folderFilter.DirectOnly ? Path.GetDirectoryName(c.Target)?.Equals(path, StringComparison.OrdinalIgnoreCase) == true : IndexPolicy.Within(c.Target, path))).Select(SearchEntry.Create) ?? []);
+            else docs = catalog.Entries(locations, folderFilter.DirectOnly).Where(d => additions == null || !additions.ContainsKey(d.Id)).Concat(additions?.Values.Where(c => (c.Kind == ItemKind.File || intent.SlashFilter == "folder" && c.Kind == ItemKind.Folder) && locations.Any(path => folderFilter.DirectOnly ? Path.GetDirectoryName(c.Target)?.Equals(path, StringComparison.OrdinalIgnoreCase) == true : IndexPolicy.Within(c.Target, path))).Select(SearchEntry.Create) ?? []);
         }
         if (intent.Count.HasValue) limit = Math.Min(limit, intent.Count.Value);
         if (limit > 0 && !emptyQuery && intent.Recency != RecencyBasis.None && intent.Terms.Length == 0 && intent.ContentPattern == null && intent.Folder == null
@@ -160,6 +162,7 @@ public static class SearchEngine
             var sortDate = (date ?? memory?.LastLaunch ?? raw.VisitedAt ?? raw.ModifiedAt)?.UtcTicks ?? 0;
             // A recency superlative orders the eligible set by evidence, including described files.
             var primary = chronological ? 0 : score;
+            if (!chronological && raw.Kind == ItemKind.Folder) primary -= .5; // Preserve filename priority on otherwise equal matches.
             var evidence = intent.Recency == RecencyBasis.Downloaded && raw.DownloadedAt != null ? 1 : 0;
             if (!chronological && raw.Kind == ItemKind.Link && Uri.TryCreate(raw.Target, UriKind.Absolute, out var uri)) primary -= Math.Min(1, uri.AbsolutePath.Count(c => c == '/') * .01);
             var priority = (evidence, primary, chronological && intent.Oldest ? -sortDate : sortDate, -position);
@@ -176,7 +179,7 @@ public static class SearchEngine
         var hits = new List<SearchHit>(queue.Count);
         while (queue.TryDequeue(out var hit, out _)) hits.Add(hit);
         hits.Reverse();
-        if (hits.Count == 0 && !intent.Literal && intent.ContentPattern == null && intent.Terms.Length == 1 && intent.Terms[0].Length is >= 3 and <= 12 && intent.Terms[0].All(char.IsLetter) && intent.Kind is null or ItemKind.File && scope is Scope.All or Scope.Files && intent.Recency == RecencyBasis.None && intent.Window == null)
+        if (hits.Count == 0 && intent.SlashFilter == null && !intent.Literal && intent.ContentPattern == null && intent.Terms.Length == 1 && intent.Terms[0].Length is >= 3 and <= 12 && intent.Terms[0].All(char.IsLetter) && intent.Kind is null or ItemKind.File && scope is Scope.All or Scope.Files && intent.Recency == RecencyBasis.None && intent.Window == null)
         {
             var term = intent.Terms[0]; var fuzzyScores = catalog.PrepareFuzzy(term);
             var fuzzy = new PriorityQueue<SearchHit, (double Score, int Order)>();

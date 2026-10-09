@@ -57,6 +57,7 @@ public partial class App : Application
                             Detail = "Downloads", Source = "Files", AddedAt = now.AddMinutes(-i * 3 - 2),
                             ModifiedAt = now.AddMinutes(-i * 3 - 2)
                         }))
+                    .Append(new Candidate("smoke:folder", ItemKind.Folder, "Projects", Path.Combine(DataDirectory, "Projects")) { Source = "Folder" })
                     .ToArray();
                 store.ReplaceIndex(fixtures);
             }

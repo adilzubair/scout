@@ -12,6 +12,20 @@ public static partial class QueryParser
 
     public static QueryIntent Parse(string text, DateTimeOffset now, TimeZoneInfo? zone = null, Scope scope = Scope.All)
     {
+        var slash = SlashQuery.Parse(text);
+        if (slash.Filter != null || slash.Error.Length > 0)
+        {
+            var operators = AdvancedQuery.Parse(slash.Text, now);
+            var error = slash.Error.Length > 0 ? slash.Error : operators.Error ?? "";
+            if (operators.Pattern != null && slash.Kind is ItemKind.Folder or ItemKind.App or ItemKind.Link or ItemKind.Workspace)
+                error = "Content patterns apply to files. Use /file or a file-type filter.";
+            return new(text.Trim(), Tokenize(operators.Text), slash.Extension, operators.Pattern != null ? ItemKind.File : slash.Kind, RecencyBasis.None, null, false)
+            {
+                SlashFilter = slash.Filter, Folder = operators.Folder == null ? null : new(operators.Folder),
+                ContentPattern = operators.Pattern, ContentRegex = operators.Regex, ExplicitExtensions = operators.Extensions ?? [],
+                MinimumSize = operators.MinimumSize, MaximumSize = operators.MaximumSize, ModifiedWindow = operators.ModifiedWindow, QueryError = error
+            };
+        }
         zone ??= TimeZoneInfo.Local;
         var advanced = AdvancedQuery.Parse(text, now);
         var q = advanced.Text.Trim().ToLowerInvariant();

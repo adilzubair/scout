@@ -46,6 +46,7 @@ internal static class DriveIndexChecks
             await service.ConfigureAsync(settings); var id = Candidate.Key(ItemKind.File,path);
             Check(service.Progress.FindFolder(selected) is { Phase: FolderPhase.Ready, Files: 1 } && service.Progress.FindFolder(child) is { Phase: FolderPhase.Ready, Files: 1 });
             Check(service.Progress.Documents == 0 && service.Progress.Files == 1);
+            Check(service.Catalog.Contains(Candidate.Key(ItemKind.Folder, child)));
             Check(service.Catalog.Count(c => c.Kind == ItemKind.File) == 1);
             Check(service.Catalog.Contains(id) && store.Candidates.Count(c => c.Id == id) == 1);
             // Simulate a stale root deletion delivered after watcher reset/recreation.
@@ -67,12 +68,14 @@ internal static class DriveIndexChecks
             Check(service.Progress.FindFolder(selected) is { Phase: FolderPhase.Unavailable, Files: 1, ContentsReady: false });
             Check(service.Progress.Description.Contains("could not be read"));
             Check(!service.Catalog.Contains(renamedId) && store.Candidates.Any(c => c.Id == renamedId));
+            Check(!service.Catalog.Contains(Candidate.Key(ItemKind.Folder, moved)) && store.Candidates.Any(c => c.Id == Candidate.Key(ItemKind.Folder, moved)));
             Directory.Move(offline,selected); await Until(() => service.Catalog.Contains(renamedId));
             File.Delete(renamed); await Until(() => !service.Catalog.Contains(renamedId));
             var added = Path.Combine(selected,"Report.txt"); await File.WriteAllTextAsync(added,"synthetic"); var addedId = Candidate.Key(ItemKind.File,added); await Until(() => service.Catalog.Contains(addedId));
             await Until(() => service.Progress.FindFolder(selected) is { Phase: FolderPhase.Ready, Files: 1 });
             await service.ConfigureAsync(new ScoutSettings { RecentItems=false,WindowsSearch=false });
             Check(!service.Catalog.Contains(addedId) && !store.Candidates.Any(c => c.Id == addedId));
+            Check(!service.Catalog.Contains(Candidate.Key(ItemKind.Folder, moved)) && !store.Candidates.Any(c => c.Id == Candidate.Key(ItemKind.Folder, moved)));
         }
         finally
         {

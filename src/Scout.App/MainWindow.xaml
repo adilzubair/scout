@@ -1,7 +1,7 @@
 <Window x:Class="Scout.App.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Scout" Width="720" Height="104" WindowStyle="None" ResizeMode="NoResize"
+        Title="Scout" Width="720" Height="76" WindowStyle="None" ResizeMode="NoResize"
         ShowInTaskbar="False" Topmost="True" WindowStartupLocation="CenterScreen"
         PreviewKeyDown="OnKeyDown" Background="{DynamicResource Canvas}">
   <Window.Resources>
@@ -26,7 +26,7 @@
           <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
           <TextBox x:Name="Query" FontFamily="Segoe UI Variable Display, Segoe UI" FontSize="23" BorderThickness="0" Background="Transparent" Padding="0,5" TextChanged="QueryChanged" AutomationProperties.Name="Search apps, files and links"/>
           <TextBlock x:Name="Placeholder" Text="Search apps, files, and more" FontFamily="Segoe UI Variable Display, Segoe UI" Foreground="{DynamicResource Muted}" FontSize="23" Margin="0,5" IsHitTestVisible="False"/>
-          <Button Grid.Row="1" Style="{StaticResource QuietButton}" Padding="0,2" HorizontalAlignment="Left" Click="IndexDetailsClick" AutomationProperties.Name="Show indexing details">
+          <Button x:Name="IndexIndicator" Grid.Row="1" Visibility="Collapsed" Style="{StaticResource QuietButton}" Padding="0,2" HorizontalAlignment="Left" Click="IndexDetailsClick" AutomationProperties.Name="Show indexing details">
             <StackPanel Orientation="Horizontal">
               <ProgressBar x:Name="IndexBusy" Width="16" Height="3" Margin="0,0,7,0" VerticalAlignment="Center" Visibility="Collapsed"/>
               <TextBlock x:Name="IndexState" FontSize="11" Foreground="{DynamicResource Muted}" AutomationProperties.LiveSetting="Polite"/>

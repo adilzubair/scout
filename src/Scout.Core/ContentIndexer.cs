@@ -44,7 +44,8 @@ public sealed class ContentIndexer
         var selected = selectedFolders.Select(Normalize).ToArray();
         var activeRoots = roots.Select(Normalize).ToArray();
         var excluded = exclusions.ToArray();
-        if (candidate.Kind != ItemKind.File || !InScope(candidate.Target, selected, activeRoots, excluded))
+        if (candidate.Kind != ItemKind.File) return;
+        if (!InScope(candidate.Target, selected, activeRoots, excluded))
         {
             index.Remove([candidate.Id]);
             return;

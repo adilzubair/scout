@@ -6,6 +6,15 @@ internal static class SettingsUiChecks
     public static void Run(Action<string, Action> test)
     {
         void Check(bool pass) { if (!pass) throw new Exception("Folder list assertion failed"); }
+        test("Completed indexing is quiet while working and unavailable folders stay visible", () =>
+        {
+            var ready = new IndexProgress(IndexPhase.Ready, 1234, 12, 12, [], []);
+            Check(!ready.ShowInLauncher && ready.Summary.Contains("1,234"));
+            Check(IndexProgress.Starting.ShowInLauncher && (ready with { Phase = IndexPhase.Contents }).ShowInLauncher);
+            Check((ready with { Phase = IndexPhase.Incomplete }).ShowInLauncher);
+            var unavailable = ready with { Folders = [new(@"C:\Docs", 1, 0, FolderPhase.Unavailable, false, false)] };
+            Check(unavailable.ShowInLauncher && unavailable.LauncherSummary == "Some folders need attention");
+        });
         test("Unified folders preserve content opt-in and deduplicate legacy lists", () =>
         {
             var selection = new FolderSelections(new ScoutSettings { ExtraFolders = [@"C:\Docs", @"C:\Extra"], ContentSearchEnabled = true, ContentFolders = [@"c:\docs\", @"C:\Body"] }, [@"C:\Docs"]);

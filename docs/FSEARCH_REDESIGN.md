@@ -370,6 +370,55 @@ and unavailable-drive status. The currently running launcher was left open;
 the verified executable is in the ignored settings-ux/build/bin/Scout.App/release
 directory. Exit the running Scout before opening this copy.
 
+## Slash filters and independent directory indexing follow-up
+
+Slash filters are optional and preserve existing unprefixed searches, natural-language
+folder commands, exact filenames/paths and advanced operators. `/folder projects`
+returns directories by name; `/folder` includes indexed empty directories. `/image`
+lists images and `/image holiday` narrows by name. `/pdf`, `/file`, `/video`, `/audio`,
+`/document`, `/spreadsheet`, `/presentation`, `/archive`, `/app`, `/link`, `/workspace`
+and `/all` are also supported. Type `/` for help. Filters respect the selected scope
+tab; words following them remain name terms, including words such as "last week".
+Use `mtime:<7d` for an explicit age restriction. Ordinary body-word search stays in
+unprefixed queries; explicit `grep:`/`regex:` can be combined with file filters.
+Slash searches use local ranking and omit web fallback; launching records activity
+without learning the whole filter as a personal alias.
+
+Previously folders were inferred from files and selected with folder phrases or
+absolute paths. Native discovery now creates stable Folder candidates independently,
+using the existing SQLite journal, compact index and mapped snapshots. Empty folders
+therefore remain searchable after restart, and directory renames/deletes update their
+names and scopes. Hidden/excluded directories remain excluded, offline drive folders
+are suppressed without discarding their cached records, and disabling drive coverage
+removes its directory records as well. File/content counts exclude directory rows.
+Existing installs discover these additional rows during background reconciliation.
+
+This supersedes the always-visible completed launcher status from the preceding
+Settings follow-up: progress/problems remain visible, but successful completion
+collapses the status row. Full readiness/counts remain available in Settings → Folders.
+
+Validation: Release build with zero warnings/errors, **290/290 C# checks**, and the
+isolated desktop smoke passed. New checks cover all filter families, quoted paths,
+operators, empty/Unicode directories, cache switches/backspace, content-only hits,
+content cleanup with mixed directory metadata, snapshot corruption/replay, watcher
+create/rename/subtree deletion, restart, exclusions, offline drives and retained folder
+activity. UI captures verify slash results/help, no web fallback, compact ready state,
+light/dark rendering, settings scrolling and existing launcher workflows.
+The same 504 compatibility cases and 80 prospective cases retain identical ordered
+hits, recall, shortlists, locations, notices, existing intent fields and correctness
+on identical candidate coverage. No predictions were regenerated: payloads remain
+identical in those cases. Expanded directory coverage is a separate feature change.
+
+One isolated 1,000-file/11-directory lifecycle run measured 731 ms initial crawl,
+421 ms first availability, 72 ms cached availability and 110 ms reconciliation.
+The base occupied 345,156 bytes; 30 watcher updates had p95 515 ms and no normal
+full rescans. These are synthetic, single-run observations, not a paired speed
+claim or a whole-drive measurement. Directory rows add storage/name-index work;
+whole-drive memory and crawl costs were not remeasured for this follow-up. The
+previous paired performance results and missed targets above remain unchanged.
+Evidence and the verified test executable are under ignored
+`artifacts/diagnostics/folder-search`; the running user instance was left open.
+
 ## Reproduction and private artifacts
 
 Private snapshots, filenames, content, binaries and raw reports remain under ignored

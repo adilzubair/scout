@@ -20,7 +20,8 @@ public partial class MainWindow
             if (Query.ActualWidth < 200 || Results.ActualHeight < 100) throw new InvalidOperationException("Launcher content was clipped.");
         }
         await SearchView("", Scope.All, "launcher-empty");
-        if (ActualHeight > 112 || ScopesRow.IsVisible || ResultsRegion.IsVisible) throw new InvalidOperationException("Empty search did not open compact.");
+        if (ActualHeight > 90 || ScopesRow.IsVisible || ResultsRegion.IsVisible) throw new InvalidOperationException("Empty search did not open compact.");
+        if (IndexIndicator.IsVisible) throw new InvalidOperationException("Completed indexing still occupies the launcher.");
         var workArea = WindowVisuals.WorkArea(this);
         if (Top + ActualHeight / 2 >= workArea.Top + workArea.Height * .39)
             throw new InvalidOperationException("Compact search did not open near the upper third.");
@@ -34,7 +35,7 @@ public partial class MainWindow
         await UiDiagnostics.Snapshot(this, "launcher-suggestions");
         Query.Text = "pdf"; await WaitForSearch();
         Query.Clear(); await WaitForSearch();
-        if (ActualHeight > 112) throw new InvalidOperationException("Clearing search did not collapse the launcher.");
+        if (ActualHeight > 90) throw new InvalidOperationException("Clearing search did not collapse the launcher.");
         WindowVisuals.SetTestMotion(false);
         RevealSuggestions(); UpdateLayout();
         if (ActualHeight < 300) throw new InvalidOperationException("Reduced-motion expansion did not complete immediately.");
@@ -48,6 +49,22 @@ public partial class MainWindow
         await SearchView("latest 3 files in downloads", Scope.All, "site-download-group", pixelScale: 3);
         if (Selected?.Kind != ItemKind.Group || group.Count != 3) throw new InvalidOperationException("Site download example did not form a three-file group.");
         ClearGroup();
+        await SearchView("/folder projects", Scope.Files, "launcher-folder-filter");
+        if (Selected?.Kind != ItemKind.Folder || Selected.Title != "Projects" || ResultsHeading.Text != "/folder results")
+            throw new InvalidOperationException("Slash folder filter did not select the independent folder.");
+        await SearchView("/image", Scope.All, "launcher-image-filter");
+        if (current?.Hits.Single().Candidate.Title != "Landing Page Mockup.png")
+            throw new InvalidOperationException("Slash image filter did not constrain file types.");
+        if (Results.Items.Cast<ResultRow>().Any(row => row.Candidate.Kind != ItemKind.File))
+            throw new InvalidOperationException("Slash image search included a non-file fallback.");
+        await SearchView("/folder absent", Scope.All, "launcher-folder-no-results");
+        if (Results.Items.Count != 0 || Empty.Visibility != Visibility.Visible)
+            throw new InvalidOperationException("An empty slash filter broadened into web search.");
+        await SearchView("/", Scope.All, "launcher-slash-help");
+        if (Results.Items.Count != 0 || !EmptyDetail.Text.Contains("/folder"))
+            throw new InvalidOperationException("Slash filter help was not visible.");
+        await SearchView("/pdf roadmap", Scope.All, "launcher-pdf-filter");
+        if (Selected?.Title != "Product Roadmap.pdf") throw new InvalidOperationException("Slash PDF name search failed.");
         await SearchView("15% of 240", Scope.All, "launcher-calculator");
         await SearchView("", Scope.Workspaces, "launcher-workspaces");
         await SearchView("no-such-file", Scope.Files, "launcher-no-results");

@@ -43,7 +43,7 @@ public partial class MainWindow : Window
     private Task localSearchTask = Task.CompletedTask;
     private Task refinementTask = Task.CompletedTask, enrichmentTask = Task.CompletedTask;
     private long appliedRevision, observedIndexVersion = -1;
-    private double requestedHeight = 104;
+    private double requestedHeight = 76;
     private bool suggestionsRevealed, expanded;
     private string lastRenderedQuery = "";
     private HashSet<string> lastRenderedIds = [];
@@ -203,7 +203,7 @@ public partial class MainWindow : Window
     }
     private string ResultStatus(SearchResult result)
     {
-        if (result.Query.Length == 0) return "Scout";
+        if (result.Query.Length == 0 || result.Intent.SlashFilter == "") return "Scout";
         if (result.Notice.Length > 0) return result.Notice;
         return result.Locations.Length == 1 ? result.Locations[0] : "Scout";
     }
@@ -255,8 +255,8 @@ public partial class MainWindow : Window
         applying = true;
         displayedHits = hits.ToArray();
         var effective = displayedHits.ToList();
-        if (scope == Scope.All && current?.Intent.Literal != true && current?.Intent.Folder == null && SyntheticResults.Calculation(Query.Text) is { } calculation) effective.Insert(0, new(calculation, 2000));
-        if (store.Settings.WebFallback && current?.Intent.Literal != true && current?.Intent.Folder == null && scope is Scope.All or Scope.Links && SyntheticResults.Web(Query.Text) is { } web) effective.Add(new(web, -100));
+        if (scope == Scope.All && current?.Intent.SlashFilter == null && current?.Intent.Literal != true && current?.Intent.Folder == null && SyntheticResults.Calculation(Query.Text) is { } calculation) effective.Insert(0, new(calculation, 2000));
+        if (store.Settings.WebFallback && current?.Intent.SlashFilter == null && current?.Intent.Literal != true && current?.Intent.Folder == null && scope is Scope.All or Scope.Links && SyntheticResults.Web(Query.Text) is { } web) effective.Add(new(web, -100));
         if (group.Count >= 2)
         {
             var kinds = group.Values.Select(c => c.Kind).Distinct().ToArray();
@@ -271,17 +271,17 @@ public partial class MainWindow : Window
         Results.SelectedItem = rows.FirstOrDefault(r => r.Candidate.Id == selected) ?? rows.FirstOrDefault();
         applying = false;
         Empty.Visibility = rows.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
-        EmptyTitle.Text = Query.Text.Length == 0 ? "What can we help you find?" : "No matches yet";
+        EmptyTitle.Text = current?.Intent.SlashFilter == "" ? "Search filters" : Query.Text.Length == 0 ? "What can we help you find?" : "No matches yet";
         EmptyDetail.Text = Query.Text.Length == 0 ? "An app, a file, or a few words to get started." : "Try a different name or search in All.";
         if (Query.Text.Length == 0 && scope != Scope.All)
         {
             EmptyTitle.Text = scope == Scope.Workspaces ? "Your work, ready to reopen" : $"Find your {scope.ToString().ToLowerInvariant()}";
-            EmptyDetail.Text = scope == Scope.Workspaces ? "Add results to a group, then save a workspace to open them together." : "Start typing a name. Pinned and recently opened items appear here.";
+            EmptyDetail.Text = scope == Scope.Workspaces ? "Add results to a group, then save a workspace to open them together." : "Try a name, /folder or /image. Pinned and recently opened items appear here.";
         }
         if (rows.Length == 0 && current?.Intent.Recency is RecencyBasis.Added or RecencyBasis.Downloaded) EmptyDetail.Text = "No matching arrival dates. Browser history can supply completed-download dates when enabled in Settings.";
         if (rows.Length == 0 && current?.Intent.Recency == RecencyBasis.Opened) EmptyDetail.Text = "No matching openings in Windows Recent Items or Scout launch history.";
         if (current?.Notice is { Length: > 0 } notice) EmptyDetail.Text = notice;
-        ResultsHeading.Text = rows.Length == 0 ? "" : Query.Text.Length == 0 ? "Suggestions" : "Results";
+        ResultsHeading.Text = rows.Length == 0 ? "" : current?.Intent.SlashFilter is { } filter ? "/" + filter + " results" : Query.Text.Length == 0 ? "Suggestions" : "Results";
         ResultCount.Text = rows.Length == 0 ? "" : $"{rows.Length} {(rows.Length == 1 ? "item" : "items")}";
         Examples.Visibility = Query.Text.Length == 0 && scope == Scope.All ? Visibility.Visible : Visibility.Collapsed;
         ResultHints.Visibility = rows.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
@@ -306,9 +306,9 @@ public partial class MainWindow : Window
     }
     private void ResizeToResults(int count, bool calculation)
     {
-        var target = !expanded ? 104 : count == 0 ? (Examples.Visibility == Visibility.Visible ? 448 : 370)
+        var target = !expanded ? 76 : count == 0 ? (Examples.Visibility == Visibility.Visible ? 448 : 370)
             : Math.Max(370, 250 + Math.Min(6, count) * 60 + (calculation ? 22 : 0));
-        if (expanded) target += 28;
+        if (IndexIndicator.Visibility == Visibility.Visible) target += 28;
         if (GroupBar.Visibility == Visibility.Visible) target += 56;
         var height = Math.Min(target, MaxHeight);
         if (Math.Abs(requestedHeight - height) < 1) return;
@@ -472,9 +472,11 @@ public partial class MainWindow : Window
     private void UpdateIndexProgress()
     {
         var progress = index.Progress;
-        IndexState.Text = progress.Summary; IndexState.ToolTip = progress.Description;
+        IndexIndicator.Visibility = progress.ShowInLauncher ? Visibility.Visible : Visibility.Collapsed;
+        IndexState.Text = progress.LauncherSummary; IndexState.ToolTip = progress.Description;
         IndexBusy.Visibility = progress.IsWorking ? Visibility.Visible : Visibility.Collapsed;
         IndexBusy.IsIndeterminate = progress.IsWorking && WindowVisuals.MotionEnabled;
+        ResizeToResults(Results.Items.Count, Selected?.Kind == ItemKind.Calculation);
     }
     private void IndexDetailsClick(object sender, RoutedEventArgs e) => ShowSettings("Folders");
     internal async void ShowSettings(string initialPage = "General")

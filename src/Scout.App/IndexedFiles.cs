@@ -13,6 +13,11 @@ internal sealed class IndexedFiles
     public SearchCatalog Snapshot { get { lock (gate) return current; } }
     public int Pending { get { lock (gate) return pending.Count + removed.Count; } }
     public int Count { get { lock (gate) return current.Count + pending.Keys.Count(id => !current.Contains(id)) - removed.Count(id => current.Contains(id)); } }
+    public int FileCount
+    {
+        get { lock (gate) return current.FileCount + pending.Values.Sum(c => (c.Kind == ItemKind.File ? 1 : 0) - (current.TryGetCandidate(c.Id, out var old) && old?.Kind == ItemKind.File ? 1 : 0))
+            - removed.Count(id => current.TryGetCandidate(id, out var old) && old?.Kind == ItemKind.File); }
+    }
     public IEnumerable<Candidate> Values
     {
         get { SearchCatalog snapshot; Dictionary<string, Candidate> adds; HashSet<string> dead;

@@ -130,7 +130,7 @@ public sealed partial class ScoutStore
             var old = Library.GetValueOrDefault(c.Id) ?? new(c, false, 0, null, []);
             var aliases = old.Aliases.AsEnumerable();
             var intent = QueryParser.Parse(query, now);
-            if (c.Source != "File contents" && !string.IsNullOrWhiteSpace(query) && intent.Recency == RecencyBasis.None && intent.Window == null && !intent.Plural) aliases = new[] { query.Trim().ToLowerInvariant() }.Concat(aliases);
+            if (intent.SlashFilter == null && c.Source != "File contents" && !string.IsNullOrWhiteSpace(query) && intent.Recency == RecencyBasis.None && intent.Window == null && !intent.Plural) aliases = new[] { query.Trim().ToLowerInvariant() }.Concat(aliases);
             Put("library", c.Id, old with { Candidate = c, Launches = Math.Min(100_000, old.Launches + 1), LastLaunch = now, Aliases = aliases.Distinct().Take(20).ToArray() });
         }
     }

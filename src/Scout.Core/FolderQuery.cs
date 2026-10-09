@@ -57,7 +57,7 @@ public static class FolderQuery
     }
 }
 
-/// <summary>Folder names are a distinct index; ordinary filename queries never match whole ancestor trees.</summary>
+/// <summary>Folder names are a distinct index; folder hits never imply filename matches for their descendants.</summary>
 public sealed class FolderCatalog
 {
     public static FolderCatalog FromPaths(IEnumerable<string> paths, IEnumerable<string> roots) => new(paths, roots);
@@ -78,6 +78,7 @@ public sealed class FolderCatalog
         var knownRoots = (roots ?? []).Select(CanonicalPath).ToArray();
         foreach (var root in knownRoots) Add(root);
         preferred = knownRoots.GroupBy(p => Normalize(FolderName(p)), StringComparer.OrdinalIgnoreCase).ToDictionary(g => g.Key, g => g.ToArray(), StringComparer.OrdinalIgnoreCase);
+        foreach (var directory in candidates.Where(c => c.Kind == ItemKind.Folder)) Add(directory.Target);
         foreach (var candidate in candidates.Where(c => c.Kind == ItemKind.File))
             if (Path.GetDirectoryName(candidate.Target) is { Length: > 0 } parent) Add(parent);
         exact = entries.Values.GroupBy(e => Normalize(e.Name), StringComparer.OrdinalIgnoreCase).ToDictionary(g => g.Key, g => g.Select(e => e.Path).ToArray(), StringComparer.OrdinalIgnoreCase);

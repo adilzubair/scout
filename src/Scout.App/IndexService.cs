@@ -51,7 +51,7 @@ internal sealed class IndexService : IDisposable
     public long Version => Interlocked.Read(ref version);
     public IEnumerable<Candidate> Candidates => Catalog.Candidates;
     internal IEnumerable<Candidate> Applications => Volatile.Read(ref apps).Where(c => c.Kind == ItemKind.App);
-    internal int CachedFileCount => files.Count;
+    internal int CachedFileCount => files.FileCount;
     public int FullScanCount { get; private set; }
     internal int LastScanSeenCount { get; private set; }
     internal int LastScanRemovedCount { get; private set; }
@@ -174,7 +174,7 @@ internal sealed class IndexService : IDisposable
         ScheduleCompaction();
         ReportProgress(throttled: true);
         var unavailable = Roots.Count(root => !NativeFileCrawler.IsAvailable(root));
-        Changed?.Invoke($"{files.Count:N0} files · {apps.Length} apps · {links.Length:N0} links" + (unavailable > 0 ? $" · {unavailable} unavailable locations" : ""));
+        Changed?.Invoke($"{files.FileCount:N0} files · {apps.Length} apps · {links.Length:N0} links" + (unavailable > 0 ? $" · {unavailable} unavailable locations" : ""));
     }
     internal Task LoadFixturesAsync() => Task.Run(() =>
     {
@@ -206,7 +206,7 @@ internal sealed class IndexService : IDisposable
                 }
                 if (Interlocked.Exchange(ref dirty, 0) == 1 || DateTime.UtcNow - lastScan > TimeSpan.FromMinutes(30))
                 {
-                    Changed?.Invoke($"Checking folders · {files.Count:N0} cached files ready");
+                    Changed?.Invoke($"Checking folders · {files.FileCount:N0} cached files ready");
                     ResetWatchers(); failed.Clear();
                     lock (progressGate) completedRoots.Clear();
                     ReportProgress(IndexPhase.FileNames, recount: true);
@@ -217,7 +217,7 @@ internal sealed class IndexService : IDisposable
                         ReportProgress(IndexPhase.FileNames, recount: true);
                     }
                     Audit("scan-complete",seen.Count,0);
-                    LastScanSeenCount = seen.Count; LastScanRemovedCount = 0; LastScanUnavailableCount = failed.Count;
+                    LastScanSeenCount = seen.Count(id => id.StartsWith("File:", StringComparison.Ordinal)); LastScanRemovedCount = 0; LastScanUnavailableCount = failed.Count;
                     foreach (var c in files.Values)
                         if (!seen.Contains(c.Id) && !failed.Keys.Any(path => IndexPolicy.Within(c.Target, path))) { files.TryRemove(c.Id, out _); LastScanRemovedCount++; }
                     Audit("reconciled",seen.Count,LastScanRemovedCount);
@@ -287,7 +287,7 @@ internal sealed class IndexService : IDisposable
     public ContentSearchResponse SearchContentResponse(string query, Scope scope, DateTimeOffset now, CancellationToken token)
     {
         var intent = QueryParser.Parse(query, now, scope: scope);
-        if (Catalog.HasTitle(query.Trim(), scope)) return new([]);
+        if (intent.SlashFilter != null && intent.ContentPattern == null || Catalog.HasTitle(query.Trim(), scope)) return new([]);
         if (!Volatile.Read(ref contentReady))
             return new([], intent.ContentPattern != null ? settings.ContentSearchEnabled ? "File contents are still being indexed. File names are already searchable." : "Select Search contents for a folder in Settings to enable content search." : "");
         if (scope is Scope.Apps or Scope.Links or Scope.Workspaces) return new([]);
@@ -340,7 +340,7 @@ internal sealed class IndexService : IDisposable
                 return new FolderIndexProgress(root, folderFiles.GetValueOrDefault(root), folderDocuments.GetValueOrDefault(root), state, contents,
                     contents && progressPhase == IndexPhase.Ready && Volatile.Read(ref contentReady) && !unavailable);
             }).ToArray();
-            snapshot = new(progressPhase, files.Count, folderDocuments.Where(p => !Roots.Any(other => !p.Key.Equals(other, StringComparison.OrdinalIgnoreCase) && IndexPolicy.Within(p.Key, other))).Sum(p => p.Value), contentProcessed, folders, settings.Exclusions.ToArray(), detail);
+            snapshot = new(progressPhase, files.FileCount, folderDocuments.Where(p => !Roots.Any(other => !p.Key.Equals(other, StringComparison.OrdinalIgnoreCase) && IndexPolicy.Within(p.Key, other))).Sum(p => p.Value), contentProcessed, folders, settings.Exclusions.ToArray(), detail);
             Volatile.Write(ref progress, snapshot);
         }
         ProgressChanged?.Invoke(snapshot);
@@ -349,22 +349,24 @@ internal sealed class IndexService : IDisposable
     {
         if (Environment.GetEnvironmentVariable("SCOUT_INDEX_AUDIT") != "1") return;
         Directory.CreateDirectory(store.IndexDirectory);
-        File.AppendAllText(Path.Combine(store.IndexDirectory,"crawl-audit.jsonl"),System.Text.Json.JsonSerializer.Serialize(new { stage, seen, removed, cached=files.Count, unavailable=failed.Count, FullScanCount, generation=store.IndexGeneration }) + Environment.NewLine);
+        File.AppendAllText(Path.Combine(store.IndexDirectory,"crawl-audit.jsonl"),System.Text.Json.JsonSerializer.Serialize(new { stage, seen, removed, cached=files.FileCount, unavailable=failed.Count, FullScanCount, generation=store.IndexGeneration }) + Environment.NewLine);
     }
     private void Scan(string root, HashSet<string> seen, CancellationToken token)
     {
-        NativeFileCrawler.ScanAsync(root, Excluded, entry =>
+        void Accept(NativeFileCrawler.Entry entry, ItemKind kind)
         {
             lock (scanBatch)
             {
-                var id = Candidate.Key(ItemKind.File, entry.Path); seen.Add(id); files.TryGetValue(id, out var old);
-                var item = new Candidate(id, ItemKind.File, entry.Name, entry.Path) { Detail = Path.GetDirectoryName(entry.Path) ?? "", SizeBytes = entry.Size,
+                var id = Candidate.Key(kind, entry.Path); seen.Add(id); files.TryGetValue(id, out var old);
+                var item = new Candidate(id, kind, entry.Name, entry.Path) { Detail = Path.GetDirectoryName(entry.Path) ?? "", SizeBytes = kind == ItemKind.File ? entry.Size : null,
                     ModifiedAt = entry.Modified, CreatedAt = entry.Created, AddedAt = old?.AddedAt ?? entry.Created, AddedSource = old?.AddedSource ?? "Windows creation date",
-                    OpenedAt = old?.OpenedAt, OpenedSource = old?.OpenedSource ?? "", DownloadedAt = old?.DownloadedAt, DownloadSource = old?.DownloadSource ?? "", Keywords = old?.Keywords ?? [], Source = "Files" };
+                    OpenedAt = old?.OpenedAt, OpenedSource = old?.OpenedSource ?? "", DownloadedAt = old?.DownloadedAt, DownloadSource = old?.DownloadSource ?? "", Keywords = old?.Keywords ?? [], Source = kind == ItemKind.File ? "Files" : "Folder" };
                 if (old == null || old.ModifiedAt != item.ModifiedAt || old.CreatedAt != item.CreatedAt || old.SizeBytes != item.SizeBytes) files[id] = item;
                 if (files.Pending >= 1000) Publish();
             }
-        }, directory => failed[directory] = 0, token).GetAwaiter().GetResult();
+        }
+        NativeFileCrawler.ScanAsync(root, Excluded, entry => Accept(entry, ItemKind.File), directory => failed[directory] = 0, token,
+            entry => Accept(entry, ItemKind.Folder)).GetAwaiter().GetResult();
     }
     private void ScheduleCompaction(bool force = false)
     {
@@ -444,7 +446,7 @@ internal sealed class IndexService : IDisposable
     public Task<Candidate[]> EnrichAsync(SearchResult local, CancellationToken token) => Task.Run(() =>
     {
         var intent = local.Intent;
-        if (!settings.WindowsSearch || local.Query.Trim().Length < 3 || intent.ContentPattern != null || intent.Literal || intent.Kind is ItemKind.App or ItemKind.Folder) return [];
+        if (!settings.WindowsSearch || local.Query.Trim().Length < 3 || intent.SlashFilter != null || intent.ContentPattern != null || intent.Literal || intent.Kind is ItemKind.App or ItemKind.Folder) return [];
         // A complete local folder scan already supplies this deterministic answer.
         if (local.Locations.Length > 0 && local.Locations.All(p => Roots.Any(r => IndexPolicy.Within(p, r))) && !RankingPolicy.NeedsModel(local)) return [];
         object? connection = null, recordset = null;

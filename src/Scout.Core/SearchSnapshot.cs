@@ -89,7 +89,7 @@ public sealed class SearchSnapshot
             data.Prepare();
             var catalog = new SearchCatalog(data, roots);
             var delta = store.ReadIndexChanges(manifest.Generation);
-            var eligible = delta.Changed.Where(c => c.Kind == ItemKind.File && !IndexPolicy.Excluded(c.Target, exclusions) && roots.Any(r => IndexPolicy.Within(c.Target, r))).ToArray();
+            var eligible = delta.Changed.Where(c => c.Kind is (ItemKind.File or ItemKind.Folder) && !IndexPolicy.Excluded(c.Target, exclusions) && roots.Any(r => IndexPolicy.Within(c.Target, r))).ToArray();
             var eligibleIds = eligible.Select(c => c.Id).ToHashSet(StringComparer.Ordinal);
             return catalog.WithChanges(eligible, delta.Removed.Concat(delta.Changed.Where(c => !eligibleIds.Contains(c.Id)).Select(c => c.Id)));
         }
@@ -98,7 +98,7 @@ public sealed class SearchSnapshot
             var removed = new List<string>();
             bool Eligible(Candidate candidate)
             {
-                if (candidate.Kind != ItemKind.File) return false;
+                if (candidate.Kind is not (ItemKind.File or ItemKind.Folder)) return false;
                 if (!IndexPolicy.Excluded(candidate.Target, exclusions) && roots.Any(root => IndexPolicy.Within(candidate.Target,root))) return true;
                 removed.Add(candidate.Id); return false;
             }

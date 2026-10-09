@@ -57,6 +57,20 @@ internal static class SnapshotChecks
             Check(SearchEngine.Search("latest 3 files", Scope.Files, replay, memory, now).Hits.Select(h => h.Candidate.Id).SequenceEqual([c.Id,b.Id]));
             Check(SearchEngine.Search("oldest 3 files", Scope.Files, replay.Compact(), memory, now).Hits.Select(h => h.Candidate.Id).SequenceEqual([b.Id,c.Id]));
         }));
+        test("Folder metadata survives corrupt snapshot rebuild and journal replay", () => Fixture((root, store) =>
+        {
+            var path = @"C:\Test\Empty 東京";
+            var folder = new Candidate(Candidate.Key(ItemKind.Folder, path), ItemKind.Folder, "Empty 東京", path);
+            store.ReplaceIndex([folder]);
+            SearchSnapshot.Save(store, new SearchCatalog([folder]), store.IndexGeneration, [@"C:\Test"], []);
+            var snapshot = Directory.GetFiles(store.IndexDirectory, "*.bin").Single();
+            using (var stream = new FileStream(snapshot, FileMode.Open, FileAccess.Write)) { stream.Position = 20; stream.WriteByte(255); }
+            var rebuilt = SearchSnapshot.Load(store, [@"C:\Test"], []);
+            Check(rebuilt.Contains(folder.Id) && rebuilt.FileCount == 0);
+            SearchSnapshot.Save(store, rebuilt, store.IndexGeneration, [@"C:\Test"], []);
+            store.UpdateIndex([], [folder.Id]);
+            Check(!SearchSnapshot.Load(store, [@"C:\Test"], []).Contains(folder.Id));
+        }));
         test("Corrupt and incompatible snapshots rebuild from authoritative SQLite", () => Fixture((root, store) =>
         {
             var a = File("Résumé 東京.txt"); store.ReplaceIndex([a]);

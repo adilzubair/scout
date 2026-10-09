@@ -18,6 +18,8 @@ internal sealed record IndexProgress(IndexPhase Phase, int Files, int Documents,
 {
     public static IndexProgress Starting { get; } = new(IndexPhase.Starting, 0, 0, 0, [], []);
     public bool IsWorking => Phase is IndexPhase.Starting or IndexPhase.FileNames or IndexPhase.Contents;
+    public bool ShowInLauncher => IsWorking || Phase == IndexPhase.Incomplete || Folders.Any(f => f.Phase is FolderPhase.Partial or FolderPhase.Unavailable);
+    public string LauncherSummary => Phase == IndexPhase.Ready ? "Some folders need attention" : Summary;
     public string Summary => Phase switch
     {
         IndexPhase.Starting => "Preparing search…", IndexPhase.FileNames => $"Indexing file names · {Files:N0} files indexed",

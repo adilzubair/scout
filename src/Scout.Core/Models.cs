@@ -89,6 +89,7 @@ public sealed record QueryIntent(string Text, string[] Terms, string? Extension,
     public int? Count { get; init; }
     public bool Literal { get; init; }
     public bool Screenshots { get; init; }
+    public string? SlashFilter { get; init; }
 }
 
 public sealed class ScoutSettings

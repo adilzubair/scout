@@ -2,7 +2,7 @@ namespace Scout.Core;
 
 public static class RankingPolicy
 {
-    public static bool NeedsModel(SearchResult result) => result.ModelShortlist.Count > 0 && !result.Intent.Literal && result.Intent.Kind != ItemKind.Folder && result.Hits.FirstOrDefault()?.Score is not >= 1000 && !(result.Hits.Count > 0 && result.Intent.Recency != RecencyBasis.None && (result.Intent.Latest || result.Intent.Oldest || result.Intent.Terms.Length == 0));
+    public static bool NeedsModel(SearchResult result) => result.ModelShortlist.Count > 0 && result.Intent.SlashFilter == null && !result.Intent.Literal && result.Intent.Kind != ItemKind.Folder && result.Hits.FirstOrDefault()?.Score is not >= 1000 && !(result.Hits.Count > 0 && result.Intent.Recency != RecencyBasis.None && (result.Intent.Latest || result.Intent.Oldest || result.Intent.Terms.Length == 0));
     public static IReadOnlyList<SearchHit> Refine(SearchResult local, RankResult judgment)
     {
         if (judgment.Scores.Count == 0 || judgment.None >= judgment.Scores.Values.Max()) return local.Hits;

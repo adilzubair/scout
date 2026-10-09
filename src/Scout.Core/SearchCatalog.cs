@@ -17,6 +17,7 @@ public sealed class SearchCatalog
     public FolderCatalog Folders { get; }
     public static SearchCatalog Empty { get; } = new([]);
     public int Count { get; }
+    public int FileCount { get; }
     public void ClearNameCache() => Base.Scores.Clear();
     public void TrimNameCache() => Base.Scores.Trim();
     internal Dictionary<CatalogData, double[][]> PrepareScores(string[] terms) => new() { [Base] = Base.Scores.Prepare(Base, terms), [overlay] = new NameScoreCache().Prepare(overlay, terms) };
@@ -34,9 +35,10 @@ public sealed class SearchCatalog
     {
         if (TryGetCandidate(Candidate.Key(ItemKind.File, path), out var exact) && exact != null) yield return exact;
         foreach (var entry in Entries([path], false)) yield return entry.Candidate;
+        if (TryGetCandidate(Candidate.Key(ItemKind.Folder, path), out var directory) && directory != null) yield return directory;
     }
     public IEnumerable<Candidate> EvidenceCandidates => Documents.Where(d => d.OpenedAt != null || d.DownloadedAt != null).Select(d => d.Candidate);
-    public bool IsAvailable(Candidate c) => c.Kind != ItemKind.File || !offline.Any(r => IndexPolicy.Within(c.Target, r));
+    public bool IsAvailable(Candidate c) => c.Kind is not (ItemKind.File or ItemKind.Folder) || !offline.Any(r => IndexPolicy.Within(c.Target, r));
     public bool Contains(string id) => TryGet(id, out _);
     public int CountFilesUnderPath(string path) => Base.DirectoryCounts.Where(p => IndexPolicy.Within(p.Key, path)).Sum(p => p.Value)
         + directoryDelta.Where(p => IndexPolicy.Within(p.Key, path)).Sum(p => p.Value);
@@ -70,7 +72,18 @@ public sealed class SearchCatalog
         foreach (var pair in overlay.DirectoryCounts) directoryDelta[pair.Key] = directoryDelta.GetValueOrDefault(pair.Key) + pair.Value;
         var liveDirectories = data.DirectoryCounts.Where(pair => pair.Value + directoryDelta.GetValueOrDefault(pair.Key) > 0).Select(pair => pair.Key)
             .Concat(directoryDelta.Where(pair => pair.Value > 0 && !data.DirectoryCounts.ContainsKey(pair.Key)).Select(pair => pair.Key));
+        FileCount = data.DirectoryCounts.Values.Sum() + directoryDelta.Values.Sum();
+        liveDirectories = liveDirectories.Concat(FolderEntries().Select(entry => entry.Target));
         Folders = FolderCatalog.FromPaths(liveDirectories.Where(p => !offline.Any(r => IndexPolicy.Within(p, r))), roots.Where(p => !offline.Any(r => IndexPolicy.Within(p, r))));
+    }
+    private IEnumerable<SearchEntry> FolderEntries()
+    {
+        foreach (var i in Base.FolderRows)
+        {
+            var entry = new SearchEntry(Base, i);
+            if (!deleted.Contains(entry.Id) && !changes.ContainsKey(entry.Id) && Available(entry)) yield return entry;
+        }
+        foreach (var i in overlay.FolderRows) { var entry = new SearchEntry(overlay, i); if (Available(entry)) yield return entry; }
     }
     public SearchCatalog WithChanges(IEnumerable<Candidate> added, IEnumerable<string> removed)
     {
@@ -84,7 +97,7 @@ public sealed class SearchCatalog
     public SearchCatalog Compact() => new SearchCatalog(Entries(null, false, true).OrderBy(d => d.Order).Select(d => d.Candidate), roots: roots).WithRoots(roots, offline);
     private bool Available(SearchEntry d)
     {
-        if (d.Kind != ItemKind.File || offline.Length == 0) return true;
+        if (d.Kind is not (ItemKind.File or ItemKind.Folder) || offline.Length == 0) return true;
         foreach (var root in offline) if (IndexPolicy.Within(d.Target, root)) return false;
         return true;
     }
@@ -138,7 +151,7 @@ internal sealed class CatalogData
     internal string[] Strings = [];
     internal SearchText[] Texts = [];
     internal string[][] FolderWords = [];
-    internal string[] FolderPaths = [];
+    internal int[] FolderRows = [];
     internal Dictionary<string,int> DirectoryCounts = new(StringComparer.OrdinalIgnoreCase);
     internal int NextOrder;
     internal Dictionary<string, int> Ids = new(StringComparer.Ordinal);
@@ -166,7 +179,7 @@ internal sealed class CatalogData
             }
             var context = c.Kind == ItemKind.File ? string.Join(' ', c.Detail.Split(['\\', '/'], StringSplitOptions.RemoveEmptyEntries).TakeLast(2)) : c.Kind == ItemKind.Link ? c.Detail : "";
             if (!folders.TryGetValue(context, out var folder)) { folders[context] = folder = words.Count; words.Add(QueryParser.Tokenize(context)); }
-            var row = new CatalogRow { Id = Intern(c.Id), Title = Intern(c.Title), Detail = Intern(c.Detail), Target = c.Kind == ItemKind.File && Path.Combine(c.Detail, c.Title) == c.Target ? -1 : Intern(c.Target), Source = Intern(c.Source), AddedSource = Intern(c.AddedSource), OpenedSource = Intern(c.OpenedSource), DownloadSource = Intern(c.DownloadSource), Kind = c.Kind, Text = text, Folder = folder, Directory = Intern(c.Kind == ItemKind.File ? Path.GetDirectoryName(c.Target) ?? c.Detail : ""), Order = first + rows.Count, Visits = c.VisitCount,
+            var row = new CatalogRow { Id = Intern(c.Id), Title = Intern(c.Title), Detail = Intern(c.Detail), Target = c.Kind == ItemKind.File && Path.Combine(c.Detail, c.Title) == c.Target ? -1 : Intern(c.Target), Source = Intern(c.Source), AddedSource = Intern(c.AddedSource), OpenedSource = Intern(c.OpenedSource), DownloadSource = Intern(c.DownloadSource), Kind = c.Kind, Text = text, Folder = folder, Directory = Intern(c.Kind is ItemKind.File or ItemKind.Folder ? Path.GetDirectoryName(c.Target) ?? c.Detail : ""), Order = first + rows.Count, Visits = c.VisitCount,
                 Modified = c.ModifiedAt?.UtcTicks ?? 0, Created = c.CreatedAt?.UtcTicks ?? 0, Added = c.AddedAt?.UtcTicks ?? 0, Opened = c.OpenedAt?.UtcTicks ?? 0, Downloaded = c.DownloadedAt?.UtcTicks ?? 0, Visited = c.VisitedAt?.UtcTicks ?? 0, Size = c.SizeBytes ?? -1, Screenshot = Screenshot.IsMatch(c.Target) };
             if (ids.TryGetValue(c.Id, out var old)) { row.Order = rows[old].Order; rows[old] = row; } else { ids[c.Id] = rows.Count; rows.Add(row); }
         }
@@ -178,9 +191,9 @@ internal sealed class CatalogData
         NextOrder = Rows.Select(r => r.Order).DefaultIfEmpty(-1).Max() + 1;
         Ids = Rows.Select((r, i) => (Id: Strings[r.Id], Index: i)).ToDictionary(p => p.Id, p => p.Index, StringComparer.Ordinal);
         Titles = Rows.Select((r, i) => (Title: Strings[r.Title], Index: i)).GroupBy(p => p.Title, StringComparer.OrdinalIgnoreCase).ToDictionary(g => g.Key, g => g.Select(p => p.Index).ToArray(), StringComparer.OrdinalIgnoreCase);
-        files = Enumerable.Range(0, Rows.Length).Where(i => Rows[i].Kind == ItemKind.File).OrderBy(i => Strings[Rows[i].Directory], StringComparer.OrdinalIgnoreCase).ThenBy(i => Rows[i].Order).ToArray();
-        DirectoryCounts = files.GroupBy(i => Strings[Rows[i].Directory],StringComparer.OrdinalIgnoreCase).ToDictionary(g => g.Key,g => g.Count(),StringComparer.OrdinalIgnoreCase);
-        FolderPaths = DirectoryCounts.Keys.ToArray();
+        files = Enumerable.Range(0, Rows.Length).Where(i => Rows[i].Kind is ItemKind.File or ItemKind.Folder).OrderBy(i => Strings[Rows[i].Directory], StringComparer.OrdinalIgnoreCase).ThenBy(i => Rows[i].Order).ToArray();
+        DirectoryCounts = files.Where(i => Rows[i].Kind == ItemKind.File).GroupBy(i => Strings[Rows[i].Directory],StringComparer.OrdinalIgnoreCase).ToDictionary(g => g.Key,g => g.Count(),StringComparer.OrdinalIgnoreCase);
+        FolderRows = Enumerable.Range(0, Rows.Length).Where(i => Rows[i].Kind == ItemKind.Folder).ToArray();
     }
     internal IEnumerable<int> Select(string[]? locations, bool direct)
     {
