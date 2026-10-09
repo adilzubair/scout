@@ -314,6 +314,62 @@ regular-check output are retained under ignored `artifacts/diagnostics/folder-pi
 This App-only correction does not change the search engine or earlier performance
 measurements.
 
+## Settings and indexing readiness follow-up
+
+The Folders page now combines additional folders and content folders into one
+**Search folders** list. Built-in locations appear in the same list. Add/Browse
+is above the rows; Enter adds a typed path. Each folder has a **Search contents**
+checkbox, with extraction off for newly added folders. Existing enabled content
+scopes are preserved. A subfolder covered by a selected parent shows an inherited
+checkmark and explains where to change that setting; overlapping scopes do not
+inflate indexed counts. Exclusions and automation folders are collapsed under an
+advanced expander. Whole-disk filename coverage remains independently opt-in.
+
+Settings wheel movement is 32 pixels per 120-unit detent, with proportional
+precision-wheel movement and clamping at each edge. Multiline fields scroll
+independently and hand wheel movement to the page at their boundaries. Touch
+panning stays vertical. The layout retains keyboard focus, validation feedback,
+theme resources and the reduced-motion preference.
+
+The compact launcher now displays indexing status even when no query is entered:
+**Preparing search**, **Indexing file names**, **Indexing contents**, then
+**Search ready**. Clicking that status opens Folders directly. The page shows
+live stages and counts; each active folder reports filename readiness and, when
+selected, content readiness with its indexed document count. Unavailable locations
+and partially readable trees are flagged. Explicit content queries explain when
+their index is still being prepared. Filename searching and UI refresh continue
+while contents are being indexed. Saved preferences are persisted before the
+background reconciliation so another Settings window reflects the active request.
+
+Counts come from directory metadata and the private content database on background
+workers, rather than materializing the complete file catalog on the UI thread.
+The filename count includes filenames with unsupported content types; the
+document count includes only successfully extracted, nonempty text. Existing
+16 MiB / 64,000-character limits, exclusions, selected-folder restrictions and
+local-only content handling remain in place. There is no discovery percentage:
+the total is unknown during enumeration. Readiness describes the last completed
+reconciliation; watcher updates and new extraction still have a delay. Content
+readiness waits for reconciliation of all selected content scopes, and partial
+folder access can leave some documents absent.
+
+The native audit uses a diagnostic application host that loads Scout's resources
+without invoking normal startup, claiming the launcher mutex or opening user data.
+It exercises the unified Browse flow, explicit content opt-in, Unicode selection,
+Cancel, deduplication, both advanced pickers and subsequent Settings navigation.
+Evidence stays under ignored artifacts/diagnostics/settings-ux; this follow-up
+does not change search ranking or replace the earlier paired performance results.
+
+Validation: Release build succeeded with zero warnings/errors; **263/263** regular
+checks and **7/7** native picker checks passed. The isolated desktop smoke passed
+navigation, validation focus, Enter-to-add, initially visible Browse, proportional
+page scrolling, multiline scrolling and edge handoff at fractional DPI, plus
+light/dark rendering and existing launcher workflows. Tests cover cold and cached
+startup stages, separate filename/content readiness, pending-search explanations,
+content reconciliation failure, Unicode/overlap counts, clearing, scope replacement
+and unavailable-drive status. The currently running launcher was left open;
+the verified executable is in the ignored settings-ux/build/bin/Scout.App/release
+directory. Exit the running Scout before opening this copy.
+
 ## Reproduction and private artifacts
 
 Private snapshots, filenames, content, binaries and raw reports remain under ignored

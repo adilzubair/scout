@@ -68,7 +68,7 @@ internal sealed class GroupWindow : Window
 internal sealed class SettingsWindow : Window
 {
     public ScoutSettings Value { get; private set; }
-    public SettingsWindow(ScoutSettings settings, Func<string, bool> applyHotkey, Action clearHistory)
+    public SettingsWindow(ScoutSettings settings, Func<string, bool> applyHotkey, Action clearHistory, IndexService? index = null, string initialPage = "General")
     {
         Value = settings;
         Title = "Scout settings"; Width = 800; Height = 654; MinWidth = 680; MinHeight = 460; WindowStartupLocation = WindowStartupLocation.CenterOwner;
@@ -108,6 +108,7 @@ internal sealed class SettingsWindow : Window
             panel.Children.Add(new TextBlock { Text = title, FontSize = 22, FontWeight = FontWeights.SemiBold });
             panel.Children.Add(new TextBlock { Text = description, TextWrapping = TextWrapping.Wrap, Foreground = WindowVisuals.Brush("Muted"), Margin = new Thickness(0, 7, 0, 24), LineHeight = 20 });
             var scroller = new ScrollViewer { Content = panel, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
+            SettingsScroll.Attach(scroller);
             var label = new StackPanel { Orientation = Orientation.Horizontal };
             label.Children.Add(new TextBlock { Text = glyph, FontFamily = new FontFamily("Segoe Fluent Icons"), FontSize = 16, Margin = new Thickness(0, 0, 11, 0), VerticalAlignment = VerticalAlignment.Center });
             label.Children.Add(new TextBlock { Text = title });
@@ -156,33 +157,44 @@ internal sealed class SettingsWindow : Window
         var web = Check(general, "Offer a web search in All and Links", settings.WebFallback);
         Note(general, "Windows Recent Items helps Scout find files you describe by when you last opened them.");
 
-        var search = Page("Folders", "\uE8B7", "Choose where Scout looks for your files and shortcuts.");
-        Note(search, "Desktop, Documents, Downloads, and Pictures are included automatically. Add one full folder path per line below, or choose Browse… under a list.");
-        Heading(search, "Whole-disk search");
+        var search = Page("Folders", "\uE8B7", "Choose search folders and see when they are ready.");
+        var indexSummary = new TextBlock { Text = index?.Progress.Summary ?? "Indexing status appears here while Scout is running.", FontWeight = FontWeights.SemiBold };
+        AutomationProperties.SetName(indexSummary, "Indexing status"); AutomationProperties.SetLiveSetting(indexSummary, AutomationLiveSetting.Polite);
+        var indexDetail = new TextBlock { Text = index?.Progress.Description ?? "Add a folder, save settings, then search its file names. Enable Search contents for text search.", FontSize = 12, Foreground = WindowVisuals.Brush("Muted"), TextWrapping = TextWrapping.Wrap, LineHeight = 18, Margin = new Thickness(0, 6, 0, 12) };
+        var indexBusy = new System.Windows.Controls.ProgressBar { Height = 3, Margin = new Thickness(0, 0, 0, 16), IsIndeterminate = WindowVisuals.MotionEnabled, Visibility = index?.Progress.IsWorking == true ? Visibility.Visible : Visibility.Collapsed };
+        search.Children.Add(indexSummary); search.Children.Add(indexDetail); search.Children.Add(indexBusy);
+        var statusTimer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(400) };
+        statusTimer.Tick += (_, _) =>
+        {
+            if (index == null) return;
+            indexSummary.Text = index.Progress.Summary; indexDetail.Text = index.Progress.Description;
+            indexBusy.Visibility = index.Progress.IsWorking ? Visibility.Visible : Visibility.Collapsed;
+            indexBusy.IsIndeterminate = index.Progress.IsWorking && WindowVisuals.MotionEnabled;
+        };
+        Loaded += (_, _) => statusTimer.Start(); Closed += (_, _) => statusTimer.Stop();
+        var folderView = new FolderSelectionView(this, settings, index == null ? null : () => index.Progress, (text, field) =>
+        {
+            feedback.Text = text; feedback.Visibility = Visibility.Visible; field.Focus();
+        });
+        search.Children.Add(folderView);
+        Heading(search, "Whole-disk file names");
         var wholeDisk = Check(search, "Index file names on selected drives", settings.WholeDiskSearchEnabled);
-        Note(search, "Off by default. Searches readable files under your Windows account. Hidden, system, offline and excluded files are skipped. File contents still use only the content folders below.");
+        Note(search, "Off by default. Searches readable files under your Windows account. Hidden, system, offline and excluded files are skipped. File contents are read only in folders where you choose Search contents.");
         var drives = new StackPanel(); search.Children.Add(drives);
         var availableDrives = DriveInfo.GetDrives().Where(d => d.DriveType == DriveType.Fixed && d.IsReady).Select(d => d.RootDirectory.FullName).Concat(settings.WholeDiskRoots).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
         var driveChecks = availableDrives.ToDictionary(root => root, root => Check(drives, root + (Directory.Exists(root) ? "" : " (unavailable)"), settings.WholeDiskRoots.Contains(root, StringComparer.OrdinalIgnoreCase)), StringComparer.OrdinalIgnoreCase);
         drives.IsEnabled = wholeDisk.IsChecked == true;
         wholeDisk.Checked += (_, _) => drives.IsEnabled = true;
         wholeDisk.Unchecked += (_, _) => drives.IsEnabled = false;
-        Heading(search, "Content search");
-        var contentSearch = Check(search, "Search inside files in selected folders", settings.ContentSearchEnabled);
-        Note(search, "Off by default. Scout indexes supported text and Office files only; PDFs and OCR are not included. Extracted text stays on this PC. Saving with this off clears all persisted extracted text.");
-        var contentFolders = Field(search, "Content search folders", string.Join(Environment.NewLine, settings.ContentFolders), true);
-        var contentBrowse = Browse(search, contentFolders, "Browse for a content search folder");
-        contentFolders.IsEnabled = contentBrowse.IsEnabled = contentSearch.IsChecked == true;
-        contentSearch.Checked += (_, _) => contentFolders.IsEnabled = contentBrowse.IsEnabled = true;
-        contentSearch.Unchecked += (_, _) => contentFolders.IsEnabled = contentBrowse.IsEnabled = false;
-        Note(search, "Use Browse… or add one full, existing folder path per line. Only the folders listed here are included in content search.");
-        var folders = Field(search, "Additional folders", string.Join(Environment.NewLine, settings.ExtraFolders), true);
-        Browse(search, folders, "Browse for an additional folder");
-        var excluded = Field(search, "Excluded folders", string.Join(Environment.NewLine, settings.Exclusions), true);
-        Browse(search, excluded, "Browse for an excluded folder");
-        var automations = Field(search, "Automation folders", string.Join(Environment.NewLine, settings.AutomationFolders), true);
-        Browse(search, automations, "Browse for an automation folder");
-        Note(search, "Add folders containing Windows shortcuts (.lnk) or Power Automate links (.url), then search a shortcut's name to run it.");
+
+        var advanced = new StackPanel();
+        var excluded = Field(advanced, "Excluded folders", string.Join(Environment.NewLine, settings.Exclusions), true);
+        Browse(advanced, excluded, "Browse for an excluded folder");
+        var automations = Field(advanced, "Automation folders", string.Join(Environment.NewLine, settings.AutomationFolders), true);
+        Browse(advanced, automations, "Browse for an automation folder");
+        Note(advanced, "Exclusions apply to file names and content. Automation folders contain shortcuts and Power Automate links.");
+        var advancedFolders = new Expander { Header = "Exclusions and automation folders", Content = advanced, Margin = new Thickness(0, 12, 0, 4) };
+        search.Children.Add(advancedFolders);
 
         var local = Page("Local AI", "\uE945", "Find things with a description, even when you forget the name.");
         var ai = Check(local, "Use Laya to understand descriptions", settings.AiEnabled);
@@ -239,17 +251,18 @@ internal sealed class SettingsWindow : Window
         save.Click += (_, _) =>
         {
             string[] Lines(string text) => text.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
-            var extra = Lines(folders.Text); var exclusions = Lines(excluded.Text); var automationFolders = Lines(automations.Text); var indexedContentFolders = Lines(contentFolders.Text);
-            foreach (var field in new[] { folders, excluded, automations })
-                if (Lines(field.Text).Any(p => !Path.IsPathFullyQualified(p) || !Directory.Exists(p))) { Error("Use existing, full folder paths, such as C:\\Users\\you\\Projects.", 1, field); return; }
-            if (contentSearch.IsChecked == true && indexedContentFolders.Any(p => !Path.IsPathFullyQualified(p) || !Directory.Exists(p))) { Error("Use existing, full folder paths, such as C:\\Users\\you\\Projects.", 1, contentFolders); return; }
+            var extra = folderView.Selection.ExtraFolders; var exclusions = Lines(excluded.Text); var automationFolders = Lines(automations.Text); var indexedContentFolders = folderView.Selection.ContentFolders;
+            foreach (var field in new[] { excluded, automations })
+                if (Lines(field.Text).Any(p => !Path.IsPathFullyQualified(p) || !Directory.Exists(p))) { advancedFolders.IsExpanded = true; Error("Use existing, full folder paths, such as C:\\Users\\you\\Projects.", 1, field); return; }
+            if (extra.Concat(indexedContentFolders).Any(p => !Path.IsPathFullyQualified(p) || !Directory.Exists(p))) { Error("A selected folder is unavailable. Remove it or reconnect its location before saving.", 1, folderView.PathField); return; }
+            if (folderView.PathField.Text.Trim().Length > 0) { Error("Choose Add to include the folder path, or clear it before saving.", 1, folderView.PathField); return; }
             if (ai.IsChecked == true && !File.Exists(python.Text.Trim())) { Error("Choose the Python executable created by local AI setup.", 2, python); return; }
             if (!applyHotkey(shortcut.Text.Trim())) { Error("That shortcut is invalid or already in use. Try Ctrl+Alt+S.", 0, shortcut); return; }
             var selectedDrives = driveChecks.Where(pair => pair.Value.IsChecked == true).Select(pair => pair.Key).ToArray();
             if (wholeDisk.IsChecked == true && selectedDrives.Length == 0) { Error("Select at least one drive for whole-disk search.", 1, wholeDisk); return; }
-            Value = new ScoutSettings { WholeDiskSearchEnabled = wholeDisk.IsChecked == true, WholeDiskRoots = selectedDrives, ChromeHistory = chrome.IsChecked == true, EdgeHistory = edge.IsChecked == true, WindowsSearch = windows.IsChecked == true, RecentItems = recent.IsChecked == true, WebFallback = web.IsChecked == true, AutomationFolders = automationFolders, ContentSearchEnabled = contentSearch.IsChecked == true, ContentFolders = indexedContentFolders, AiEnabled = ai.IsChecked == true, SemanticHelper = semanticHelper?.IsChecked == true, PythonPath = python.Text.Trim(), Model = (string)checkpoint.SelectedItem, Device = (string)device.SelectedItem, CpuThreads = settings.CpuThreads, Hotkey = shortcut.Text.Trim(), ExtraFolders = extra, Exclusions = exclusions };
+            Value = new ScoutSettings { WholeDiskSearchEnabled = wholeDisk.IsChecked == true, WholeDiskRoots = selectedDrives, ChromeHistory = chrome.IsChecked == true, EdgeHistory = edge.IsChecked == true, WindowsSearch = windows.IsChecked == true, RecentItems = recent.IsChecked == true, WebFallback = web.IsChecked == true, AutomationFolders = automationFolders, ContentSearchEnabled = indexedContentFolders.Length > 0, ContentFolders = indexedContentFolders, AiEnabled = ai.IsChecked == true, SemanticHelper = semanticHelper?.IsChecked == true, PythonPath = python.Text.Trim(), Model = (string)checkpoint.SelectedItem, Device = (string)device.SelectedItem, CpuThreads = settings.CpuThreads, Hotkey = shortcut.Text.Trim(), ExtraFolders = extra, Exclusions = exclusions };
             DialogResult = true;
         };
-        SelectPage(pages[0].Page);
+        SelectPage(pages[initialPage == "Folders" ? 1 : 0].Page);
     }
 }

@@ -12,8 +12,10 @@ using Scout.Core;
 // Opt-in interactive audit; opens only this process's dialogs and saves no user settings.
 internal static class FolderPickerSmoke
 {
+    private static string diagnostics = "";
     public static int Run(string output)
     {
+        diagnostics = Path.GetDirectoryName(Path.GetFullPath(output))!;
         Exception? failure = null;
         var checks = new List<string>();
         var fixture = Path.Combine(Path.GetDirectoryName(Path.GetFullPath(output))!, "picker-fixture", "Selected 東京");
@@ -22,28 +24,33 @@ internal static class FolderPickerSmoke
         {
             try
             {
-                var app = new Scout.App.App(); app.InitializeComponent();
+                var app = new DialogDiagnosticApplication(); app.InitializeComponent();
                 var settings = new SettingsWindow(new ScoutSettings(), _ => true, () => { });
                 try
                 {
                     settings.Show();
                     UiDiagnostics.Descendants<Button>(settings).Single(b => AutomationProperties.GetName(b) == "Folders").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
                     settings.UpdateLayout();
-                    UiDiagnostics.Descendants<CheckBox>(settings).Single(b => AutomationProperties.GetName(b) == "Search inside files in selected folders").IsChecked = true;
+                    settings.Dispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+                    var view = UiDiagnostics.Descendants<FolderSelectionView>(settings).Single();
+                    var contentBrowse = UiDiagnostics.Descendants<Button>(settings).Single(b => AutomationProperties.GetName(b) == "Browse for a search folder");
+                    ClickPicker(settings, contentBrowse, fixture);
+                    var selected = view.Selection.Items.Single(i => i.Path.Equals(fixture, StringComparison.OrdinalIgnoreCase));
+                    if (selected.Contents) throw new InvalidOperationException("Adding a folder unexpectedly enabled content extraction.");
+                    checks.Add("Native Unicode folder selection adds one filename scope with contents off");
                     settings.UpdateLayout();
-                    var field = UiDiagnostics.Descendants<TextBox>(settings).Single(f => (AutomationProperties.GetLabeledBy(f) as TextBlock)?.Text == "Content search folders");
-                    var contentBrowse = UiDiagnostics.Descendants<Button>(settings).Single(b => AutomationProperties.GetName(b) == "Browse for a content search folder");
-                    if (!contentBrowse.IsEnabled || !field.IsEnabled) throw new InvalidOperationException("Enabling content search did not enable Browse.");
-                    ClickPicker(settings, contentBrowse, fixture);
-                    if (!field.Text.Equals(fixture, StringComparison.OrdinalIgnoreCase)) throw new InvalidOperationException($"Selected folder was not appended to the content list: {field.Text}");
-                    checks.Add("Content toggle, native folder selection and Unicode path append");
+                    UiDiagnostics.Descendants<CheckBox>(settings).Single(b => AutomationProperties.GetName(b) == "Search contents in " + fixture).IsChecked = true;
+                    if (!selected.Contents) throw new InvalidOperationException("Per-folder content selection was not applied.");
+                    checks.Add("Per-folder content search is explicitly selectable");
                     ClickPicker(settings, contentBrowse, null);
-                    if (field.Text != fixture) throw new InvalidOperationException("Cancel modified the folder list.");
-                    checks.Add("Cancel preserves content folder list and restores owner");
+                    if (view.Selection.Items.Count(i => i.Path == fixture) != 1 || !selected.Contents) throw new InvalidOperationException("Cancel modified the folder selection.");
+                    checks.Add("Cancel preserves folder and content choices and restores owner");
                     ClickPicker(settings, contentBrowse, fixture);
-                    if (field.Text != fixture) throw new InvalidOperationException("Repeat selection duplicated the folder.");
-                    checks.Add("Repeated native selection does not duplicate the folder");
-                    foreach (var name in new[] { "Browse for an additional folder", "Browse for an excluded folder", "Browse for an automation folder" })
+                    if (view.Selection.Items.Count(i => i.Path == fixture) != 1 || !selected.Contents) throw new InvalidOperationException("Repeat selection duplicated or reset the folder.");
+                    checks.Add("Repeated native selection does not duplicate or reset the folder");
+                    UiDiagnostics.Descendants<Expander>(settings).Single(e => e.Header as string == "Exclusions and automation folders").IsExpanded = true;
+                    settings.UpdateLayout();
+                    foreach (var name in new[] { "Browse for an excluded folder", "Browse for an automation folder" })
                     {
                         ClickPicker(settings, UiDiagnostics.Descendants<Button>(settings).Single(b => AutomationProperties.GetName(b) == name), null);
                         checks.Add(name + " opens and cancels");
@@ -68,7 +75,6 @@ internal static class FolderPickerSmoke
     private static void ClickPicker(Window owner, Button browse, string? folder)
     {
         var ownerHandle = new WindowInteropHelper(owner).Handle;
-        var threadId = GetCurrentThreadId();
         var automation = Task.Run(async () =>
         {
             nint dialog = 0;
@@ -77,10 +83,13 @@ internal static class FolderPickerSmoke
                 var timer = Stopwatch.StartNew();
                 while (dialog == 0 && timer.Elapsed < TimeSpan.FromSeconds(10))
                 {
-                    EnumThreadWindows(threadId, (handle, _) =>
+                    EnumWindows((handle, _) =>
                     {
                         var name = new StringBuilder(100); GetClassName(handle, name, name.Capacity);
-                        if (GetWindow(handle, 4) == ownerHandle && name.ToString() == "#32770") dialog = handle;
+                        GetWindowThreadProcessId(handle, out var process);
+                        var owned = GetWindow(handle, 4);
+                        while (owned != 0 && owned != ownerHandle) owned = GetWindow(owned, 4);
+                        if (process == Environment.ProcessId && owned == ownerHandle && name.ToString() == "#32770" && IsWindowVisible(handle)) dialog = handle;
                         return true;
                     }, 0);
                     if (dialog == 0) await Task.Delay(50);
@@ -97,7 +106,13 @@ internal static class FolderPickerSmoke
                         if (edit != null) edit.TryGetCurrentPattern(ValuePattern.Pattern, out value);
                         if (value == null) await Task.Delay(100);
                     }
-                    if (value == null) throw new InvalidOperationException("Folder path edit is unavailable.");
+                    if (value == null)
+                    {
+                        var controls = root.FindAll(TreeScope.Descendants, System.Windows.Automation.Condition.TrueCondition).Cast<AutomationElement>()
+                            .Select(e => new { id = e.Current.AutomationId, name = e.Current.Name, type = e.Current.ControlType.ProgrammaticName }).ToArray();
+                        File.WriteAllText(Path.Combine(diagnostics, "picker-controls.json"), JsonSerializer.Serialize(controls, new JsonSerializerOptions { WriteIndented = true }));
+                        throw new InvalidOperationException("Folder path edit is unavailable.");
+                    }
                     ((ValuePattern)value).SetValue(folder);
                 }
                 var button = root.FindFirst(TreeScope.Descendants, new AndCondition(new PropertyCondition(AutomationElement.AutomationIdProperty, folder == null ? "2" : "1"), new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Button)));
@@ -123,8 +138,8 @@ internal static class FolderPickerSmoke
     }
 
     private delegate bool WindowCallback(nint window, nint parameter);
-    [DllImport("kernel32.dll")] private static extern uint GetCurrentThreadId();
-    [DllImport("user32.dll")] private static extern bool EnumThreadWindows(uint thread, WindowCallback callback, nint parameter);
+    [DllImport("user32.dll")] private static extern bool EnumWindows(WindowCallback callback, nint parameter);
+    [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(nint window, out uint process);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern int GetClassName(nint window, StringBuilder name, int maximum);
     [DllImport("user32.dll")] private static extern nint GetWindow(nint window, uint command);
     [DllImport("user32.dll")] private static extern bool IsWindowVisible(nint window);

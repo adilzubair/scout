@@ -34,6 +34,7 @@ BluetoothChecks.Run(Test);
 SearchUpgradeChecks.Run(Test);
 ContentSearchChecks.Run(Test);
 IndexRaceChecks.Run(Test);
+IndexProgressChecks.Run(Test);
 SnapshotChecks.Run(Test);
 CacheChecks.Run(Test);
 ChronologicalChecks.Run(Test);

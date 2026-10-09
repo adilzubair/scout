@@ -12,6 +12,7 @@ public sealed class SearchCatalog
     private readonly ImmutableDictionary<string, int> changeOrder;
     private readonly CatalogData overlay;
     private readonly string[] roots, offline;
+    private readonly Dictionary<string, int> directoryDelta;
 
     public FolderCatalog Folders { get; }
     public static SearchCatalog Empty { get; } = new([]);
@@ -37,6 +38,9 @@ public sealed class SearchCatalog
     public IEnumerable<Candidate> EvidenceCandidates => Documents.Where(d => d.OpenedAt != null || d.DownloadedAt != null).Select(d => d.Candidate);
     public bool IsAvailable(Candidate c) => c.Kind != ItemKind.File || !offline.Any(r => IndexPolicy.Within(c.Target, r));
     public bool Contains(string id) => TryGet(id, out _);
+    public int CountFilesUnderPath(string path) => Base.DirectoryCounts.Where(p => IndexPolicy.Within(p.Key, path)).Sum(p => p.Value)
+        + directoryDelta.Where(p => IndexPolicy.Within(p.Key, path)).Sum(p => p.Value);
+
     internal bool TryGet(string id, out SearchEntry d)
     {
         if (overlay.Ids.TryGetValue(id, out var i)) { d = new(overlay, i); return Available(d); }
@@ -55,7 +59,7 @@ public sealed class SearchCatalog
         for (var i = 0; i < overlay.Rows.Length; i++)
         { var id = overlay.Strings[overlay.Rows[i].Id]; if (data.Ids.TryGetValue(id, out var old)) overlay.SetOrder(i, data.Rows[old].Order); else if (this.changeOrder.TryGetValue(id, out var order)) overlay.SetOrder(i, order); }
         Count = data.Rows.Length - deleted.Count(id => data.Ids.ContainsKey(id)) + changes.Keys.Count(id => !data.Ids.ContainsKey(id));
-        var directoryDelta = new Dictionary<string,int>(StringComparer.OrdinalIgnoreCase);
+        directoryDelta = new Dictionary<string,int>(StringComparer.OrdinalIgnoreCase);
         void RemoveDirectory(string id)
         {
             if (!data.Ids.TryGetValue(id,out var i) || data.Rows[i].Kind != ItemKind.File) return;

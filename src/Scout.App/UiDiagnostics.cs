@@ -20,7 +20,7 @@ public partial class MainWindow
             if (Query.ActualWidth < 200 || Results.ActualHeight < 100) throw new InvalidOperationException("Launcher content was clipped.");
         }
         await SearchView("", Scope.All, "launcher-empty");
-        if (ActualHeight > 90 || ScopesRow.IsVisible || ResultsRegion.IsVisible) throw new InvalidOperationException("Empty search did not open compact.");
+        if (ActualHeight > 112 || ScopesRow.IsVisible || ResultsRegion.IsVisible) throw new InvalidOperationException("Empty search did not open compact.");
         var workArea = WindowVisuals.WorkArea(this);
         if (Top + ActualHeight / 2 >= workArea.Top + workArea.Height * .39)
             throw new InvalidOperationException("Compact search did not open near the upper third.");
@@ -34,7 +34,7 @@ public partial class MainWindow
         await UiDiagnostics.Snapshot(this, "launcher-suggestions");
         Query.Text = "pdf"; await WaitForSearch();
         Query.Clear(); await WaitForSearch();
-        if (ActualHeight > 90) throw new InvalidOperationException("Clearing search did not collapse the launcher.");
+        if (ActualHeight > 112) throw new InvalidOperationException("Clearing search did not collapse the launcher.");
         WindowVisuals.SetTestMotion(false);
         RevealSuggestions(); UpdateLayout();
         if (ActualHeight < 300) throw new InvalidOperationException("Reduced-motion expansion did not complete immediately.");
@@ -99,7 +99,7 @@ public partial class MainWindow
         }
         finally { nameWindow.Close(); }
 
-        var settings = new SettingsWindow(store.Settings, _ => false, () => { }) { Owner = this };
+        var settings = new SettingsWindow(store.Settings, _ => false, () => { }, index) { Owner = this };
         try
         {
             settings.Show();
@@ -118,7 +118,45 @@ public partial class MainWindow
             }
             var foldersNav = UiDiagnostics.Descendants<Button>(settings).Single(button => AutomationProperties.GetName(button) == "Folders");
             foldersNav.RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); settings.UpdateLayout();
-            var folders = UiDiagnostics.Descendants<TextBox>(settings).Single(field => (AutomationProperties.GetLabeledBy(field) as TextBlock)?.Text == "Additional folders");
+            var viewer = UiDiagnostics.Descendants<ScrollViewer>(settings).First(v => v.Content is StackPanel);
+            viewer.ScrollToTop(); settings.UpdateLayout();
+            viewer.RaiseEvent(new System.Windows.Input.MouseWheelEventArgs(System.Windows.Input.Mouse.PrimaryDevice, Environment.TickCount, -120) { RoutedEvent = UIElement.PreviewMouseWheelEvent });
+            settings.UpdateLayout();
+            if (Math.Abs(viewer.VerticalOffset - Math.Min(32, viewer.ScrollableHeight)) > 1) throw new InvalidOperationException("Settings wheel did not move 32 pixels.");
+            await UiDiagnostics.Snapshot(settings, "settings-folders-scrolled");
+            WindowVisuals.SetTestTheme(true); await UiDiagnostics.Snapshot(settings, "settings-folders-dark"); WindowVisuals.SetTestTheme(null);
+            viewer.ScrollToTop(); settings.UpdateLayout();
+            var view = UiDiagnostics.Descendants<FolderSelectionView>(settings).Single();
+            var addBrowse = UiDiagnostics.Descendants<Button>(view).Single(b => AutomationProperties.GetName(b) == "Browse for a search folder");
+            if (addBrowse.TranslatePoint(new System.Windows.Point(0, addBrowse.ActualHeight), viewer).Y > viewer.ActualHeight)
+                throw new InvalidOperationException("Adding a folder requires scrolling past the folder list.");
+            view.PathField.Text = App.DataDirectory;
+            view.PathField.RaiseEvent(new System.Windows.Input.KeyEventArgs(System.Windows.Input.Keyboard.PrimaryDevice, PresentationSource.FromVisual(settings), Environment.TickCount, System.Windows.Input.Key.Enter) { RoutedEvent = System.Windows.Input.Keyboard.PreviewKeyDownEvent });
+            settings.UpdateLayout();
+            if (!view.Selection.Items.Any(i => i.Path == App.DataDirectory && !i.Contents) || view.PathField.Text.Length != 0)
+                throw new InvalidOperationException("Enter did not add the typed folder with content search off.");
+            UiDiagnostics.Descendants<Button>(view).Single(b => AutomationProperties.GetName(b) == "Remove folder " + App.DataDirectory).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            var advanced = UiDiagnostics.Descendants<Expander>(settings).Single(e => e.Header as string == "Exclusions and automation folders");
+            advanced.IsExpanded = true; settings.UpdateLayout();
+            var excluded = UiDiagnostics.Descendants<TextBox>(settings).Single(field => (AutomationProperties.GetLabeledBy(field) as TextBlock)?.Text == "Excluded folders");
+            var savedExclusions = excluded.Text;
+            excluded.Text = string.Join(Environment.NewLine, Enumerable.Repeat(App.DataDirectory, 100));
+            excluded.BringIntoView(); settings.UpdateLayout();
+            var nested = UiDiagnostics.Descendants<ScrollViewer>(excluded).First(v => v.ScrollableHeight > 0);
+            nested.ScrollToTop(); settings.UpdateLayout(); var pageOffset = viewer.VerticalOffset;
+            nested.RaiseEvent(new System.Windows.Input.MouseWheelEventArgs(System.Windows.Input.Mouse.PrimaryDevice, Environment.TickCount, -120) { RoutedEvent = UIElement.PreviewMouseWheelEvent });
+            settings.UpdateLayout();
+            if (Math.Abs(viewer.VerticalOffset - pageOffset) > 1 || Math.Abs(nested.VerticalOffset - 32) > 1)
+                throw new InvalidOperationException("Multiline wheel scrolling moved the page or skipped too far.");
+            nested.ScrollToBottom(); viewer.ScrollToVerticalOffset(Math.Max(0, pageOffset - 64)); settings.UpdateLayout();
+            pageOffset = viewer.VerticalOffset; var nestedEdge = $"{nested.VerticalOffset}/{nested.ScrollableHeight}";
+            nested.RaiseEvent(new System.Windows.Input.MouseWheelEventArgs(System.Windows.Input.Mouse.PrimaryDevice, Environment.TickCount, -120) { RoutedEvent = UIElement.PreviewMouseWheelEvent });
+            settings.UpdateLayout();
+            if (Math.Abs(viewer.VerticalOffset - Math.Min(viewer.ScrollableHeight, pageOffset + 32)) > 1)
+                throw new InvalidOperationException($"Multiline edge did not hand scrolling back to the settings page: page {pageOffset} -> {viewer.VerticalOffset} (max {viewer.ScrollableHeight}), nested {nestedEdge} -> {nested.VerticalOffset}/{nested.ScrollableHeight}.");
+            excluded.Text = savedExclusions; advanced.IsExpanded = false;
+            viewer.ScrollToTop(); settings.UpdateLayout();
+            var folders = UiDiagnostics.Descendants<FolderSelectionView>(settings).Single().PathField;
             folders.Text = "not an absolute path";
             var privacyNav = UiDiagnostics.Descendants<Button>(settings).Single(button => AutomationProperties.GetName(button) == "Privacy");
             privacyNav.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
@@ -138,6 +176,12 @@ public partial class MainWindow
         }
         finally { preview.Close(); }
     }
+}
+
+// Native dialog audits reuse app resources without starting the launcher or opening user data.
+internal sealed class DialogDiagnosticApplication : App
+{
+    protected override void OnStartup(StartupEventArgs e) { }
 }
 
 internal static class UiDiagnostics

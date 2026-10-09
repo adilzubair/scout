@@ -43,7 +43,7 @@ public partial class MainWindow : Window
     private Task localSearchTask = Task.CompletedTask;
     private Task refinementTask = Task.CompletedTask, enrichmentTask = Task.CompletedTask;
     private long appliedRevision, observedIndexVersion = -1;
-    private double requestedHeight = 76;
+    private double requestedHeight = 104;
     private bool suggestionsRevealed, expanded;
     private string lastRenderedQuery = "";
     private HashSet<string> lastRenderedIds = [];
@@ -53,6 +53,8 @@ public partial class MainWindow : Window
         this.store = store; this.index = index; this.model = model;
         InitializeComponent();
         WindowVisuals.Configure(this);
+        UpdateIndexProgress();
+        index.ProgressChanged += _ => Dispatcher.BeginInvoke(UpdateIndexProgress);
         SourceInitialized += (_, _) =>
         {
             HwndSource.FromHwnd(new WindowInteropHelper(this).Handle)?.AddHook(WindowMessage);
@@ -93,7 +95,7 @@ public partial class MainWindow : Window
         if (IsVisible && !show) { HidePanel(); return; }
         modelIdle.Stop();
         _ = model.WarmAsync(store.Settings);
-        WindowVisuals.RefreshTheme(); UpdateExpansion();
+        WindowVisuals.RefreshTheme(); UpdateIndexProgress(); UpdateExpansion();
         model.Context = WindowsIntegration.CaptureContext();
         Show(); Activate(); WindowsIntegration.SetForegroundWindow(new WindowInteropHelper(this).Handle); Query.Focus(); Query.SelectAll();
         _ = index.RefreshAsync(forceHistory: true); ScheduleSearch(false);
@@ -304,8 +306,9 @@ public partial class MainWindow : Window
     }
     private void ResizeToResults(int count, bool calculation)
     {
-        var target = !expanded ? 76 : count == 0 ? (Examples.Visibility == Visibility.Visible ? 448 : 370)
+        var target = !expanded ? 104 : count == 0 ? (Examples.Visibility == Visibility.Visible ? 448 : 370)
             : Math.Max(370, 250 + Math.Min(6, count) * 60 + (calculation ? 22 : 0));
+        if (expanded) target += 28;
         if (GroupBar.Visibility == Visibility.Visible) target += 56;
         var height = Math.Min(target, MaxHeight);
         if (Math.Abs(requestedHeight - height) < 1) return;
@@ -466,25 +469,39 @@ public partial class MainWindow : Window
     }
     private async void OpenGroupClick(object sender, RoutedEventArgs e) => await Execute(group.Values.ToArray());
     private void SettingsClick(object sender, RoutedEventArgs e) => ShowSettings();
-    internal async void ShowSettings()
+    private void UpdateIndexProgress()
+    {
+        var progress = index.Progress;
+        IndexState.Text = progress.Summary; IndexState.ToolTip = progress.Description;
+        IndexBusy.Visibility = progress.IsWorking ? Visibility.Visible : Visibility.Collapsed;
+        IndexBusy.IsIndeterminate = progress.IsWorking && WindowVisuals.MotionEnabled;
+    }
+    private void IndexDetailsClick(object sender, RoutedEventArgs e) => ShowSettings("Folders");
+    internal async void ShowSettings(string initialPage = "General")
     {
         Toggle(true);
-        var dialog = new SettingsWindow(store.Settings, ApplyHotkey, () => store.ClearLaunchHistory()) { Owner = this };
+        var dialog = new SettingsWindow(store.Settings, ApplyHotkey, () => store.ClearLaunchHistory(), index, initialPage) { Owner = this };
         if (dialog.ShowDialog() == true)
         {
-            search.Cancel(); revision++; uiRefresh.Stop(); await model.ResetAsync();
+            search.Cancel(); revision++;
+            var saved = false;
             try
             {
-                await index.ConfigureAsync(dialog.Value);
-                store.SaveSettings(dialog.Value); enriched = []; ClearGroup();
+                store.SaveSettings(dialog.Value); saved = true;
+                // Configure invalidates old content results immediately. Searches and UI refresh
+                // continue while the new scope is reconciled in background workers.
+                var reconfigure = index.ConfigureAsync(dialog.Value);
+                enriched = []; ClearGroup();
+                await model.ResetAsync(); await reconfigure;
                 indexChanged = false; observedIndexVersion = index.Version; ScheduleSearch(false);
             }
             catch (Exception error) when (error is IOException or UnauthorizedAccessException or Microsoft.Data.Sqlite.SqliteException)
             {
                 indexChanged = false; observedIndexVersion = index.Version;
-                Status.Text = "Settings weren't saved. Check access to Scout's data folder and selected folders, then try again.";
+                Status.Text = saved ? "Settings saved; indexing needs attention. Open indexing details to check your folders."
+                    : "Settings weren't saved. Check access to Scout's data folder, then try again.";
             }
-            finally { uiRefresh.Start(); _ = model.WarmAsync(store.Settings); }
+            finally { _ = model.WarmAsync(store.Settings); }
         }
         Query.Focus();
     }

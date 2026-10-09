@@ -119,6 +119,19 @@ public sealed partial class ContentIndex
         }
     }
 
+    public IReadOnlyDictionary<string, int> CountsByFolder(IEnumerable<string> folders) => WithConnection(connection =>
+    {
+        var counts = folders.Distinct(StringComparer.OrdinalIgnoreCase).ToDictionary(p => p, _ => 0, StringComparer.OrdinalIgnoreCase);
+        using var command = connection.CreateCommand(); command.CommandText = "SELECT path FROM content_files";
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            var path = reader.GetString(0);
+            foreach (var folder in counts.Keys) if (IndexPolicy.Within(path, folder)) counts[folder]++;
+        }
+        return (IReadOnlyDictionary<string, int>)counts;
+    });
+
     public int Count => WithConnection(connection =>
     {
         using var command = connection.CreateCommand();

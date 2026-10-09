@@ -35,6 +35,17 @@ internal sealed class IndexService : IDisposable
     private long version;
     private long configurationVersion;
     private Task configurationTail = Task.CompletedTask;
+    private readonly object progressGate = new();
+    private readonly HashSet<string> completedRoots = new(StringComparer.OrdinalIgnoreCase);
+    private IReadOnlyDictionary<string, int> folderFiles = new Dictionary<string, int>();
+    private IReadOnlyDictionary<string, int> folderDocuments = new Dictionary<string, int>();
+    private IndexProgress progress = IndexProgress.Starting;
+    private IndexPhase progressPhase = IndexPhase.Starting;
+    private int contentProcessed;
+    private DateTime nextProgress;
+    private bool configuring;
+    public IndexProgress Progress => Volatile.Read(ref progress);
+    public event Action<IndexProgress>? ProgressChanged;
     public event Action<string>? Changed;
     public SearchCatalog Catalog => Volatile.Read(ref catalog);
     public long Version => Interlocked.Read(ref version);
@@ -80,11 +91,14 @@ internal sealed class IndexService : IDisposable
             await refreshGate.WaitAsync(lifetime.Token);
             try
             {
-                settings = value; loaded = false;
+                settings = value; loaded = false; configuring = true;
+                lock (progressGate) { completedRoots.Clear(); folderFiles = new Dictionary<string, int>(); folderDocuments = new Dictionary<string, int>(); contentProcessed = 0; }
+                ReportProgress(IndexPhase.Starting);
                 await contentIndexer.ClearAsync(lifetime.Token);
                 Volatile.Write(ref roots, IndexPolicy.ActiveRoots(defaultFolders().Concat(value.ExtraFolders), value));
                 links = []; lastHistory = DateTime.MinValue;
                 ResetWatchers();
+                ReportProgress(IndexPhase.FileNames);
                 Interlocked.Exchange(ref dirty, 1);
                 var appTask = Task.Run(() => applications().Concat(WindowsEvidence.Automations(value.AutomationFolders)).ToArray(), lifetime.Token);
                 var refreshTask = RefreshCoreAsync(forceHistory: false);
@@ -97,9 +111,17 @@ internal sealed class IndexService : IDisposable
                     throw new IOException("Scout could not reconcile the configured index.");
                 }
                 if (Interlocked.Read(ref configurationVersion) == generation)
+                {
                     Volatile.Write(ref contentReady, value.ContentSearchEnabled);
+                    await Task.Run(() => ReportProgress(IndexPhase.Ready, recount: true), lifetime.Token);
+                }
             }
-            finally { refreshGate.Release(); }
+            catch (Exception error) when (error is IOException or UnauthorizedAccessException or Microsoft.Data.Sqlite.SqliteException)
+            {
+                ReportProgress(IndexPhase.Incomplete, detail: "Search could not finish preparing. Check access to your selected folders and Scout's data folder, then try again.");
+                throw;
+            }
+            finally { configuring = false; refreshGate.Release(); }
         }
         finally { completion.TrySetResult(); }
     }
@@ -150,13 +172,14 @@ internal sealed class IndexService : IDisposable
             Volatile.Write(ref catalog, next); Interlocked.Increment(ref version);
         }
         ScheduleCompaction();
+        ReportProgress(throttled: true);
         var unavailable = Roots.Count(root => !NativeFileCrawler.IsAvailable(root));
         Changed?.Invoke($"{files.Count:N0} files · {apps.Length} apps · {links.Length:N0} links" + (unavailable > 0 ? $" · {unavailable} unavailable locations" : ""));
     }
     internal Task LoadFixturesAsync() => Task.Run(() =>
     {
         files.Replace(new SearchCatalog(store.StreamCandidates()));
-        loaded = true; Interlocked.Exchange(ref dirty, 0); lastScan = DateTime.UtcNow; Publish();
+        loaded = true; Interlocked.Exchange(ref dirty, 0); lastScan = DateTime.UtcNow; Publish(); ReportProgress(IndexPhase.Ready, recount: true);
     });
     public async Task RefreshAsync(bool wait = false, bool forceHistory = false)
     {
@@ -179,24 +202,35 @@ internal sealed class IndexService : IDisposable
                 {
                     files.Replace(SearchSnapshot.Load(store, Roots, settings.Exclusions, reconcileCoverage:true));
                     lastPersistedGeneration = store.IndexJournalFloor;
-                    loaded = true; Publish();
+                    loaded = true; Publish(); ReportProgress(IndexPhase.FileNames, recount: true);
                 }
                 if (Interlocked.Exchange(ref dirty, 0) == 1 || DateTime.UtcNow - lastScan > TimeSpan.FromMinutes(30))
                 {
                     Changed?.Invoke($"Checking folders · {files.Count:N0} cached files ready");
                     ResetWatchers(); failed.Clear();
+                    lock (progressGate) completedRoots.Clear();
+                    ReportProgress(IndexPhase.FileNames, recount: true);
                     var seen = new HashSet<string>(StringComparer.Ordinal);
-                    foreach (var root in TraversalRoots) Scan(root, seen, token);
+                    foreach (var root in TraversalRoots)
+                    {
+                        Scan(root, seen, token);
+                        ReportProgress(IndexPhase.FileNames, recount: true);
+                    }
                     Audit("scan-complete",seen.Count,0);
                     LastScanSeenCount = seen.Count; LastScanRemovedCount = 0; LastScanUnavailableCount = failed.Count;
                     foreach (var c in files.Values)
                         if (!seen.Contains(c.Id) && !failed.Keys.Any(path => IndexPolicy.Within(c.Target, path))) { files.TryRemove(c.Id, out _); LastScanRemovedCount++; }
                     Audit("reconciled",seen.Count,LastScanRemovedCount);
+                    lock (progressGate) foreach (var root in TraversalRoots) completedRoots.Add(root);
                     FullScanCount++; lastScan = DateTime.UtcNow;
                     Publish(); ScheduleCompaction(!files.Snapshot.IsPersisted);
 
                     if (settings.ContentSearchEnabled)
-                        contentIndexer.SynchronizeAsync(files.Values, settings.ContentFolders, Roots, settings.Exclusions, token).GetAwaiter().GetResult();
+                    {
+                        ReportProgress(IndexPhase.Contents, recount: true);
+                        contentIndexer.SynchronizeAsync(files.Values, settings.ContentFolders, Roots, settings.Exclusions, token,
+                            checkedFiles => ReportProgress(IndexPhase.Contents, processed: checkedFiles)).GetAwaiter().GetResult();
+                    }
                 }
                 var updates = new Dictionary<string, Candidate>(); var removed = new HashSet<string>();
                 while (changes.TryDequeue(out var change))
@@ -232,16 +266,22 @@ internal sealed class IndexService : IDisposable
                 if (updates.Count > 0 || removed.Count > 0) Publish();
                 if (settings.ContentSearchEnabled)
                 {
+                    if (updates.Count > 0 || removed.Count > 0) ReportProgress(IndexPhase.Contents);
                     contentIndexer.Remove(removed);
                     foreach (var item in updates.Values)
                         contentIndexer.UpdateAsync(item, settings.ContentFolders, Roots, settings.Exclusions, token).GetAwaiter().GetResult();
                 }
                 if (forceHistory || DateTime.UtcNow - lastHistory > TimeSpan.FromSeconds(30)) ReadHistory(token);
+                if (!configuring) ReportProgress(IndexPhase.Ready, recount: true);
             }, lifetime.Token);
             return true;
         }
         catch (OperationCanceledException) { return false; }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException or COMException or Microsoft.Data.Sqlite.SqliteException) { Changed?.Invoke("Some sources are unavailable; cached results are ready"); return false; }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or COMException or Microsoft.Data.Sqlite.SqliteException)
+        {
+            ReportProgress(IndexPhase.Incomplete, detail: "Some sources could not be read. Cached file names remain searchable; check folder access and try again.");
+            Changed?.Invoke("Some sources are unavailable; cached results are ready"); return false;
+        }
     }
     public ContentMatch[] SearchContent(string query, Scope scope, DateTimeOffset now, CancellationToken token) => SearchContentResponse(query, scope, now, token).Matches;
     public ContentSearchResponse SearchContentResponse(string query, Scope scope, DateTimeOffset now, CancellationToken token)
@@ -249,7 +289,7 @@ internal sealed class IndexService : IDisposable
         var intent = QueryParser.Parse(query, now, scope: scope);
         if (Catalog.HasTitle(query.Trim(), scope)) return new([]);
         if (!Volatile.Read(ref contentReady))
-            return new([], intent.ContentPattern != null ? "Enable content search and choose content folders in Settings." : "");
+            return new([], intent.ContentPattern != null ? settings.ContentSearchEnabled ? "File contents are still being indexed. File names are already searchable." : "Select Search contents for a folder in Settings to enable content search." : "");
         if (scope is Scope.Apps or Scope.Links or Scope.Workspaces) return new([]);
         if (intent.ContentPattern != null) return store.ContentIndex.SearchPattern(intent, Catalog, token);
         if (intent.Literal || intent.Terms.Length == 0) return new([]);
@@ -274,6 +314,36 @@ internal sealed class IndexService : IDisposable
             };
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException) { return null; }
+    }
+    private void ReportProgress(IndexPhase? phase = null, int? processed = null, bool recount = false, bool throttled = false, string detail = "")
+    {
+        IndexProgress snapshot;
+        lock (progressGate)
+        {
+            if (throttled && DateTime.UtcNow < nextProgress) return;
+            nextProgress = DateTime.UtcNow.AddMilliseconds(250);
+            if (phase.HasValue) progressPhase = phase.Value;
+            if (processed.HasValue) contentProcessed = processed.Value;
+            if (recount)
+            {
+                var data = files.Snapshot;
+                folderFiles = Roots.ToDictionary(root => root, data.CountFilesUnderPath, StringComparer.OrdinalIgnoreCase);
+                folderDocuments = settings.ContentSearchEnabled ? store.ContentIndex.CountsByFolder(Roots) : new Dictionary<string, int>();
+            }
+            var folders = Roots.Select(root =>
+            {
+                var complete = completedRoots.Any(parent => IndexPolicy.Within(root, parent));
+                var unavailable = !availableRoots.Contains(root, StringComparer.OrdinalIgnoreCase);
+                var partial = failed.Keys.Any(path => IndexPolicy.Within(path, root) || IndexPolicy.Within(root, path));
+                var state = unavailable ? FolderPhase.Unavailable : !complete ? FolderPhase.Indexing : partial ? FolderPhase.Partial : FolderPhase.Ready;
+                var contents = settings.ContentSearchEnabled && settings.ContentFolders.Any(parent => IndexPolicy.Within(root, parent));
+                return new FolderIndexProgress(root, folderFiles.GetValueOrDefault(root), folderDocuments.GetValueOrDefault(root), state, contents,
+                    contents && progressPhase == IndexPhase.Ready && Volatile.Read(ref contentReady) && !unavailable);
+            }).ToArray();
+            snapshot = new(progressPhase, files.Count, folderDocuments.Where(p => !Roots.Any(other => !p.Key.Equals(other, StringComparison.OrdinalIgnoreCase) && IndexPolicy.Within(p.Key, other))).Sum(p => p.Value), contentProcessed, folders, settings.Exclusions.ToArray(), detail);
+            Volatile.Write(ref progress, snapshot);
+        }
+        ProgressChanged?.Invoke(snapshot);
     }
     private void Audit(string stage,int seen,int removed)
     {

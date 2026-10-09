@@ -44,6 +44,8 @@ internal static class DriveIndexChecks
         try
         {
             await service.ConfigureAsync(settings); var id = Candidate.Key(ItemKind.File,path);
+            Check(service.Progress.FindFolder(selected) is { Phase: FolderPhase.Ready, Files: 1 } && service.Progress.FindFolder(child) is { Phase: FolderPhase.Ready, Files: 1 });
+            Check(service.Progress.Documents == 0 && service.Progress.Files == 1);
             Check(service.Catalog.Count(c => c.Kind == ItemKind.File) == 1);
             Check(service.Catalog.Contains(id) && store.Candidates.Count(c => c.Id == id) == 1);
             // Simulate a stale root deletion delivered after watcher reset/recreation.
@@ -62,10 +64,13 @@ internal static class DriveIndexChecks
             // Remove the overlapping child root before simulating a disconnected selected location.
             settings.ExtraFolders=[]; await service.ConfigureAsync(settings);
             var offline = Path.Combine(root,"offline"); Directory.Move(selected,offline); service.NotifyWatcherOverflow(); await service.RefreshAsync(wait:true);
+            Check(service.Progress.FindFolder(selected) is { Phase: FolderPhase.Unavailable, Files: 1, ContentsReady: false });
+            Check(service.Progress.Description.Contains("could not be read"));
             Check(!service.Catalog.Contains(renamedId) && store.Candidates.Any(c => c.Id == renamedId));
             Directory.Move(offline,selected); await Until(() => service.Catalog.Contains(renamedId));
             File.Delete(renamed); await Until(() => !service.Catalog.Contains(renamedId));
             var added = Path.Combine(selected,"Report.txt"); await File.WriteAllTextAsync(added,"synthetic"); var addedId = Candidate.Key(ItemKind.File,added); await Until(() => service.Catalog.Contains(addedId));
+            await Until(() => service.Progress.FindFolder(selected) is { Phase: FolderPhase.Ready, Files: 1 });
             await service.ConfigureAsync(new ScoutSettings { RecentItems=false,WindowsSearch=false });
             Check(!service.Catalog.Contains(addedId) && !store.Candidates.Any(c => c.Id == addedId));
         }

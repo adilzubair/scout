@@ -1,7 +1,7 @@
 <Window x:Class="Scout.App.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Scout" Width="720" Height="76" WindowStyle="None" ResizeMode="NoResize"
+        Title="Scout" Width="720" Height="104" WindowStyle="None" ResizeMode="NoResize"
         ShowInTaskbar="False" Topmost="True" WindowStartupLocation="CenterScreen"
         PreviewKeyDown="OnKeyDown" Background="{DynamicResource Canvas}">
   <Window.Resources>
@@ -23,8 +23,15 @@
         <Grid.ColumnDefinitions><ColumnDefinition Width="37"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
         <Path Data="M 16,9 A 7,7 0 1 1 2,9 A 7,7 0 1 1 16,9 M 14,14 L 21,21" Stroke="{DynamicResource Muted}" StrokeThickness="1.7" StrokeStartLineCap="Round" StrokeEndLineCap="Round" VerticalAlignment="Center" Width="24" Height="24"/>
         <Grid Grid.Column="1">
+          <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
           <TextBox x:Name="Query" FontFamily="Segoe UI Variable Display, Segoe UI" FontSize="23" BorderThickness="0" Background="Transparent" Padding="0,5" TextChanged="QueryChanged" AutomationProperties.Name="Search apps, files and links"/>
           <TextBlock x:Name="Placeholder" Text="Search apps, files, and more" FontFamily="Segoe UI Variable Display, Segoe UI" Foreground="{DynamicResource Muted}" FontSize="23" Margin="0,5" IsHitTestVisible="False"/>
+          <Button Grid.Row="1" Style="{StaticResource QuietButton}" Padding="0,2" HorizontalAlignment="Left" Click="IndexDetailsClick" AutomationProperties.Name="Show indexing details">
+            <StackPanel Orientation="Horizontal">
+              <ProgressBar x:Name="IndexBusy" Width="16" Height="3" Margin="0,0,7,0" VerticalAlignment="Center" Visibility="Collapsed"/>
+              <TextBlock x:Name="IndexState" FontSize="11" Foreground="{DynamicResource Muted}" AutomationProperties.LiveSetting="Polite"/>
+            </StackPanel>
+          </Button>
         </Grid>
         <Button x:Name="ClearQuery" Grid.Column="2" Style="{StaticResource QuietButton}" Visibility="Collapsed" Padding="8" Margin="8,0,4,0" VerticalAlignment="Center" Click="ClearQueryClick" AutomationProperties.Name="Clear search" ToolTip="Clear search"><TextBlock Text="&#xE711;" FontFamily="Segoe Fluent Icons" FontSize="11"/></Button>
         <Button Grid.Column="3" Style="{StaticResource QuietButton}" Padding="8,6" VerticalAlignment="Center" Click="SettingsClick" ToolTip="Settings (Ctrl+,)" AutomationProperties.Name="Open settings"><TextBlock Text="&#xE713;" FontFamily="Segoe Fluent Icons" FontSize="15"/></Button>
