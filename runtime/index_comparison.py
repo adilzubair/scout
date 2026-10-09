@@ -11,6 +11,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--baseline', type=Path, required=True)
     parser.add_argument('--redesigned', type=Path, required=True)
+    parser.add_argument('--previous', type=Path, help='Optional intermediate implementation, measured in the same rounds')
     parser.add_argument('--corpus', type=Path, action='append', required=True)
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--rounds', type=int, default=2)
@@ -19,7 +20,10 @@ def main():
     if args.rounds < 2 or args.rounds % 2:
         parser.error('--rounds must be a positive even number of at least two')
     args.output.mkdir(parents=True, exist_ok=True)
-    engines = {'baseline': args.baseline.resolve(), 'redesigned': args.redesigned.resolve()}
+    engines = {'baseline': args.baseline.resolve()}
+    if args.previous:
+        engines['previous'] = args.previous.resolve()
+    engines['redesigned'] = args.redesigned.resolve()
     summary = {'warmupPasses': 10, 'measuredPasses': 30, 'rounds': args.rounds, 'corpora': []}
     for corpus in args.corpus:
         reports = {key: [] for key in engines}

@@ -84,6 +84,35 @@ public sealed class SearchCatalog
         foreach (var root in offline) if (IndexPolicy.Within(d.Target, root)) return false;
         return true;
     }
+    internal IEnumerable<SearchEntry> DateFinalists(QueryIntent intent, Scope scope, IReadOnlyDictionary<string, LibraryItem> library, DateTimeOffset now, int limit, CancellationToken cancellationToken)
+    {
+        var queue = new PriorityQueue<(CatalogData Data, int Index), (int Evidence, long Date, int Order)>();
+        var latest = now.AddSeconds(2).UtcTicks;
+        var since = intent.Window?.Since.UtcTicks ?? long.MinValue;
+        var until = intent.Window?.Until.UtcTicks ?? long.MaxValue;
+        void Scan(CatalogData data, bool isBase)
+        {
+            for (var i = 0; i < data.Rows.Length; i++)
+            {
+                if ((i & 127) == 0) cancellationToken.ThrowIfCancellationRequested();
+                ref readonly var row = ref data.Rows[i];
+                if (!SearchEntry.InScope(row.Kind, scope) || intent.Kind is { } kind && row.Kind != kind && !(kind == ItemKind.App && row.Kind == ItemKind.Automation)) continue;
+                var ticks = SearchEntry.DateTicks(row, intent.Recency);
+                if (intent.Recency == RecencyBasis.Opened && library.Count > 0 && library.TryGetValue(data.Strings[row.Id], out var memory) && memory.LastLaunch is { } launch)
+                    ticks = Math.Max(ticks, launch.UtcTicks);
+                if (ticks == 0 || ticks > latest || ticks < since || ticks >= until) continue;
+                var priority = (intent.Recency == RecencyBasis.Downloaded && row.Downloaded != 0 ? 1 : 0, intent.Oldest ? -ticks : ticks, -row.Order - 1);
+                if (queue.Count >= limit && queue.TryPeek(out _, out var threshold) && priority.CompareTo(threshold) <= 0) continue;
+                if (isBase && (deleted.Count > 0 && deleted.Contains(data.Strings[row.Id]) || changes.Count > 0 && changes.ContainsKey(data.Strings[row.Id]))) continue;
+                if (offline.Length > 0 && !Available(new SearchEntry(data, i))) continue;
+                queue.Enqueue((data, i), priority);
+                if (queue.Count > limit) queue.Dequeue();
+            }
+        }
+        Scan(Base, true); Scan(overlay, false);
+        // Rich scoring and payload construction still use the ordinary search path.
+        return queue.UnorderedItems.Select(item => new SearchEntry(item.Element.Data, item.Element.Index)).ToArray();
+    }
     internal IEnumerable<SearchEntry> Entries(string[]? locations, bool direct, bool includeUnavailable = false)
     {
         foreach (var i in Base.Select(locations, direct)) { var d = new SearchEntry(Base, i); if ((deleted.Count == 0 || !deleted.Contains(d.Id)) && (changes.Count == 0 || !changes.ContainsKey(d.Id)) && (includeUnavailable || Available(d))) yield return d; }
@@ -191,6 +220,7 @@ internal readonly struct SearchEntry
     public string Initials => Text.Initials;
     public string Extension => Text.Extension;
     public bool Screenshot => Row.Screenshot;
+    public bool HasDownloadEvidence => Row.Downloaded != 0;
     public long? SizeBytes => Row.Size < 0 ? null : Row.Size;
     private static DateTimeOffset? Time(long ticks) => ticks == 0 ? null : new DateTimeOffset(ticks, TimeSpan.Zero);
     public DateTimeOffset? ModifiedAt => Time(Row.Modified);
@@ -199,8 +229,11 @@ internal readonly struct SearchEntry
     public DateTimeOffset? DownloadedAt => Time(Row.Downloaded);
     public DateTimeOffset? VisitedAt => Time(Row.Visited);
     public bool IsGroupable => Kind is ItemKind.File or ItemKind.App or ItemKind.Link or ItemKind.Folder;
-    public bool InScope(Scope s) => s switch { Scope.All => true, Scope.Files => Kind is ItemKind.File or ItemKind.Folder, Scope.Apps => Kind is ItemKind.App or ItemKind.Automation, Scope.Links => Kind == ItemKind.Link, Scope.Workspaces => Kind == ItemKind.Workspace, _ => false };
-    public DateTimeOffset? Date(RecencyBasis b) => Time(b switch { RecencyBasis.Modified => Row.Modified, RecencyBasis.Created => Row.Created, RecencyBasis.Added => Row.Added, RecencyBasis.Opened => Row.Opened, RecencyBasis.Downloaded => Row.Downloaded == 0 ? Row.Added : Row.Downloaded, RecencyBasis.Visited => Row.Visited, _ => 0 });
+    public bool InScope(Scope s) => InScope(Kind, s);
+    internal static bool InScope(ItemKind kind, Scope s) => s switch { Scope.All => true, Scope.Files => kind is ItemKind.File or ItemKind.Folder, Scope.Apps => kind is ItemKind.App or ItemKind.Automation, Scope.Links => kind == ItemKind.Link, Scope.Workspaces => kind == ItemKind.Workspace, _ => false };
+    public DateTimeOffset? Date(RecencyBasis b) => Time(DateTicks(b));
+    public long DateTicks(RecencyBasis b) => DateTicks(Row, b);
+    internal static long DateTicks(in CatalogRow row, RecencyBasis b) => b switch { RecencyBasis.Modified => row.Modified, RecencyBasis.Created => row.Created, RecencyBasis.Added => row.Added, RecencyBasis.Opened => row.Opened, RecencyBasis.Downloaded => row.Downloaded == 0 ? row.Added : row.Downloaded, RecencyBasis.Visited => row.Visited, _ => 0 };
     public Candidate Candidate => new(Id, Kind, Title, Target) { Detail = Detail, Source = Data.Strings[Row.Source], ModifiedAt = ModifiedAt, CreatedAt = CreatedAt, AddedAt = Time(Row.Added), OpenedAt = OpenedAt, DownloadedAt = DownloadedAt, VisitedAt = VisitedAt, AddedSource = Data.Strings[Row.AddedSource], OpenedSource = Data.Strings[Row.OpenedSource], DownloadSource = Data.Strings[Row.DownloadSource], Keywords = Text.Keywords.ToArray(), VisitCount = Row.Visits, SizeBytes = SizeBytes };
     internal static SearchEntry Create(Candidate c) => new(CatalogData.Build([c]), 0);
 }

@@ -42,6 +42,21 @@ internal static class SnapshotChecks
             Check(replay.Count == 1 && !replay.Contains(a.Id) && replay.Candidates.Single().ModifiedAt == now.AddHours(1));
             Check(mapped.Contains(a.Id));
         }));
+        test("Chronological finalists preserve mapped and replayed tick ordering", () => Fixture((root, store) =>
+        {
+            var a = File("First.txt") with { ModifiedAt = now.AddTicks(-1) };
+            var b = File("Second.txt") with { ModifiedAt = now.AddTicks(-2) };
+            var c = File("Third.txt") with { ModifiedAt = now.AddTicks(-3) };
+            store.ReplaceIndex([a,b,c]);
+            SearchSnapshot.Save(store, new SearchCatalog([a,b,c]), store.IndexGeneration, [@"C:\Test"], []);
+            var mapped = SearchSnapshot.Load(store, [@"C:\Test"], []);
+            Check(mapped.IsPersisted);
+            Check(SearchEngine.Search("latest 3 files", Scope.Files, mapped, memory, now).Hits.Select(h => h.Candidate.Id).SequenceEqual([a.Id,b.Id,c.Id]));
+            store.UpdateIndex([c with { ModifiedAt = now }], [a.Id]);
+            var replay = SearchSnapshot.Load(store, [@"C:\Test"], []);
+            Check(SearchEngine.Search("latest 3 files", Scope.Files, replay, memory, now).Hits.Select(h => h.Candidate.Id).SequenceEqual([c.Id,b.Id]));
+            Check(SearchEngine.Search("oldest 3 files", Scope.Files, replay.Compact(), memory, now).Hits.Select(h => h.Candidate.Id).SequenceEqual([b.Id,c.Id]));
+        }));
         test("Corrupt and incompatible snapshots rebuild from authoritative SQLite", () => Fixture((root, store) =>
         {
             var a = File("Résumé 東京.txt"); store.ReplaceIndex([a]);

@@ -35,6 +35,7 @@ ContentSearchChecks.Run(Test);
 IndexRaceChecks.Run(Test);
 SnapshotChecks.Run(Test);
 CacheChecks.Run(Test);
+ChronologicalChecks.Run(Test);
 IndexRedesignChecks.Run(Test);
 DriveIndexChecks.Run(Test);
 SettingsUiChecks.Run(Test);

@@ -54,6 +54,9 @@ public static class SearchEngine
             else docs = catalog.Entries(locations, folderFilter.DirectOnly).Where(d => additions == null || !additions.ContainsKey(d.Id)).Concat(additions?.Values.Where(c => c.Kind == ItemKind.File && locations.Any(path => folderFilter.DirectOnly ? Path.GetDirectoryName(c.Target)?.Equals(path, StringComparison.OrdinalIgnoreCase) == true : IndexPolicy.Within(c.Target, path))).Select(SearchEntry.Create) ?? []);
         }
         if (intent.Count.HasValue) limit = Math.Min(limit, intent.Count.Value);
+        if (limit > 0 && !emptyQuery && intent.Recency != RecencyBasis.None && intent.Terms.Length == 0 && intent.ContentPattern == null && intent.Folder == null
+            && intent.Extension == null && intent.ExplicitExtensions.Length == 0 && intent.MinimumSize == null && intent.MaximumSize == null && intent.ModifiedWindow == null && !intent.Screenshots && additions is not { Count: > 0 })
+            docs = catalog.DateFinalists(intent, scope, library, now, limit, cancellationToken);
         var nameScores = catalog.PrepareScores(intent.Terms);
         var phrase = string.Join(' ', intent.Terms);
         // A zero title score cannot become an ordinary hit merely through folder context.
@@ -61,6 +64,11 @@ public static class SearchEngine
         var canPruneNames = !emptyQuery && intent.Terms.Length > 0 && intent.Extension == null && intent.Kind is not (ItemKind.App or ItemKind.Link) && intent.ContentPattern == null;
         var aliasIds = canPruneNames ? library.Values.Where(m => intent.Recency == RecencyBasis.None && intent.Window == null && m.Aliases.Any(a => a.Equals(literal, StringComparison.OrdinalIgnoreCase))).Select(m => m.Candidate.Id).ToHashSet(StringComparer.Ordinal) : [];
         var eligibleNames = canPruneNames ? catalog.PrepareEligibility(literal, phrase, intent.Terms, nameScores) : [];
+        var chronological = intent.Recency != RecencyBasis.None && (intent.Terms.Length == 0 || intent.Latest || intent.Oldest);
+        var dateOnly = chronological && intent.Terms.Length == 0 && intent.ContentPattern == null && !emptyQuery;
+        var latestTicks = dateOnly ? now.AddSeconds(2).UtcTicks : 0;
+        var sinceTicks = intent.Window?.Since.UtcTicks ?? long.MinValue;
+        var untilTicks = intent.Window?.Until.UtcTicks ?? long.MaxValue;
         var position = 0; var visited = 0;
         foreach (var doc in docs)
         {
@@ -74,6 +82,17 @@ public static class SearchEngine
             if (intent.ModifiedWindow is { } mw && (raw.ModifiedAt == null || raw.ModifiedAt < mw.Since || raw.ModifiedAt >= mw.Until)) continue;
             if (intent.ContentPattern != null && !content.ContainsKey(raw.Id)) continue;
             if (intent.Screenshots && !doc.Screenshot) continue;
+            // Date-only queries rank by evidence and ticks, independently of name/activity scores.
+            // Reject non-finalists before decoding dates, looking up personal data or scoring names.
+            if (dateOnly)
+            {
+                var ticks = raw.DateTicks(intent.Recency);
+                if (intent.Recency == RecencyBasis.Opened && library.Count > 0 && library.TryGetValue(raw.Id, out var openedMemory) && openedMemory.LastLaunch is { } launch)
+                    ticks = Math.Max(ticks, launch.UtcTicks);
+                if (ticks == 0 || ticks > latestTicks || ticks < sinceTicks || ticks >= untilTicks) continue;
+                var datePriority = (intent.Recency == RecencyBasis.Downloaded && raw.HasDownloadEvidence ? 1 : 0, 0d, intent.Oldest ? -ticks : ticks, -position);
+                if (queue.Count >= limit && datePriority.CompareTo(queue.PeekPriority()) <= 0) continue;
+            }
             library.TryGetValue(raw.Id, out var memory);
             var opened = memory?.LastLaunch is { } lastOpened && (raw.OpenedAt == null || lastOpened > raw.OpenedAt) ? lastOpened : raw.OpenedAt;
             var basis = intent.Recency == RecencyBasis.None && intent.Window != null ? (raw.Kind == ItemKind.Link ? RecencyBasis.Visited : RecencyBasis.Modified) : intent.Recency;
@@ -140,7 +159,6 @@ public static class SearchEngine
             if (memory?.LastLaunch is { } last) score += 5 / (1 + Math.Max(0, (now - last).TotalDays));
             var sortDate = (date ?? memory?.LastLaunch ?? raw.VisitedAt ?? raw.ModifiedAt)?.UtcTicks ?? 0;
             // A recency superlative orders the eligible set by evidence, including described files.
-            var chronological = intent.Recency != RecencyBasis.None && (intent.Terms.Length == 0 || intent.Latest || intent.Oldest);
             var primary = chronological ? 0 : score;
             var evidence = intent.Recency == RecencyBasis.Downloaded && raw.DownloadedAt != null ? 1 : 0;
             if (!chronological && raw.Kind == ItemKind.Link && Uri.TryCreate(raw.Target, UriKind.Absolute, out var uri)) primary -= Math.Min(1, uri.AbsolutePath.Count(c => c == '/') * .01);
