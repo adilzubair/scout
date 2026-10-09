@@ -1,5 +1,13 @@
 # Validation
 
+Beta 2 release validation (2026-10-09): **295 C# checks**, **13 adapter checks**,
+seven native folder-picker checks and isolated desktop smoke checks pass.
+See [INSTALLER.md](INSTALLER.md) and [RELEASE_NOTES.md](RELEASE_NOTES.md) for
+package checks and outstanding clean-machine validation. The HTTP contract
+accepts and reports complete budgeted abstention: CPU inference on this PC can
+exceed the existing two-second ranking budget. Historical model evaluations
+below retain their original corpora and dates.
+
 Latest optional local helper: **56/64** fresh semantic validation cases versus
 38/64 with Laya alone; **497/504** prior real-metadata regressions versus 484/504.
 Four fresh false matches and two older presentation-query regressions remain.

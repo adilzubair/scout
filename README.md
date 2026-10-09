@@ -2,7 +2,9 @@
 
 A native Windows launcher built against [Intern](https://github.com/dabit3/intern)'s behavior, using local [Laya](https://huggingface.co/convaiinnovations/laya) instead of Jev. C#/.NET 10, WPF, SQLite and an authenticated Python sidecar. Intern is cloned under `.reference/intern` for reference; its code and assets are not redistributed.
 
-[Website](https://adilzubair.github.io/scout-site/) · [Public beta download](https://github.com/adilzubair/scout-site/releases/tag/v0.1.0-beta.1)
+[Website](https://adilzubair.github.io/scout-site/) · [Public beta download](https://github.com/adilzubair/scout-site/releases/tag/v0.1.0-beta.2)
+
+See [beta 2 release notes](docs/RELEASE_NOTES.md) for changes and upgrade instructions.
 
 ## Download and install
 

@@ -1,5 +1,9 @@
 #ifndef ScoutVersion
-  #define ScoutVersion "0.1.0-beta.1"
+  #define ScoutVersion "0.1.0-beta.2"
+#endif
+
+#ifndef ScoutFileVersion
+  #define ScoutFileVersion "0.1.0.2"
 #endif
 
 [Setup]
@@ -29,7 +33,7 @@ Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
 VersionInfoDescription=Scout installer
-VersionInfoVersion=0.1.0.0
+VersionInfoVersion={#ScoutFileVersion}
 
 [Files]
 Source: "..\artifacts\Scout\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
