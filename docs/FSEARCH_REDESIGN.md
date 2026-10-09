@@ -287,6 +287,33 @@ model manifest and HTTP test sources are byte-equivalent to the baseline after
 newline normalization. This is an unresolved runtime timing limitation, not a
 claimed successful HTTP check.
 
+## Folder-picker correction from user testing
+
+Clicking Browse in Folders settings terminated Scout with an unhandled
+`REGDB_E_CLASSNOTREG` (`0x80040154`): the custom COM helper used an unregistered
+class identifier. The earlier UI smoke covered navigation and folder-list editing,
+but did not open the native picker and therefore missed this defect.
+
+The helper now uses the framework's
+[OpenFolderDialog](https://learn.microsoft.com/en-us/dotnet/api/microsoft.win32.openfolderdialog?view=windowsdesktop-10.0)
+with the Settings window as its owner. All four folder lists share the corrected
+helper; picker failures show inline feedback and allow entering a path manually.
+An isolated, opt-in native audit exercises the real content toggle and Browse
+button, selects a Unicode folder, cancels without modifying the list, checks
+repeat-selection deduplication, opens/cancels the other three Browse buttons and
+verifies that Settings navigation still responds afterward. All seven checks pass;
+the Release build has zero warnings/errors and the 256 regular checks also pass.
+No user settings are saved by the audit.
+
+```powershell
+dotnet run --project tests/Scout.Tests -c Release --no-build --no-restore -- --folder-picker-smoke IGNORED_REPORT_JSON
+```
+
+The command requires an interactive Windows desktop. Native audit evidence and
+regular-check output are retained under ignored `artifacts/diagnostics/folder-picker-fix`.
+This App-only correction does not change the search engine or earlier performance
+measurements.
+
 ## Reproduction and private artifacts
 
 Private snapshots, filenames, content, binaries and raw reports remain under ignored

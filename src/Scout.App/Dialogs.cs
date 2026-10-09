@@ -1,4 +1,6 @@
-﻿using System.Windows;
+﻿using System.ComponentModel;
+using System.Runtime.InteropServices;
+using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -130,7 +132,20 @@ internal sealed class SettingsWindow : Window
         {
             var browse = new Button { Content = "Browse…", HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 8, 0, 6) };
             AutomationProperties.SetName(browse, name); panel.Children.Add(browse);
-            browse.Click += (_, _) => { var picked = FolderPicker.Pick(this); if (picked != null) field.Text = FolderList.Append(field.Text, picked); };
+            browse.Click += (_, _) =>
+            {
+                try
+                {
+                    var picked = FolderPicker.Pick(this);
+                    if (picked != null) field.Text = FolderList.Append(field.Text, picked);
+                }
+                catch (Exception error) when (error is COMException or Win32Exception)
+                {
+                    feedback.Text = "Scout couldn't open the folder picker. Enter the full folder path in the list instead.";
+                    feedback.Visibility = Visibility.Visible;
+                    field.Focus();
+                }
+            };
             return browse;
         }
         var general = Page("General", "\uE713", "Make Scout fit the way you work.");
