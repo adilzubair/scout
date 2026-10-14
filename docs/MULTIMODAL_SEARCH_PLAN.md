@@ -1,8 +1,9 @@
 # Scout multimodal semantic search implementation plan
 
 Date: 2026-10-15. Branch: `feature/multimodal-semantic-search`.
-Status: implementation restarted on 2026-10-15 from the verified background-indexing
-checkpoint `7e66ee3`, preserving the unfinished retrieval and preview changes.
+Status: implementation resumed on 2026-10-15 from checkpoint `6e666ca`.
+Retrieval, previews, OCR and format coverage are committed. The frozen evaluation
+foundation passes 300 Release checks; independent quality and release gates remain open.
 This plan is the implementation checklist; the add-on remains a
 preview until the release gates below pass. The full-model runtime and content smoke probe
 are implemented and verified on CPU and CUDA. On 2026-10-14 the user directed
@@ -27,7 +28,7 @@ all-family CPU indexing and watcher/maintenance/revocation checks. Constrained
 retrieval, lexical fusion and locator previews now pass engineering contracts,
 real CPU code/image queries and authored WPF playback checks.
 Bounded Windows OCR now adds scanned text while preserving vision and page locators;
-its 292 Release checks and authored CPU pipeline smoke pass. Calibrated quality,
+its authored CPU pipeline smoke passes. Calibrated quality,
 clean standard-account installation, further parser lifecycle hardening,
 distribution review and release
 evaluations remain required. See
@@ -296,7 +297,7 @@ results as end-to-end release evidence.
 | Extractor bridge | Receipt/hash/payload validation, private tokenizer copy, source rechecks, owned-copy cleanup, resource guards and Settings progress | Packaged crash/upgrade checks and full resource/quality evaluation |
 | Document/image readers | Six Office formats with sandbox-backed WPF locator previews; bounded OCR; explicit unsupported/encrypted/corrupt statuses and scoped coverage review | Independent content/language quality, additional fidelity cases exposed by evaluation and packaged parser crash cleanup |
 | Audio/video readers | Bounded PyAV readers connected to indexing; all seven families pass CPU scheduler, watcher, maintenance and revocation checks (`7e66ee3`) | Packaged cancellation/crash cleanup, quality and resource gates |
-| Retrieval/UI | Engineering foundation: 289 Release checks, real CPU code/image queries, retained selection/revoked actions, and all eight required media extensions in WPF | Independent quality/admission evaluation, richer locator/format fixtures and packaged lifecycle validation |
+| Retrieval/UI | Constrained retrieval and preview engineering contracts, real CPU code/image queries, retained selection/revoked actions, and all eight required media extensions in WPF | Independent quality/admission evaluation, richer locator/format fixtures and packaged lifecycle validation |
 | Release validation | Fixed quality protocol and frozen development pilot; scorer compares content keyword/semantic/fusion, dimensions and production-adapter replay | Independent 400-task holdout, abstention calibration, Laya on/off, throughput/resource measurements, clean packaging/install and every release gate below |
 
 Proceed in this order, committing each verified unit:
@@ -318,13 +319,23 @@ Proceed in this order, committing each verified unit:
    WAV/MP3/M4A/FLAC/MP4/MOV/MKV/WebM; WebM uses a bounded sandboxed clip.
    Real process-death tests recover abandoned clips and preserve active owners.
    These checks do not calibrate admission or establish final quality.
-4. Complete document/image coverage and parser lifecycle hardening, including
-   PDF scans/OCR availability and cleanup of sandbox permissions and job files
-   after packaged crashes. Preserve explicit unsupported/partial statuses.
-5. Freeze at least 400 independent content-grounded holdout tasks before tuning
-   admission. Run quality/locator/abstention and dimension comparisons, plus the
-   specified corpus-size, CPU/GPU, disk and lifecycle benchmarks.
-6. Finish distribution notices and clean standard-account install/update/removal
+4. Document/image coverage foundation completed: PDF scans, bounded Windows OCR,
+   unsupported/encrypted/corrupt statuses and scoped coverage review pass. Keep
+   independent fidelity/language evaluation and packaged parser crash cleanup open.
+5. Current slice: collect a diverse, licensed natural-media candidate pool with
+   original checksums, provenance, bounded downloads and interruption recovery.
+   Review actual content, license obligations and related-source groups before
+   assigning splits or labels. Provider metadata alone never approves a holdout.
+6. Freeze at least 400 independent content-grounded holdout tasks across all seven
+   families, including natural sound and joint audiovisual queries, before tuning
+   admission. Preserve the opened development pilot as regression evidence.
+   Run file/locator/abstention and dimension comparisons, then fix measured failures
+   and validate with a fresh unopened holdout when necessary. Prove joint AV inputs
+   consume both channels; separate sound/frame smoke checks do not establish this.
+7. Run the specified 25K/100K/500K corpus-size, CPU/GPU, ordinary-search regression,
+   throughput, memory, battery, disk and lifecycle benchmarks. Validate the physical
+   16 GB CPU laptop separately from the available 32 GB development machine.
+8. Finish distribution notices and clean standard-account install/update/removal
    checks, rebuild the package and run packaged WPF checks. Physical 16 GB CPU
    hardware validation is still outstanding; a memory cap on the available 32 GB
    machine is not a substitute. Report any failed or unavailable gate explicitly.
@@ -404,7 +415,18 @@ Keep all large or private evaluation outputs under ignored
 
 ## Next implementation task
 
-Freeze the independent content-grounded evaluation corpus and at least 400
+Complete resumable natural-media intake and its offline integrity contracts, then
+review sources through bounded decoding without running retrieval predictions.
+The current discovery has 92 public candidates; 71 pass initial license-label,
+container, size and original-checksum filters. These are unreviewed candidates,
+not approved licenses, source groups or content labels. The first transfer stopped
+on HTTP 429 after two originals. A bounded resume verified seven photos and one
+audio file before another provider limit; the verified subset is now preserved in
+an eight-source intake manifest using offline-only verification. Do not retry the
+remaining transfers in a tight loop. Reuse only files whose original bytes/hash
+still match. Keep sources and attribution manifests under ignored diagnostics.
+
+Then freeze the independent content-grounded evaluation corpus and at least 400
 holdout tasks before changing admission/ranking policy. The evaluator foundation
 now freezes hashes, checks source/group split integrity, scores file/locator and
 abstention results, compares dimensions and verifies production-adapter replay.

@@ -400,6 +400,35 @@ actions, clear revoked evidence and advance playback for all eight required
 audio/video extensions. These checks do not establish general retrieval quality,
 minimum-hardware suitability or clean-account release readiness.
 
+The evaluation source-intake tool discovers public Commons candidates using the
+checked-in `evaluation/multimodal/media-queries.json`. It records page revision,
+original URL/size/SHA-1, creator/license metadata and discovery topics. Downloads
+accept only approved HTTPS hosts, selected containers and license labels, at most
+32 MiB per file / 512 MiB per batch. Actual downloaded bytes must match the original
+size and SHA-1; the local manifest also records SHA-256 and opaque filenames.
+These filters do not approve rights or establish what the source contains.
+Content, license, related-group and split review flags remain unapproved.
+
+Discovery checkpoints completed requests and resumes only with the same query
+definition hash. Both commands use an OS owner lock; completed manifests publish
+atomically without overwriting evidence. An interrupted intake can reuse originals
+only after rechecking their hashes. HTTP 429/503 retries honor bounded Retry-After
+and stop after three attempts. Use `intake --existing-only` to preserve a selected
+downloaded subset without any network request. Keep sources, attribution manifests
+and later review outputs in ignored diagnostics; never embed or tune against an
+unreviewed future holdout to choose its labels.
+
+Fourteen offline contracts cover checksum/budget failure cleanup, altered sources,
+host/redirect rejection, license filtering, lock release, immutable publication,
+rate limits, interruption recovery and offline-only subset verification:
+
+```powershell
+.runtime/python/cpython-3.12.13-windows-x86_64-none/python.exe scripts/test_multimodal_media_intake.py
+.runtime/python/cpython-3.12.13-windows-x86_64-none/python.exe scripts/multimodal-media-intake.py discover --queries evaluation/multimodal/media-queries.json --output artifacts/diagnostics/multimodal/candidate-discovery.json
+# Select IDs after inspecting provenance; an intake is still an unreviewed pool.
+.runtime/python/cpython-3.12.13-windows-x86_64-none/python.exe scripts/multimodal-media-intake.py intake --discovery artifacts/diagnostics/multimodal/candidate-discovery.json --output artifacts/diagnostics/multimodal/candidate-pool --ids commons-147960076
+```
+
 Developer verification (use an isolated add-on root and data directory):
 
 ```powershell

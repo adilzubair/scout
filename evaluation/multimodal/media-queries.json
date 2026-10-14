@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "purpose": "Candidate discovery only; not evaluation labels or an approved holdout",
+  "queries": [
+    {"id":"cats","family":"images","query":"filetype:bitmap cat sitting","limit":5},
+    {"id":"bicycles","family":"images","query":"filetype:bitmap bicycle parked","limit":5},
+    {"id":"bridges","family":"images","query":"filetype:bitmap bridge river","limit":5},
+    {"id":"flowers","family":"images","query":"filetype:bitmap sunflower bee","limit":5},
+    {"id":"kitchens","family":"images","query":"filetype:bitmap kitchen sink","limit":5},
+    {"id":"sailboats","family":"images","query":"filetype:bitmap sailboat harbor","limit":5},
+    {"id":"rain","family":"audio","query":"filetype:audio rain","limit":5},
+    {"id":"bells","family":"audio","query":"filetype:audio church bells","limit":5},
+    {"id":"birds","family":"audio","query":"filetype:audio birds singing","limit":5},
+    {"id":"applause","family":"audio","query":"filetype:audio applause","limit":5},
+    {"id":"traffic","family":"audio","query":"filetype:audio traffic","limit":5},
+    {"id":"water","family":"audio","query":"filetype:audio flowing water","limit":5},
+    {"id":"dogs","family":"video","query":"filetype:video dog .webm","limit":5},
+    {"id":"ducks","family":"video","query":"filetype:video ducks .webm","limit":5},
+    {"id":"waves","family":"video","query":"filetype:video waves beach .webm","limit":5},
+    {"id":"trains","family":"video","query":"filetype:video train .webm","limit":5},
+    {"id":"waterfalls","family":"video","query":"filetype:video waterfall .webm","limit":5},
+    {"id":"cycling","family":"video","query":"filetype:video cycling .webm","limit":5}
+  ],
+  "namedCandidates": [
+    {"id":"rain-pd","family":"audio","title":"File:Rain.ogg"},
+    {"id":"husky-cc0","family":"video","title":"File:Howling Husky Dog.webm"}
+  ]
+}
