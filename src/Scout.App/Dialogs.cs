@@ -66,7 +66,7 @@ internal sealed class GroupWindow : Window
 internal sealed class SettingsWindow : Window
 {
     public ScoutSettings Value { get; private set; }
-    public SettingsWindow(ScoutSettings settings, Func<string, bool> applyHotkey, Action clearHistory, MultimodalHost? multimodalHost = null, Action? addonRemoved = null)
+    public SettingsWindow(ScoutSettings settings, Func<string, bool> applyHotkey, Action clearHistory, MultimodalHost? multimodalHost = null, Action? addonRemoved = null, SemanticService? semantic = null)
     {
         Value = settings;
         Title = "Scout settings"; Width = 800; Height = 654; MinWidth = 680; MinHeight = 460; WindowStartupLocation = WindowStartupLocation.CenterOwner;
@@ -197,9 +197,10 @@ internal sealed class SettingsWindow : Window
 
         var multimodalOptions = settings.Multimodal ?? new MultimodalSettings();
         var multimodal = Page("Multimodal", "\uE8A5", "Prepare local content search across documents, images, audio, and video.");
-        Note(multimodal, "Development preview: this build prepares and tests the add-on. Content indexing and search results are still being implemented.");
+        Note(multimodal, "Development preview: selected content can be indexed in the background. Semantic search results and evidence previews are still being implemented.");
         var embeddingEnabled = Check(multimodal, "Enable the multimodal add-on", multimodalOptions.Enabled);
         var embeddingPaused = Check(multimodal, "Pause background content indexing", multimodalOptions.Paused);
+        var embeddingBattery = Check(multimodal,"Pause content indexing on battery power",multimodalOptions.PauseOnBattery);
         Note(multimodal, "Independent of Laya. Selected content will be processed on this PC; it is not sent to Laya or a cloud model.");
         var embeddingFolders = Field(multimodal, "Multimodal content folders", string.Join(Environment.NewLine, multimodalOptions.Folders), true);
         Browse(multimodal, embeddingFolders, "Browse for a multimodal content folder");
@@ -237,10 +238,32 @@ internal sealed class SettingsWindow : Window
         multimodal.Children.Remove(embeddingStatus);
         multimodal.Children.Insert(3, setupActions); multimodal.Children.Insert(4, embeddingStatus); multimodal.Children.Insert(5, downloadNote);
         CancellationTokenSource? embeddingOperation = null;
+        var indexingProgress=new TextBlock{TextWrapping=TextWrapping.Wrap,Margin=new Thickness(0,8,0,12),Foreground=WindowVisuals.Brush("Muted")};
+        AutomationProperties.SetName(indexingProgress,"Multimodal indexing progress");multimodal.Children.Add(indexingProgress);
+        var progressTimer=new System.Windows.Threading.DispatcherTimer{Interval=TimeSpan.FromMilliseconds(500)};
+        void UpdateProgress()
+        {
+            var value=semantic?.Activity;
+            indexingProgress.Text=value==null?"Content scheduler unavailable in this preview session":value.Message+
+                (value.Progress is {} p?$"\n{p.Ready:N0} indexed · {p.Pending:N0} queued · {p.Running:N0} processing · {p.Partial:N0} partial · {p.Unsupported:N0} unsupported · {p.Failed:N0} failed\n{p.DatabaseBytes/(1024.0*1024):N1} MB index":"");
+        }
+        progressTimer.Tick+=(_,_)=>UpdateProgress();UpdateProgress();progressTimer.Start();
+        Closed+=(_,_)=>progressTimer.Stop();
+        var retryContent=new Button{Content="Retry failed content files",HorizontalAlignment=HorizontalAlignment.Left,Margin=new Thickness(0,0,0,8),IsEnabled=semantic!=null};
+        multimodal.Children.Add(retryContent);
+        retryContent.Click+=async(_,_)=>
+        {
+            retryContent.IsEnabled=false;
+            try{if(semantic is {IsDisposed:false})await semantic.RetryFailedAsync();}
+            catch(Exception error)when(error is IOException or UnauthorizedAccessException or Microsoft.Data.Sqlite.SqliteException)
+            {indexingProgress.Text="Content retry could not start. Check access to Scout's data folder.";}
+            finally{retryContent.IsEnabled=semantic is {IsDisposed:false};}
+        };
         void Busy(bool value)
         {
             embeddingInstall.IsEnabled = embeddingTest.IsEnabled = embeddingRemove.IsEnabled = embeddingDevice.IsEnabled = !value;
             embeddingCancel.IsEnabled = value;
+            retryContent.IsEnabled = !value && semantic!=null;
             save.IsEnabled = !value;
         }
         embeddingCancel.Click += (_, _) => embeddingOperation?.Cancel();
@@ -251,6 +274,7 @@ internal sealed class SettingsWindow : Window
             embeddingOperation = CancellationTokenSource.CreateLinkedTokenSource(setupLifetime.Token);
             try
             {
+                if(semantic!=null)await semantic.SuspendAsync();
                 if (multimodalHost != null) await multimodalHost.BeginSetupAsync();
                 await MultimodalSetup.InstallAsync((string)embeddingDevice.SelectedItem, new Progress<string>(text => embeddingStatus.Text = text), embeddingOperation.Token);
                 embeddingStatus.Text = "Add-on verified. Choose folders and save settings to enable it.";
@@ -260,7 +284,8 @@ internal sealed class SettingsWindow : Window
             finally
             {
                 embeddingOperation.Dispose(); embeddingOperation = null; Busy(false);
-                if (multimodalHost is { IsDisposed: false }) await multimodalHost.ConfigureAsync(multimodalOptions);
+                if(semantic is {IsDisposed:false})await semantic.ResumeAsync();
+                else if (multimodalHost is { IsDisposed: false }) await multimodalHost.ConfigureAsync(multimodalOptions);
             }
         };
         embeddingTest.Click += async (_, _) =>
@@ -270,6 +295,7 @@ internal sealed class SettingsWindow : Window
             using var testHost = new MultimodalHost();
             try
             {
+                if(semantic!=null)await semantic.SuspendAsync();
                 if (multimodalHost != null) await multimodalHost.ConfigureAsync(new());
                 await testHost.ConfigureAsync(new() { Enabled = true, Device = (string)embeddingDevice.SelectedItem, CpuThreads = (int)embeddingThreads.SelectedItem });
                 await testHost.QueryAsync("local model readiness", embeddingOperation.Token);
@@ -280,7 +306,9 @@ internal sealed class SettingsWindow : Window
             finally
             {
                 embeddingOperation.Dispose(); embeddingOperation = null; Busy(false);
-                if (multimodalHost is { IsDisposed: false }) await multimodalHost.ConfigureAsync(multimodalOptions);
+                testHost.Dispose();
+                if(semantic is {IsDisposed:false})await semantic.ResumeAsync();
+                else if (multimodalHost is { IsDisposed: false }) await multimodalHost.ConfigureAsync(multimodalOptions);
             }
         };
         embeddingRemove.Click += async (_, _) =>
@@ -288,13 +316,14 @@ internal sealed class SettingsWindow : Window
             Busy(true);
             try
             {
+                if(semantic!=null)await semantic.RemoveIndexAsync();
                 if (multimodalHost != null) await multimodalHost.ConfigureAsync(new());
-                await Task.Run(() => MultimodalSetup.Remove());
                 embeddingEnabled.IsChecked = false;
                 addonRemoved?.Invoke();
+                await Task.Run(() => MultimodalSetup.Remove());
                 embeddingStatus.Text = "Add-on removed. Your ordinary file library and Laya are kept.";
             }
-            catch (Microsoft.Data.Sqlite.SqliteException) { embeddingStatus.Text = "Add-on removed, but the disabled setting could not be saved. Try saving settings again."; }
+            catch (Microsoft.Data.Sqlite.SqliteException) { embeddingStatus.Text = "Content indexing is disabled, but the setting could not be saved. The add-on was kept. Try saving settings before removing it."; }
             catch (Exception error) when (error is IOException or UnauthorizedAccessException) { embeddingStatus.Text = "Removal did not finish. Close other add-on workers and try again."; }
             finally { Busy(false); }
         };
@@ -332,6 +361,7 @@ internal sealed class SettingsWindow : Window
             if (!applyHotkey(shortcut.Text.Trim())) { Error("That shortcut is invalid or already in use. Try Ctrl+Alt+S.", 0, shortcut); return; }
             Value = new ScoutSettings { ChromeHistory = chrome.IsChecked == true, EdgeHistory = edge.IsChecked == true, WindowsSearch = windows.IsChecked == true, RecentItems = recent.IsChecked == true, WebFallback = web.IsChecked == true, AutomationFolders = automationFolders, ContentSearchEnabled = contentSearch.IsChecked == true, ContentFolders = indexedContentFolders, AiEnabled = ai.IsChecked == true, SemanticHelper = semanticHelper?.IsChecked == true, PythonPath = python.Text.Trim(), Model = (string)checkpoint.SelectedItem, Device = (string)device.SelectedItem, CpuThreads = settings.CpuThreads, Hotkey = shortcut.Text.Trim(), ExtraFolders = extra, Exclusions = exclusions };
             Value.Multimodal = new() { Enabled = embeddingEnabled.IsChecked == true, Paused = embeddingPaused.IsChecked == true,
+                PauseOnBattery = embeddingBattery.IsChecked == true,
                 Folders = embeddingRoots, Modalities = selectedTypes, Device = (string)embeddingDevice.SelectedItem,
                 CpuThreads = (int)embeddingThreads.SelectedItem, IndexQuotaBytes = (long)embeddingQuota.SelectedItem * 1024*1024*1024 };
             DialogResult = true;

@@ -12,13 +12,14 @@ internal static class MultimodalChecks
         test("Multimodal settings default off with every content family selected", () =>
         {
             var old = JsonSerializer.Deserialize<ScoutSettings>("{\"AiEnabled\":true,\"PythonPath\":\"laya-python\"}")!;
-            Check(!old.Multimodal.Enabled && !old.Multimodal.Paused && old.Multimodal.Folders.Length == 0);
+            Check(!old.Multimodal.Enabled && !old.Multimodal.Paused && old.Multimodal.PauseOnBattery && old.Multimodal.Folders.Length == 0);
             Check(old.Multimodal.Modalities.SequenceEqual(MultimodalSettings.ContentTypes) && old.AiEnabled && old.PythonPath == "laya-python");
             Check(old.Multimodal.IndexQuotaBytes == 2L*1024*1024*1024);
             Check(JsonSerializer.Deserialize<ScoutSettings>("{\"Multimodal\":null}")!.Multimodal is { Enabled: false });
             old.Multimodal.Enabled = true; old.Multimodal.Paused = true; old.Multimodal.Folders = [@"C:\Docs"]; old.Multimodal.Device = "cuda";
+            old.Multimodal.PauseOnBattery=false;
             var roundtrip = JsonSerializer.Deserialize<ScoutSettings>(JsonSerializer.Serialize(old))!;
-            Check(roundtrip.Multimodal.Enabled && roundtrip.Multimodal.Paused && roundtrip.Multimodal.Device == "cuda" && roundtrip.AiEnabled);
+            Check(roundtrip.Multimodal.Enabled && roundtrip.Multimodal.Paused && !roundtrip.Multimodal.PauseOnBattery && roundtrip.Multimodal.Device == "cuda" && roundtrip.AiEnabled);
         });
         test("Absent and disabled multimodal add-on starts without Python or Laya", () =>
         {

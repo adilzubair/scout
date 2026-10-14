@@ -1,6 +1,6 @@
 # Scout multimodal semantic search implementation plan
 
-Date: 2026-10-14. Branch: `feature/multimodal-semantic-search`.
+Date: 2026-10-15. Branch: `feature/multimodal-semantic-search`.
 Status: implementation resumed on 2026-10-14 after the renderer-free checkpoint
 `c6496b8`. This plan is the implementation checklist; the add-on remains a
 preview until the release gates below pass. The full-model runtime and content smoke probe
@@ -12,16 +12,19 @@ Exact Office layout reproduction is outside this path; PDF page rendering,
 standalone images, audio and video remain required.
 The independent add-on setup, host and settings preview is implemented and
 verified. The separate SQLite segment index and durable queue now pass crash,
-source-change, revocation, atomic replacement and quota contracts. They are not
-yet connected to the application. Native source acquisition and renderer-free
+source-change, revocation, atomic replacement and quota contracts. The app now
+connects selected-folder reconciliation and background indexing to that queue.
+Native source acquisition and renderer-free
 Office/PDF/image/CSV reader foundations are implemented; all six Office formats
 pass actual no-network AppContainer extraction and CPU embedding. Bounded audio/video
 readers now pass real-codec sandbox extraction and full-model CPU/CUDA embedding.
 A trusted extractor bridge validates receipts/payloads and source identity before
 durable publication; all seven families pass its real CPU pipeline smoke.
 Sandbox permission journals recover after owner crashes, and shared runtime
-leases interlock with setup/removal. Application scheduling, clean standard-account
-installation, further parser lifecycle hardening, distribution review and release
+leases interlock with setup/removal. Scheduler/progress integration passes real
+all-family CPU indexing and watcher/maintenance/revocation checks. Retrieval and
+previews, clean standard-account installation, further parser lifecycle hardening,
+distribution review and release
 evaluations remain required. See
 [the runtime screen](MULTIMODAL_RUNTIME_SCREEN.md) for results and reproduction.
 See [the add-on preview](MULTIMODAL_ADDON.md) for lifecycle, installation,
@@ -283,9 +286,9 @@ results as end-to-end release evidence.
 | --- | --- | --- |
 | Runtime | Full-model CPU/CUDA and all-encoder prepared-input probes; pinned artifacts (`c9febee`) | Exact shipped-resource, codec distribution and minimum-hardware validation |
 | Add-on lifecycle | Independent host/settings/setup (`6c6be38`); model-only readiness without LibreOffice (`df62e0b`) | Clean standard-account installation, interrupted upgrade/removal, cache reclamation and app lifecycle integration |
-| Durable index | SQLite queue, atomic source replacement, quota, revocation and restart contracts (`33aaf86`) | Connect file reconciliation and background scheduling to Scout |
+| Durable index | SQLite queue and app scheduler: source replacement, quota/resource pauses, revocation, retry and metadata events | Packaged process-death recovery and large-library performance |
 | Source acquisition | Native identity checks and hashed owned snapshots (`f87fb8b`) | Revalidate source and scope across extraction, embedding, display and launch |
-| Extractor bridge | Receipt/hash/payload validation, private tokenizer copy, source rechecks, owned-copy cleanup and all-family CPU-to-SQLite smoke | Connect the bridge to app scheduling, resource guards and progress UI; packaged crash/upgrade checks |
+| Extractor bridge | Receipt/hash/payload validation, private tokenizer copy, source rechecks, owned-copy cleanup, resource guards and Settings progress | Packaged crash/upgrade checks and full resource/quality evaluation |
 | Document/image readers | Six Office formats through actual no-network AppContainer extraction and CPU embedding (`c6496b8`); PDF/image/CSV foundations | OCR, additional corrupt/large/scan fixtures, coverage fidelity and parser crash cleanup |
 | Audio/video readers | Bounded PyAV file readers; real codecs and timestamps validated in the no-network sandbox | Connect extraction/embedding to indexing; verify scheduling, cancellation/crash cleanup, quality and resource gates |
 | Retrieval/UI | Pending | Constrained vector search, lexical fusion, calibrated admission, grouped evidence and locator previews with Laya off/on |
@@ -299,16 +302,17 @@ Proceed in this order, committing each verified unit:
    AppContainer execution pass. All 22 segments from 16 authored smoke files pass
    full-model CPU and CUDA embedding. This is compatibility evidence, not a
    retrieval-quality or minimum-hardware result.
-2. Build the extractor host and connect the durable queue to Scout's selected
-   folders and file reconciliation. Validate snapshot receipts and source hashes,
-   cancellation, immediate scope revocation, pause/quota/resource behavior,
-   interactive priority and crash recovery without holding the metadata refresh gate.
-3. Complete document/image coverage and parser lifecycle hardening, including
-   PDF scans/OCR availability and cleanup of sandbox permissions and job files
-   after crashes. Preserve explicit unsupported/partial statuses.
-4. Connect constrained retrieval and evidence previews. Preserve literal names,
+2. Extractor/scheduler foundation completed: selected-folder reconciliation,
+   snapshot receipts/hashes, cancellation, immediate scope revocation,
+   pause/quota/resource behavior, interactive priority and Settings progress pass
+   without holding the metadata refresh gate. Packaged forced-exit/upgrade cases
+   remain in the release checklist.
+3. Connect constrained retrieval and evidence previews. Preserve literal names,
    date ordering, actions, manual selection and stale-response handling; test
    semantic results independently with Laya disabled and enabled.
+4. Complete document/image coverage and parser lifecycle hardening, including
+   PDF scans/OCR availability and cleanup of sandbox permissions and job files
+   after packaged crashes. Preserve explicit unsupported/partial statuses.
 5. Freeze at least 400 independent content-grounded holdout tasks before tuning
    admission. Run quality/locator/abstention and dimension comparisons, plus the
    specified corpus-size, CPU/GPU, disk and lifecycle benchmarks.
@@ -392,11 +396,11 @@ Keep all large or private evaluation outputs under ignored
 
 ## Next implementation task
 
-Connect the verified extractor bridge to the durable app scheduler. Feed selected
-folders through metadata reconciliation, keep decoding/inference outside its
-refresh gate, and expose progress, pause/quota/resource states and setup/removal
-coordination. Preserve immediate scope revocation and recheck source identity at
-publication. Use authored fixtures under ignored diagnostic folders and keep these
-smoke checks separate from the frozen release holdout. The next completion check
-is actual selected-folder indexing across all families, crash/resume and
-pause/cancellation without blocking ordinary search or interactive queries.
+Implement constrained vector retrieval and evidence previews using the live
+semantic index. Apply folder/type/time/scope constraints before top-k selection,
+revalidate native source identity, preserve literal/date/action/manual-selection
+behavior, and suppress superseded responses. Keep Laya optional and metadata-only.
+Add admission/fusion/grouping contracts and final UI outcomes before quality
+evaluation. OCR/fidelity, packaged forced-death recovery, independent holdout,
+resource/hardware and distribution/install gates remain open; a completed indexing
+smoke does not establish release readiness.

@@ -108,6 +108,7 @@ public sealed class MultimodalSettings
     public static readonly string[] ContentTypes = ["documents", "presentations", "spreadsheets", "code", "images", "audio", "video"];
     public bool Enabled { get; set; }
     public bool Paused { get; set; }
+    public bool PauseOnBattery { get; set; } = true;
     public string[] Folders { get; set; } = [];
     public string[] Modalities { get; set; } = [.. ContentTypes];
     public string Device { get; set; } = "cpu";

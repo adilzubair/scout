@@ -65,6 +65,7 @@ public partial class App : Application
             if (!smoke && !diagnose && !bluetooth) _ = model.WarmAsync(store.Settings);
             multimodal = new MultimodalHost();
             await multimodal.ConfigureAsync(store.Settings.Multimodal);
+            index.EnableSemantic(multimodal,DataDirectory);
             var main = new MainWindow(store, index, model, multimodal); MainWindow = main;
             tray = new System.Windows.Forms.NotifyIcon
             {

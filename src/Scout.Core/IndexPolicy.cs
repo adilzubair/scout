@@ -12,6 +12,7 @@ public static class IndexPolicy
     public static bool Within(string path, string root) => path.Equals(root.TrimEnd('\\', '/'), StringComparison.OrdinalIgnoreCase) || path.StartsWith(root.TrimEnd('\\', '/') + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
     public static string[] ActiveRoots(IEnumerable<string> metadataRoots, ScoutSettings settings) => metadataRoots
         .Concat(settings.ContentSearchEnabled ? settings.ContentFolders : [])
+        .Concat(settings.Multimodal.Enabled ? settings.Multimodal.Folders : [])
         .Where(Directory.Exists)
         .Where(path => !Excluded(path, settings.Exclusions))
         .Distinct(StringComparer.OrdinalIgnoreCase)

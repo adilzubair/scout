@@ -7,7 +7,11 @@ namespace Scout.App;
 
 // Trusted bridge: sources -> no-capability parser -> validated memory -> full-model host.
 // The parser never receives an original file path or the embedding worker's credentials.
-internal sealed class SemanticExtractor : IAsyncDisposable
+internal interface ISemanticExtractionSession : IAsyncDisposable
+{
+    Task<SemanticExtraction> ExtractAsync(SemanticSource source, CancellationToken token);
+}
+internal sealed class SemanticExtractor : ISemanticExtractionSession
 {
     private readonly string root, addonRoot, pythonHome, runtime, tokenizer;
     private readonly MultimodalInstallation installation;

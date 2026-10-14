@@ -24,13 +24,33 @@ internal sealed class MultimodalHost : IDisposable
     private string configuration = "", sessionDirectory = "";
     private bool disposed;
     private int pendingQueries;
+    private int indexingActivity;
+    public IDisposable KeepIndexingActive()
+    {
+        ObjectDisposedException.ThrowIf(disposed,this);
+        Interlocked.Increment(ref indexingActivity);
+        return new Activity(this);
+    }
+    private sealed class Activity(MultimodalHost owner) : IDisposable
+    {
+        private MultimodalHost? host=owner;
+        public void Dispose() { var value=Interlocked.Exchange(ref host,null); if(value!=null)Interlocked.Decrement(ref value.indexingActivity); }
+    }
     private MultimodalSettings options = new();
     private DateTime lastUsed = DateTime.UtcNow;
     private readonly System.Threading.Timer idle;
     public MultimodalState State { get; private set; } = MultimodalState.NotInstalled;
     internal bool IsDisposed => disposed;
     public string Status { get; private set; } = "Add-on not installed";
-    internal int? ProcessId => process is { HasExited: false } && workerPid != 0 ? workerPid : null;
+    internal int? ProcessId
+    {
+        get
+        {
+            var current=process;
+            try{return current is {HasExited:false} && workerPid!=0?workerPid:null;}
+            catch(InvalidOperationException){return null;} // An idle unload may dispose it concurrently.
+        }
+    }
 
     public MultimodalHost(string? root = null)
     {
@@ -202,8 +222,7 @@ internal sealed class MultimodalHost : IDisposable
         if (disposed || !await gate.WaitAsync(0)) return;
         try
         {
-            // There is no indexing queue yet. Later indexing activity must hold the host busy.
-            if (!disposed && process != null && DateTime.UtcNow - lastUsed > TimeSpan.FromMinutes(5)) { Stop(); SetAvailable(); }
+            if (!disposed && process != null && Volatile.Read(ref indexingActivity)==0 && DateTime.UtcNow - lastUsed > TimeSpan.FromMinutes(5)) { Stop(); SetAvailable(); }
         }
         finally { gate.Release(); }
     }

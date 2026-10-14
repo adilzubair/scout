@@ -1,14 +1,13 @@
 # Multimodal add-on development preview
 
-Date: 2026-10-14. Branch: `feature/multimodal-semantic-search`.
+Date: 2026-10-15. Branch: `feature/multimodal-semantic-search`.
 
 Scout now has an independent setup entry point, authenticated embedding worker,
 Windows process lifetime, and Multimodal settings page. The preview installs and
-tests the full EmbeddingGemma 2 model; it does not yet index selected folders or
-add semantic matches to search results. The durable index and native source
-snapshot foundation and isolated document/image/audio/video readers are implemented;
-the trusted extractor bridge passes all-family durable publication. Application
-scheduling and retrieval are next.
+tests the full EmbeddingGemma 2 model and indexes explicitly selected folders in
+the background. Semantic matches and evidence navigation are not connected to
+search results yet. The separate durable queue, native snapshots, isolated
+document/image/audio/video readers and app scheduler are implemented.
 All content families remain in the release scope. LibreOffice is removed from
 the product path by user direction. Office evidence will use extracted text,
 cells, chart data and embedded images, without exact Office page/slide rendering.
@@ -21,10 +20,12 @@ not enable Laya or change its Python environment. Enabling the preview requires
 an installed matching device, at least one existing folder, and at least one
 selected content type. All seven content families are selected by default.
 
-The enablement, indexing pause, selected folders/types, device, CPU threads and
-index quota are stored separately in `ScoutSettings.Multimodal`. Pause, scope
-and quota are preferences for the upcoming queue; no background content jobs
-exist in this slice. The existing keyword content-search setting is independent.
+The enablement, indexing pause, selected folders/types, device, CPU threads,
+battery preference and index quota are stored separately in
+`ScoutSettings.Multimodal`. Selected semantic folders also join the ordinary
+metadata library while enabled. The existing keyword content-search setting is
+independent. Content indexing is off by default; all seven families are selected
+when users opt in, and indexing pauses on battery by default.
 
 Setup uses `%LOCALAPPDATA%\Scout\addons\multimodal` (under `SCOUT_DATA_DIR` in
 isolated diagnostics). Its dedicated Python, dependency cache, model and setup
@@ -59,8 +60,8 @@ loading, ready, paused, or failed. Applying settings cancels the current session
 and stops its worker. Starting Scout with the add-on absent/disabled needs no
 Python. An installed worker loads on demand, unloads after five idle minutes,
 and is terminated at exit through a Windows job with kill-on-close semantics.
-No UI or index queue depends on Laya readiness. Later queue work must count
-active indexing as busy rather than allowing idle unload between long jobs.
+No UI or index queue depends on Laya readiness. Active content jobs hold an
+activity lease to prevent idle unload during snapshot acquisition or parsing.
 [Windows job lifetime](https://learn.microsoft.com/en-us/windows/win32/procthread/job-objects).
 
 Windows venv launchers can create a separate interpreter process. Readiness
@@ -253,6 +254,36 @@ scope purges the resulting rows. Eight new C# checks bring the Release suite to
 266/266 with zero warnings. This is a bridge smoke, not Scout's selected-folder
 background scheduler or final search UI; those integrations remain required.
 
+The app scheduler now has separate metadata-reconciliation and content-worker
+tasks. Metadata events signal work without decoding, hashing or model inference
+inside the metadata refresh gate. Reconciliation checks native source identity,
+deduplicates paths and periodically rechecks skipped/changed sources. A selected
+folder's removal, exclusion or type change updates eligibility and cancels the
+old generation before asynchronous cleanup. Settings displays ready, queued,
+processing, partial, unsupported and failed counts plus index size.
+
+Pause and quota exhaustion start no new content jobs. Low disk space, available
+memory and the optional battery rule pause extraction without spending a retry
+attempt; foreground query priority remains independent. The initial guard keeps
+512 MiB free beyond a source snapshot, requires 4 GiB available physical RAM
+before cold loading and 512 MiB with a live model. These guards are not measured
+minimum-hardware claims. Failed reads retain their bounded backoff and terminal
+status; Settings can retry failed files without rebuilding unchanged ready files.
+Install/verify/test actions suspend and drain the content queue, then restore the
+saved configuration. Removal disables indexing, stops workers, clears only the
+semantic database/WAL/SHM and removes the add-on; corrupt derived storage does not
+require changing the ordinary library or original files.
+
+Eleven scheduler contracts bring the Release suite to 277/277. They cover default
+off, selected-root consent, nonblocking metadata refresh, late publication after
+revocation, deletion/hidden-file events, pause/maintenance, quota/resource waits,
+retry, duplicate metadata representations and corrupt-index removal. A real CPU
+smoke indexed sixteen authored sources across all seven families through the app
+scheduler, then verified watched arrival/rename, maintenance resume and complete
+scope revocation. WPF smoke checks also cover the progress and retry controls.
+Clean-account packaging, forced process-death resume, final retrieval/previews,
+quality and hardware/resource gates remain required.
+
 Developer verification (use an isolated add-on root and data directory):
 
 ```powershell
@@ -264,6 +295,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/setup-multimodal.ps1
 dotnet run --project tests/Scout.Tests -c Release -- --multimodal-host C:/Path/To/PrivateTestAddon
 dotnet run --project tests/Scout.Tests -c Release -- --extract-media .runtime/semantic-search/cpu-venv/Scripts/python.exe .runtime/python/cpython-3.12.13-windows-x86_64-none .runtime/semantic-search/model
 dotnet run --project tests/Scout.Tests -c Release -- --semantic-extractor artifacts/diagnostics/multimodal/addon-no-office .runtime/python/cpython-3.12.13-windows-x86_64-none
+dotnet run --project tests/Scout.Tests -c Release -- --semantic-scheduler artifacts/diagnostics/multimodal/addon-no-office .runtime/python/cpython-3.12.13-windows-x86_64-none
 .runtime/semantic-search/cpu-venv/Scripts/python.exe runtime/test_extracted_embeddings.py --model .runtime/semantic-search/model --root C:/Path/Printed/By/SandboxTest --device cpu
 ```
 

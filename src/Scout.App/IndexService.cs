@@ -23,6 +23,16 @@ internal sealed class IndexService : IDisposable
     private SearchCatalog catalog = SearchCatalog.Empty;
     private bool loaded;
     private bool contentReady;
+    private bool metadataReady;
+    public SemanticService? Semantic { get; private set; }
+    internal void EnableSemantic(MultimodalHost host,string dataRoot,string? addonRoot=null,
+        Func<MultimodalInstallation,Func<SemanticScope>,ISemanticExtractionSession>? factory=null,
+        Func<MultimodalInstallation?>? find=null,Func<long,string?>? pressure=null)
+    {
+        if(Semantic!=null)throw new InvalidOperationException("Content scheduler already attached.");
+        Semantic=new SemanticService(dataRoot,host,()=>Catalog.Candidates.ToArray(),()=>Volatile.Read(ref metadataReady),addonRoot,factory,find,pressure);
+        Changed+=_=>Semantic.NotifyCatalogChanged();
+    }
     private int dirty = 1;
     private DateTime lastScan, lastHistory;
     private long version;
@@ -49,6 +59,8 @@ internal sealed class IndexService : IDisposable
     {
         var generation = Interlocked.Increment(ref configurationVersion);
         Volatile.Write(ref contentReady, false);
+        Volatile.Write(ref metadataReady,false);
+        var semanticConfiguration=Semantic?.ConfigureAsync(value);
         var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         Task predecessor;
         lock (configurationGate)
@@ -71,7 +83,7 @@ internal sealed class IndexService : IDisposable
                 {
                     try
                     {
-                        var watcher = new FileSystemWatcher(root) { IncludeSubdirectories = true, NotifyFilter = NotifyFilters.FileName | NotifyFilters.DirectoryName | NotifyFilters.LastWrite, InternalBufferSize = 32768 };
+                        var watcher = new FileSystemWatcher(root) { IncludeSubdirectories = true, NotifyFilter = NotifyFilters.FileName | NotifyFilters.DirectoryName | NotifyFilters.LastWrite | NotifyFilters.Attributes, InternalBufferSize = 32768 };
                         watcher.Created += (_, e) => Queue(e.FullPath, true, false);
                         watcher.Changed += (_, e) => Queue(e.FullPath, false, false);
                         watcher.Deleted += (_, e) => Queue(e.FullPath, false, true);
@@ -96,11 +108,20 @@ internal sealed class IndexService : IDisposable
                     Volatile.Write(ref contentReady, value.ContentSearchEnabled);
             }
             finally { refreshGate.Release(); }
+            if(Interlocked.Read(ref configurationVersion)==generation)
+            {
+                Volatile.Write(ref metadataReady,true);
+                Semantic?.NotifyCatalogChanged();
+            }
         }
-        finally { completion.TrySetResult(); }
+        finally
+        {
+            try { if(semanticConfiguration!=null)await semanticConfiguration; }
+            finally { completion.TrySetResult(); }
+        }
     }
     private void Queue(string path, bool arrival, bool deleted)
-    { if (!Excluded(path)) changes.Enqueue((path, arrival, deleted)); }
+    { if (!Excluded(path)) { changes.Enqueue((path, arrival, deleted)); Semantic?.NotifyCatalogChanged(); } }
     private async Task WatchUpdates()
     {
         try
@@ -345,5 +366,5 @@ internal sealed class IndexService : IDisposable
             if (connection != null) { try { ((dynamic)connection).Close(); } catch (COMException) { } Marshal.FinalReleaseComObject(connection); }
         }
     }, token);
-    public void Dispose() { lifetime.Cancel(); foreach (var watcher in watchers) watcher.Dispose(); }
+    public void Dispose() { lifetime.Cancel(); foreach (var watcher in watchers) watcher.Dispose(); Semantic?.Dispose(); }
 }

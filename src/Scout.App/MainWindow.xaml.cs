@@ -467,7 +467,7 @@ public partial class MainWindow : Window
     {
         Toggle(true);
         var dialog = new SettingsWindow(store.Settings, ApplyHotkey, () => store.ClearLaunchHistory(), multimodal,
-            () => { var saved = store.Settings; saved.Multimodal.Enabled = false; store.SaveSettings(saved); }) { Owner = this };
+            () => { var saved = store.Settings; saved.Multimodal.Enabled = false; store.SaveSettings(saved); },index.Semantic) { Owner = this };
         if (dialog.ShowDialog() == true)
         {
             search.Cancel(); revision++; uiRefresh.Stop(); await model.ResetAsync();
@@ -475,7 +475,7 @@ public partial class MainWindow : Window
             {
                 await index.ConfigureAsync(dialog.Value);
                 store.SaveSettings(dialog.Value);
-                await multimodal.ConfigureAsync(dialog.Value.Multimodal);
+                if(index.Semantic==null)await multimodal.ConfigureAsync(dialog.Value.Multimodal);
                 enriched = []; ClearGroup();
                 indexChanged = false; observedIndexVersion = index.Version; ScheduleSearch(false);
             }

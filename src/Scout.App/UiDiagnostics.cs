@@ -99,7 +99,7 @@ public partial class MainWindow
         }
         finally { nameWindow.Close(); }
 
-        var settings = new SettingsWindow(store.Settings, _ => false, () => { }) { Owner = this };
+        var settings = new SettingsWindow(store.Settings, _ => false, () => { },multimodalHost:multimodal,semantic:index.Semantic) { Owner = this };
         try
         {
             settings.Show();
@@ -113,6 +113,15 @@ public partial class MainWindow
                     WindowVisuals.SetTestTheme(true);
                     await UiDiagnostics.Snapshot(settings, "settings-general-dark");
                     WindowVisuals.SetTestTheme(null);
+                }
+                if(name=="Multimodal")
+                {
+                    var progress=UiDiagnostics.Descendants<TextBlock>(settings).Single(text=>AutomationProperties.GetName(text)=="Multimodal indexing progress");
+                    var retry=UiDiagnostics.Descendants<Button>(settings).Single(button=>button.Content as string=="Retry failed content files");
+                    retry.BringIntoView();settings.UpdateLayout();
+                    await UiDiagnostics.Snapshot(settings,"settings-multimodal-progress");
+                    if(string.IsNullOrWhiteSpace(progress.Text) || !UiDiagnostics.Descendants<Button>(settings).Any(button=>button.Content as string=="Retry failed content files"))
+                        throw new InvalidOperationException("Content progress or retry control is missing.");
                 }
                 if (AutomationProperties.GetItemStatus(navigation) != "Selected") throw new InvalidOperationException("Settings navigation lost its selected state.");
             }
