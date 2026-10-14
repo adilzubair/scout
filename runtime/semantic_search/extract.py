@@ -1,0 +1,70 @@
+"""Sandbox-only extraction entry point: fixed owned input, bounded prepared files."""
+import argparse
+import json
+from pathlib import Path
+import sys
+
+if __package__ in (None, ''):
+    sys.path.insert(0, str(Path(__file__).absolute().parents[1]))
+from semantic_search.paths import local_file
+from semantic_search.manifest import sha256
+
+FAMILIES = {'documents', 'presentations', 'spreadsheets', 'code', 'images', 'audio', 'video'}
+
+def extract(request_path):
+    from tokenizers import Tokenizer
+    from semantic_search.readers import SegmentWriter, plain, images, pdf, csv_sheet
+    from semantic_search.office_readers import office
+    root = Path(request_path).absolute().parent
+    request_path = local_file(request_path, root)
+    if request_path.stat().st_size > 16384: raise ValueError('request_budget')
+    request = json.loads(request_path.read_text(encoding='utf-8-sig'))
+    if set(request) != {'schemaVersion','source','sourceSha256','family','tokenizer'} or type(request['schemaVersion']) is not int or request['schemaVersion'] != 1:
+        raise ValueError('invalid_extract_request')
+    if request['family'] not in FAMILIES: raise ValueError('unsupported_family')
+    name = request['source']
+    if not isinstance(name,str) or Path(name).name != name or not name.startswith('input.') or ':' in name or '\\' in name or '/' in name:
+        raise ValueError('invalid_source_name')
+    source = local_file(root/name, root)
+    if sha256(source) != request['sourceSha256']: raise ValueError('snapshot_hash_mismatch')
+    tokenizer = Tokenizer.from_file(str(Path(request['tokenizer'])))
+    writer = SegmentWriter(root/'output', tokenizer.encode)
+    suffix = source.suffix.lower()
+    if suffix in ('.docx','.odt','.pptx','.odp','.xlsx','.ods'): office(source,writer)
+    elif suffix == '.pdf': pdf(source,writer)
+    elif suffix in ('.csv','.tsv'): csv_sheet(source,writer)
+    elif request['family'] == 'images': images(source,writer)
+    elif request['family'] == 'code' or suffix in ('.txt','.md','.markdown'): plain(source,writer)
+    else: raise ValueError('media_reader_not_implemented')
+    if sha256(source) != request['sourceSha256']: raise ValueError('snapshot_changed')
+    if not writer.files: raise ValueError('no_extractable_content')
+    return writer.finish(source)
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--request', type=Path, required=True)
+    options = parser.parse_args()
+    try:
+        # The launcher supplies a no-capability AppContainer and Windows job limits.
+        # Refuse direct execution without that security boundary.
+        import ctypes
+        from ctypes import wintypes
+        kernel, advapi = ctypes.WinDLL('kernel32',use_last_error=True), ctypes.WinDLL('advapi32',use_last_error=True)
+        kernel.GetCurrentProcess.restype = wintypes.HANDLE
+        kernel.CloseHandle.argtypes = [wintypes.HANDLE]
+        advapi.OpenProcessToken.argtypes = [wintypes.HANDLE,wintypes.DWORD,ctypes.POINTER(wintypes.HANDLE)]
+        advapi.GetTokenInformation.argtypes = [wintypes.HANDLE,ctypes.c_int,ctypes.c_void_p,wintypes.DWORD,ctypes.POINTER(wintypes.DWORD)]
+        token, size, value = wintypes.HANDLE(), wintypes.DWORD(), wintypes.DWORD()
+        if not advapi.OpenProcessToken(kernel.GetCurrentProcess(),8,ctypes.byref(token)): raise ValueError('sandbox_required')
+        try:
+            if not advapi.GetTokenInformation(token,29,ctypes.byref(value),4,ctypes.byref(size)) or value.value != 1: raise ValueError('sandbox_required')
+            advapi.GetTokenInformation(token,30,None,0,ctypes.byref(size))
+            capabilities = ctypes.create_string_buffer(size.value)
+            if not advapi.GetTokenInformation(token,30,capabilities,size.value,ctypes.byref(size)) or wintypes.DWORD.from_buffer(capabilities).value != 0: raise ValueError('sandbox_required')
+        finally: kernel.CloseHandle(token)
+        extract(options.request)
+    except Exception as error:
+        # Never persist exception bodies, paths or extracted document text.
+        reason = str(error) if type(error) is ValueError and str(error).isascii() and all(c.isalnum() or c == '_' for c in str(error)) and len(str(error)) <=80 else 'extraction_failed'
+        (options.request.absolute().parent/'failed.json').write_text(json.dumps(dict(schemaVersion=1,reason=reason)),encoding='utf-8')
+        raise SystemExit(2)

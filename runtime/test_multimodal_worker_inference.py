@@ -15,7 +15,7 @@ import urllib.request
 
 import numpy as np
 from PIL import Image
-from semantic_search.office import stop_tree
+from semantic_search.processes import stop_tree
 
 ROOT = Path(__file__).resolve().parents[1]
 

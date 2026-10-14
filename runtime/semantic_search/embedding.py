@@ -5,14 +5,7 @@ from pathlib import Path
 import time
 
 from .manifest import verify_model
-
-
-def local_file(path, root):
-    path = Path(path).resolve(strict=True)
-    root = Path(root).resolve(strict=True)
-    if not path.is_relative_to(root) or not path.is_file():
-        raise ValueError('Media must be a local file inside the selected fixture root')
-    return path
+from .paths import local_file
 
 
 def normalize_vector(vector, dimensions):

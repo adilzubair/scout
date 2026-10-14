@@ -9,11 +9,15 @@ namespace Scout.App;
 internal sealed class ProcessJob : IDisposable
 {
     private readonly SafeFileHandle handle;
-    public ProcessJob(Process process)
+    public ProcessJob(Process process, long processMemoryBytes = 0, long jobMemoryBytes = 0, uint activeProcesses = 0)
     {
+        if (processMemoryBytes < 0 || jobMemoryBytes < 0) throw new ArgumentOutOfRangeException(nameof(processMemoryBytes));
         handle = CreateJobObject(IntPtr.Zero, null);
         if (handle.IsInvalid) throw new Win32Exception(Marshal.GetLastWin32Error());
         var limits = new ExtendedLimits { Basic = new BasicLimits { Flags = 0x2000 } }; // KILL_ON_JOB_CLOSE
+        if (processMemoryBytes != 0) { limits.Basic.Flags |= 0x100; limits.ProcessMemory = (UIntPtr)(ulong)processMemoryBytes; }
+        if (jobMemoryBytes != 0) { limits.Basic.Flags |= 0x200; limits.JobMemory = (UIntPtr)(ulong)jobMemoryBytes; }
+        if (activeProcesses != 0) { limits.Basic.Flags |= 8; limits.Basic.ActiveProcesses = activeProcesses; }
         try
         {
             if (!SetInformationJobObject(handle, 9, ref limits, Marshal.SizeOf<ExtendedLimits>()) ||
@@ -22,6 +26,31 @@ internal sealed class ProcessJob : IDisposable
         catch { handle.Dispose(); throw; }
     }
     public void Dispose() => handle.Dispose();
+    public async Task StopAsync()
+    {
+        // Capture owned handles before closing the job; kill completion is asynchronous.
+        var processes = new List<Process>();
+        var buffer = Marshal.AllocHGlobal(4096);
+        try
+        {
+            if (!QueryInformationJobObject(handle, 3, buffer, 4096, out _)) throw new Win32Exception(Marshal.GetLastWin32Error());
+            var count = Marshal.ReadInt32(buffer, 4);
+            if (count is < 0 or > 128) throw new IOException("Unexpected worker process count.");
+            for (var i = 0; i < count; i++)
+            {
+                var pid = checked((int)(IntPtr.Size == 8 ? Marshal.ReadInt64(buffer, 8 + i*8) : Marshal.ReadInt32(buffer, 8 + i*4)));
+                try { var process = Process.GetProcessById(pid); if (Contains(pid)) processes.Add(process); else process.Dispose(); }
+                catch (ArgumentException) { }
+            }
+        }
+        finally { Marshal.FreeHGlobal(buffer); Dispose(); }
+        try
+        {
+            using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            await Task.WhenAll(processes.Select(process => process.WaitForExitAsync(deadline.Token))).ConfigureAwait(false);
+        }
+        finally { foreach (var process in processes) process.Dispose(); }
+    }
     public bool Contains(int pid)
     {
         using var candidate = Process.GetProcessById(pid);
@@ -59,4 +88,7 @@ internal sealed class ProcessJob : IDisposable
     [DllImport("kernel32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool IsProcessInJob(IntPtr process, SafeFileHandle job, [MarshalAs(UnmanagedType.Bool)] out bool member);
+    [DllImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool QueryInformationJobObject(SafeFileHandle job, int kind, IntPtr data, int size, out int returned);
 }

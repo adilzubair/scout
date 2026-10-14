@@ -137,15 +137,42 @@ ancestors, checks selected roots, and copies through a handle that blocks
 concurrent writes/deletion. The owned snapshot is hashed and the source is
 rechecked before publication. Six additional contracts cover preserved-metadata
 replacement, scope rejection, snapshot cleanup and cancellation; 256 Release
-checks pass. Parser isolation is the next slice; this adapter is not connected
-to personal indexing yet.
+checks pass. This adapter is not connected to personal indexing yet.
+
+The renderer-free reader foundation now extracts all six Open XML/OpenDocument
+formats, including paragraph groups, slide text/notes, cached chart series,
+shared/inline strings, numeric/boolean cells, cached formula values, merged
+headings, repeated ODF cells and embedded images. Missing caches/unsupported
+objects and absent Office layout get explicit coverage reasons. It never
+calculates formulas or fetches external resources. PDF text/page images,
+multi-page images, source lines and CSV cell evidence have bounded readers too.
+
+The extraction launcher creates a zero-capability Windows AppContainer with a
+clean environment, no inherited handles, a suspended start assigned to a job
+before execution, 1 GiB per-process/2 GiB job limits and a bounded process count.
+Only dedicated runtime directories receive read access; owned jobs receive write
+access. It restores its package-specific grants and removes the profile on normal
+disposal. The CLI refuses execution outside this sandbox and emits bounded,
+hashed prepared segments. Windows canonical NT handle names preserve path
+boundaries without DOS-volume namespace access or ancestor permission changes.
+Crash recovery of permissions, resource pressure and application scheduling still
+need lifecycle integration before release.
+
+All six Office formats pass actual AppContainer extraction with the published
+tokenizer and C# locator validation. Twelve prepared Office segments (including
+embedded image content) pass full-model CPU embedding. Ten reader contracts and
+258 Release checks pass; authenticated CPU all-modality inference also passes.
+A real schema 2 CPU generation was installed from cached locked dependencies and
+verified model weights without any Office runtime. The base ZIP was inspected
+and contains no Office helper, manifest or downloader. These are development
+checks, not a completed clean-account install or end-to-end retrieval evaluation.
 
 The Office helper is excluded from the application package and new setup no
 longer downloads or verifies it. Schema 2 installations contain only the model
 and interpreter paths; existing schema 1 model generations remain usable even
 when their obsolete Office folder is absent. The model and dependency identity
-checks remain mandatory. Structured Office readers and general parser isolation,
-application lifecycle integration, prioritization, query fusion, evidence
+checks remain mandatory. Further reader coverage and parser lifecycle hardening,
+application integration, prioritization, query fusion, evidence
 previews, holdout quality, 16 GB hardware measurements and final distribution
 review remain required before release. This preview does not establish general
 retrieval quality or all-format fidelity.

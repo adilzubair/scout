@@ -11,9 +11,11 @@ standalone images, audio and video remain required.
 The independent add-on setup, host and settings preview is implemented and
 verified. The separate SQLite segment index and durable queue now pass crash,
 source-change, revocation, atomic replacement and quota contracts. They are not
-yet connected to the application; source acquisition and isolated readers are
-the next integration slice. Clean
-standard-account installation, parser isolation, distribution review and
+yet connected to the application. Native source acquisition and renderer-free
+Office/PDF/image/CSV reader foundations are implemented; all six Office formats
+pass actual no-network AppContainer extraction and CPU embedding. Media readers,
+application integration, clean standard-account installation, parser lifecycle
+hardening, distribution review and
 release evaluations remain required. See
 [the runtime screen](MULTIMODAL_RUNTIME_SCREEN.md) for results and reproduction.
 See [the add-on preview](MULTIMODAL_ADDON.md) for lifecycle, installation,

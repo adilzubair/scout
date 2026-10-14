@@ -12,6 +12,7 @@ public sealed record ContentLocator(string Kind)
     public string? EndCell { get; init; }
     public int? StartLine { get; init; }
     public int? EndLine { get; init; }
+    public string? Section { get; init; }
     public double? StartSeconds { get; init; }
     public double? EndSeconds { get; init; }
     [System.Text.Json.Serialization.JsonIgnore]
@@ -19,6 +20,7 @@ public sealed record ContentLocator(string Kind)
     {
         "page" => $"Page {Page}", "slide" => $"Slide {Page}", "image" => Page > 1 ? $"Image page {Page}" : "Image",
         "sheet" => $"{Sheet} · {StartCell}:{EndCell}", "lines" => $"Lines {StartLine}–{EndLine}",
+        "paragraphs" => $"{Section ?? "Document"} · Paragraphs {StartLine}–{EndLine}",
         "time" => $"{TimeSpan.FromSeconds(StartSeconds ?? 0):mm\\:ss}–{TimeSpan.FromSeconds(EndSeconds ?? 0):mm\\:ss}", _ => "Content"
     };
     public void Validate()
@@ -29,7 +31,7 @@ public sealed record ContentLocator(string Kind)
         var valid = Kind switch
         {
             "page" or "slide" or "image" => Page is > 0 and <= 100000,
-            "lines" => StartLine is > 0 && EndLine >= StartLine && EndLine <= 10000000,
+            "lines" or "paragraphs" => StartLine is > 0 && EndLine >= StartLine && EndLine <= 10000000 && (Section == null || Section.Length <= 200),
             "sheet" => Sheet is { Length: > 0 and <= 200 } && Cells(StartCell) && Cells(EndCell),
             "time" => StartSeconds is { } start && EndSeconds is { } end && double.IsFinite(start) && double.IsFinite(end) && start >= 0 && end >= start && end <= 864000,
             _ => false
