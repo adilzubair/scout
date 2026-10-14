@@ -6,7 +6,10 @@ are implemented and verified on CPU and CUDA. The Office compatibility spike
 now passes DOCX/ODT, PPTX/ODP and XLSX/ODS conversion from a privately extracted
 official Windows package, including native presentation chart rendering.
 The independent add-on setup, host and settings preview is implemented and
-verified; the next slice is the durable segment index and work queue. Clean
+verified. The separate SQLite segment index and durable queue now pass crash,
+source-change, revocation, atomic replacement and quota contracts. They are not
+yet connected to the application; source acquisition and isolated readers are
+the next integration slice. Clean
 standard-account installation, renderer hardening, distribution review and
 release evaluations remain required. See
 [the runtime screen](MULTIMODAL_RUNTIME_SCREEN.md) for results and reproduction.

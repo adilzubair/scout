@@ -113,9 +113,24 @@ passes 231 checks with zero build warnings, including settings compatibility,
 installation identity, scoped removal, and job termination of descendants.
 The isolated WPF smoke workflow covers the new settings page and navigation.
 
+The separate `SemanticIndex`/`SemanticIndexer` foundation now persists 768d
+segments, typed page/cell/line/time evidence and durable pending/running leases
+in its own SQLite database. Configuration generations invalidate late results;
+changed/deleted sources immediately lose previous segments. A single scheduler
+owns restart recovery. Transactions enforce complete file replacement and the
+index quota; failed jobs retry with backoff or receive an explicit unsupported
+status. Cancellation returns work to the queue. Root/type/exclusion revocation
+purges rows and checkpoints/compacts SQLite, including its WAL. This is logical
+purge, not a claim about physical storage erasure.
+
+Nineteen additional C# contracts verify that foundation, including extraction
+finishing after revocation and old source refreshes racing newer metadata.
+The Release suite now passes 250 checks. No semantic database is created in a
+normal Scout profile yet; application scheduling and readers remain pending.
+
 The Office helper is not yet invoked by this worker, and its network/resource
-restrictions remain part of the extraction integration. Durable indexing,
-source/scope validation, purge, quotas, prioritization, query fusion, evidence
+restrictions remain part of the extraction integration. Native source validation,
+application lifecycle integration, prioritization, query fusion, evidence
 previews, holdout quality, 16 GB hardware measurements and final distribution
 review remain required before release. This preview does not establish general
 retrieval quality or all-format fidelity.
