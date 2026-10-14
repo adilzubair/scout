@@ -79,6 +79,38 @@ evaluated separately. They preserve paragraph, slide and sheet/cell evidence,
 without promising exact Office layout. Packaged crash/upgrade and quality/resource
 gates remain open.
 
+The content-quality evaluator now freezes dataset and source hashes together with
+`evaluation/multimodal/protocol.json`. It rejects related groups or byte-identical
+sources crossing development/holdout, helpful filenames, unsafe source paths and
+invalid file/locator labels. A freeze cannot be overwritten, and source/dataset/
+protocol mutations invalidate a run. Labels and source bytes are fixed before
+inference; related task counts and independent source-group counts are reported
+separately. This replaces the filename-only benchmark as the basis for future
+content evaluation, while preserving that benchmark as regression evidence.
+
+The evaluator runs actual sandbox extraction, native source checks, full-model
+CPU embeddings and durable indexing, then compares current keyword content
+search, semantic-only retrieval and fusion at 768/512/256 dimensions. Shorter
+dimensions use normalized prefixes of the same native output. A second pass
+replays cached real embeddings through the production app adapter and compares
+the resulting file order; replay latency is not model inference latency. Reports
+include source coverage, first-file/Recall@20, locator and negative-admission
+counts, ambiguous-case certainty, cache use, query activation state and code/model
+hashes. Actual locators, temporal start offsets and leading cosine scores remain
+in the report for audit; time-window overlap is not a claim of exact timestamp
+alignment. Laya on/off and full UI outcomes remain separate unfinished checks.
+
+The initial frozen development pilot has fourteen authored files, seven related
+source groups and twenty-one tasks across all seven families. It is **not the
+400-task holdout**: its synthetic voice and drawn motion clips do not cover natural
+photos, environmental recordings, real video or joint audiovisual content. With
+the unchanged provisional 0.35 floor, semantic/fused search found the expected
+first file and locator on all seven positive cases, but admitted files on all
+seven negatives at each tested dimension. These tiny counts demonstrate an
+abstention problem; they do not establish population accuracy. No threshold has
+been tuned from them. Release-quality gates explicitly remain ineligible for a
+development pilot.
+
 Setup uses `%LOCALAPPDATA%\Scout\addons\multimodal` (under `SCOUT_DATA_DIR` in
 isolated diagnostics). Its dedicated Python, dependency cache, model and setup
 tool stay outside the base application installation. No Office suite is required. The
@@ -386,6 +418,9 @@ dotnet run --project tests/Scout.Tests -c Release -- --semantic-scheduler artifa
 dotnet run --project tests/Scout.Tests -c Release -- --semantic-playback artifacts/diagnostics/multimodal/addon-no-office .runtime/python/cpython-3.12.13-windows-x86_64-none
 dotnet run --project tests/Scout.Tests -c Release -- --semantic-scans artifacts/diagnostics/multimodal/addon-no-office .runtime/python/cpython-3.12.13-windows-x86_64-none
 dotnet run --project tests/Scout.Tests -c Release -- --semantic-formats artifacts/diagnostics/multimodal/addon-no-office .runtime/python/cpython-3.12.13-windows-x86_64-none
+.runtime/semantic-search/.venv/Scripts/python.exe scripts/build-multimodal-evaluation-pilot.py --output artifacts/diagnostics/multimodal/evaluation-pilot-v1
+dotnet run --project tests/Scout.Tests -c Release -- --multimodal-freeze artifacts/diagnostics/multimodal/evaluation-pilot-v1/dataset.json evaluation/multimodal/protocol.json
+dotnet run --project tests/Scout.Tests -c Release -- --multimodal-eval artifacts/diagnostics/multimodal/evaluation-pilot-v1/dataset.json evaluation/multimodal/protocol.json artifacts/diagnostics/multimodal/addon-no-office .runtime/python/cpython-3.12.13-windows-x86_64-none artifacts/diagnostics/multimodal/evaluation-results development
 .runtime/semantic-search/cpu-venv/Scripts/python.exe runtime/test_extracted_embeddings.py --model .runtime/semantic-search/model --root C:/Path/Printed/By/SandboxTest --device cpu
 ```
 

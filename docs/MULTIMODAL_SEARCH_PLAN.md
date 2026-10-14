@@ -297,7 +297,7 @@ results as end-to-end release evidence.
 | Document/image readers | Six Office formats with sandbox-backed WPF locator previews; bounded OCR; explicit unsupported/encrypted/corrupt statuses and scoped coverage review | Independent content/language quality, additional fidelity cases exposed by evaluation and packaged parser crash cleanup |
 | Audio/video readers | Bounded PyAV readers connected to indexing; all seven families pass CPU scheduler, watcher, maintenance and revocation checks (`7e66ee3`) | Packaged cancellation/crash cleanup, quality and resource gates |
 | Retrieval/UI | Engineering foundation: 289 Release checks, real CPU code/image queries, retained selection/revoked actions, and all eight required media extensions in WPF | Independent quality/admission evaluation, richer locator/format fixtures and packaged lifecycle validation |
-| Release validation | Pending | Frozen independent holdout, throughput/resource measurements, clean packaging/install and every release gate below |
+| Release validation | Fixed quality protocol and frozen development pilot; scorer compares content keyword/semantic/fusion, dimensions and production-adapter replay | Independent 400-task holdout, abstention calibration, Laya on/off, throughput/resource measurements, clean packaging/install and every release gate below |
 
 Proceed in this order, committing each verified unit:
 
@@ -405,11 +405,22 @@ Keep all large or private evaluation outputs under ignored
 ## Next implementation task
 
 Freeze the independent content-grounded evaluation corpus and at least 400
-holdout tasks before changing admission/ranking policy. Build the file/locator,
-abstention, dimension and latency evaluation harness against final retrieval.
+holdout tasks before changing admission/ranking policy. The evaluator foundation
+now freezes hashes, checks source/group split integrity, scores file/locator and
+abstention results, compares dimensions and verifies production-adapter replay.
 Keep related sources, derivatives and paraphrases in one split and exclude the
 engineering smoke fixtures from quality claims. Exercise every required family,
 close distractors, negatives and ambiguous descriptions with Laya off/on.
+
+The fourteen-source, seven-group, twenty-one-task development pilot is frozen
+separately from the future holdout. Its actual CPU pipeline finds seven positive
+first files/locators and admits all seven negative queries at the provisional
+0.35 threshold across 768/512/256 dimensions. This is a concrete abstention failure,
+not a quality pass. Keep the threshold unchanged until independent holdout tasks
+are frozen. Natural photos, environmental audio, real video, joint AV, multilingual
+and larger-source slices need independent content/label review; authored toy
+media and synthetic speech alone cannot discharge these gates. Laya on/off,
+large-library latency, physical 16 GB CPU and packaged lifecycle checks remain open.
 
 The format audit now has 296 Release checks, nine actual sandbox format-status
 fixtures and all six Office evidence previews in WPF. Unsupported legacy formats

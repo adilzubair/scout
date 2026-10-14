@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "id": "scout-multimodal-quality-v1",
+  "requiredFamilies": ["documents", "presentations", "spreadsheets", "code", "images", "audio", "video"],
+  "minimumHoldoutTasks": 400,
+  "recallAt": 20,
+  "minimumRecall": 0.95,
+  "minimumFirstFileAccuracy": 0.90,
+  "maximumNegativeAdmissionRate": 0.05,
+  "dimensions": [768, 512, 256],
+  "frozenAdmissionFloor": 0.35,
+  "units": "Report task counts and source-group counts separately; related queries are not independent sources.",
+  "splitRule": "All related sources, derivatives and paraphrases belong to one group and split. Development and holdout groups cannot overlap.",
+  "labels": "File and locator labels are authored from source contents before inference. Filenames are opaque. Do not generate labels from retrieved predictions.",
+  "negativeRule": "A negative task has no supported source in the searched corpus. Any admitted file is a false admission.",
+  "ambiguousRule": "Report acceptable-file recall and advertised certainty separately; do not count ambiguous tasks in unambiguous first-file accuracy.",
+  "freezeRule": "Hash the dataset and every source, record this protocol hash, and refuse changes after freezing. Preserve the exact source bytes, including synthetic speech.",
+  "baselineRule": "Run current keyword content search, semantic-only and production fusion separately. Laya receives only the production metadata shortlist.",
+  "holdoutRule": "Do not tune against opened holdout results. A failed opened holdout becomes regression evidence; a fresh independent holdout is required for a subsequent release claim.",
+  "limits": "A small development pilot, toy visuals, synthetic speech or filename-only benchmarks cannot establish general content quality. Record corpus coverage and missing real-media slices.",
+  "releaseRule": "Quality evaluation does not prove release readiness: physical 16 GB CPU, resource, packaged lifecycle, distribution and clean-account gates remain separate."
+}
