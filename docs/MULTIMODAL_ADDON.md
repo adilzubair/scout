@@ -128,6 +128,16 @@ finishing after revocation and old source refreshes racing newer metadata.
 The Release suite now passes 250 checks. No semantic database is created in a
 normal Scout profile yet; application scheduling and readers remain pending.
 
+The native source adapter now uses canonical handle paths, the Windows file ID,
+volume identity and change/write/creation times for revisions. It rejects
+network paths, alternate streams, hidden/reparse/offline/recall sources and
+ancestors, checks selected roots, and copies through a handle that blocks
+concurrent writes/deletion. The owned snapshot is hashed and the source is
+rechecked before publication. Six additional contracts cover preserved-metadata
+replacement, scope rejection, snapshot cleanup and cancellation; 256 Release
+checks pass. Parser isolation is the next slice; this adapter is not connected
+to personal indexing yet.
+
 The Office helper is not yet invoked by this worker, and its network/resource
 restrictions remain part of the extraction integration. Native source validation,
 application lifecycle integration, prioritization, query fusion, evidence
