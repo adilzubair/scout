@@ -3,7 +3,7 @@
 Date: 2026-10-15. Branch: `feature/multimodal-semantic-search`.
 Status: implementation resumed on 2026-10-15 from checkpoint `6e666ca`.
 Retrieval, previews, OCR and format coverage are committed. The frozen evaluation
-foundation passes 305 Release checks; independent quality and release gates remain open.
+foundation passes 307 Release checks; independent quality and release gates remain open.
 This plan is the implementation checklist; the add-on remains a
 preview until the release gates below pass. The full-model runtime and content smoke probe
 are implemented and verified on CPU and CUDA. On 2026-10-14 the user directed
@@ -298,7 +298,7 @@ results as end-to-end release evidence.
 | Document/image readers | Six Office formats with sandbox-backed WPF locator previews; bounded OCR; explicit unsupported/encrypted/corrupt statuses and scoped coverage review | Independent content/language quality, additional fidelity cases exposed by evaluation and packaged parser crash cleanup |
 | Audio/video readers | Bounded PyAV readers connected to indexing; separate and synchronized AV windows; full-model CPU/CUDA joint-input compatibility | Independent natural audiovisual quality, packaged cancellation/crash cleanup and resource gates |
 | Retrieval/UI | Constrained retrieval and preview engineering contracts, real CPU code/image queries, retained selection/revoked actions, and all eight required media extensions in WPF | Independent quality/admission evaluation, richer locator/format fixtures and packaged lifecycle validation |
-| Release validation | Fixed quality protocol and frozen development pilot; scorer compares content keyword/semantic/fusion, dimensions and production-adapter replay | Independent 400-task holdout, abstention calibration, Laya on/off, throughput/resource measurements, clean packaging/install and every release gate below |
+| Release validation | Frozen quality protocol/development pilot and production-adapter replay; grouped-source 25K/100K/500K scale baseline with uncached CPU queries | Independent 400-task holdout, abstention calibration, Laya on/off, broader source distributions/UI timing, throughput/resources, physical minimum hardware and clean packaging/install |
 
 Proceed in this order, committing each verified unit:
 
@@ -415,6 +415,15 @@ Keep all large or private evaluation outputs under ignored
 `artifacts/diagnostics/multimodal/` and model/runtime downloads outside Git.
 
 ## Next implementation task
+
+The first grouped-source scale run is complete on the available 32 GB development
+machine: warm semantic p95 including uncached CPU query embedding is 393/471/893 ms
+at 25K/100K/500K segments. The workload uses 250 synthetic segments per real
+generated local source, so file counts are 100/400/2,000. Initial worker/matrix/query
+activation is 15.5/18.0/33.5 seconds. Raw samples, source/binary identity and hardware
+metadata are retained; generated indexes were removed. Do not generalize these
+numbers to the physical 16 GB CPU target, different file distributions, WPF UI or
+ordinary-search regression. Keep the remaining hardware/resource gates open.
 
 Joint audiovisual prepared windows now preserve separate sound/frame vectors and
 add synchronized representations only where audio covers the whole frame window.

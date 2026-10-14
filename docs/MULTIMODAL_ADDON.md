@@ -306,6 +306,41 @@ SQLite timestamp evidence. Mutation, revocation, cancellation and snapshot clean
 still pass. Independent CPU and CUDA worker HTTP smokes accept combined payloads
 with outgoing Python sockets blocked. The Release suite passes 305/305 checks.
 
+The production-adapter scale benchmark uses seeded synthetic 768d vectors and
+250 text segments per generated local source. It publishes through the actual
+SQLite queue, then exercises metadata constraints, cached vector loading, native
+source validation, evidence retrieval, lexical fusion and uncached CPU query
+embedding. Each scale has three warmups and 24 distinct measured queries, with
+zero query-cache hits. It verifies forty current file matches with evidence.
+Generated source/index directories are removed after each completed scale; JSON
+measurements remain under ignored diagnostics. No extraction or content-quality
+claim is derived from the synthetic setup throughput.
+
+The first run on the available Intel Core Ultra 9 275HX / 32 GB Windows 11 machine,
+with Laya off, measured:
+
+| Segments | Generated files | Warm semantic p95 | Query embedding p95 | Initial worker/matrix/query |
+| --- | --- | --- | --- | --- |
+| 25,000 | 100 | 393 ms | 67 ms | 15.5 s |
+| 100,000 | 400 | 471 ms | 66 ms | 18.0 s |
+| 500,000 | 2,000 | 893 ms | 61 ms | 33.5 s |
+
+The semantic column includes query embedding, adapter retrieval and fusion. The
+initial column includes the worker activation caused by configuring each scale;
+it is not isolated matrix loading. The largest index was 2,121,932,800 bytes and
+the benchmark app's private memory was 1,880,809,472 bytes, excluding the separate
+model worker. Raw samples were independently rescored and generated-index cleanup
+was checked. The original run retained its exact benchmark-source snapshot,
+binary hashes and separately captured hardware metadata. Future runs write
+hardware/CLR/SIMD and binary/model-manifest identities automatically. The Release
+suite now passes 307 checks, including percentile and provenance validation.
+
+This grouped-file synthetic workload does not prove performance for every file
+distribution, full WPF latency, ordinary-search p95 regression, decoder throughput,
+or the physical 16 GB CPU laptop gate. The 500K initial activation is substantial
+and remains visible in the report. Large-library measurements and all remaining
+quality, hardware and packaging gates are still required.
+
 Decoding reads the owned snapshot through an explicit demuxer, denies secondary
 I/O and URL protocols, and runs inside the same zero-capability AppContainer.
 Bounds include 600 seconds per track timeline, 60,000 decoded frames and 200,000
@@ -521,6 +556,7 @@ dotnet run --project tests/Scout.Tests -c Release -- --semantic-formats artifact
 .runtime/semantic-search/.venv/Scripts/python.exe scripts/build-multimodal-evaluation-pilot.py --output artifacts/diagnostics/multimodal/evaluation-pilot-v1
 dotnet run --project tests/Scout.Tests -c Release -- --multimodal-freeze artifacts/diagnostics/multimodal/evaluation-pilot-v1/dataset.json evaluation/multimodal/protocol.json
 dotnet run --project tests/Scout.Tests -c Release -- --multimodal-review artifacts/diagnostics/multimodal/candidate-pool artifacts/diagnostics/multimodal/addon-no-office .runtime/python/cpython-3.12.13-windows-x86_64-none artifacts/diagnostics/multimodal/content-review
+dotnet run --project tests/Scout.Tests -c Release -- --multimodal-scale artifacts/diagnostics/multimodal/addon-no-office artifacts/diagnostics/multimodal/retrieval-scale
 dotnet run --project tests/Scout.Tests -c Release -- --extraction-python artifacts/diagnostics/multimodal/addon-no-office/generations/GENERATION/venv/Scripts/python.exe .runtime/python/cpython-3.12.13-windows-x86_64-none
 dotnet run --project tests/Scout.Tests -c Release -- --multimodal-eval artifacts/diagnostics/multimodal/evaluation-pilot-v1/dataset.json evaluation/multimodal/protocol.json artifacts/diagnostics/multimodal/addon-no-office .runtime/python/cpython-3.12.13-windows-x86_64-none artifacts/diagnostics/multimodal/evaluation-results development
 .runtime/semantic-search/cpu-venv/Scripts/python.exe runtime/test_extracted_embeddings.py --model .runtime/semantic-search/model --root C:/Path/Printed/By/SandboxTest --device cpu
