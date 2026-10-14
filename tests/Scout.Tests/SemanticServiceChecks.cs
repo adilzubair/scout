@@ -116,6 +116,38 @@ static class SemanticServiceChecks
             Check(ordinary.SequenceEqual(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(Path.Combine(f.Root,"scout.db")))));
             Check(f.Service.Activity.State=="disabled" && f.Host.ProcessId==null);
         }));
+        test("Semantic lookup caches query vectors and invalidates stale sources and revoked scope",()=>With(async f=>
+        {
+            await f.Metadata.ConfigureAsync(f.Enabled());await Wait(()=>f.Service.Activity.Progress?.Ready==2);
+            var local=SearchEngine.Search("authored evidence",Scope.Files,f.Metadata.Catalog,new Dictionary<string,LibraryItem>(),DateTimeOffset.Now);
+            var first=await f.Service.SearchAsync(local,Scope.Files,f.Metadata.Catalog,new Dictionary<string,LibraryItem>(),DateTimeOffset.Now,default);
+            Check(first.Matches.Count==2 && f.Queries==1);
+            await f.Service.SearchAsync(local,Scope.Files,f.Metadata.Catalog,new Dictionary<string,LibraryItem>(),DateTimeOffset.Now,default);
+            Check(f.Queries==1,"unchanged query was re-embedded");
+            var proof=first.Matches[0].Evidence[0];File.WriteAllText(proof.Path,"changed source revision");
+            Check(!f.Service.IsCurrent(proof));
+            await f.Service.DisableAsync();
+            Check(!f.Service.IsCurrent(first.Matches[1].Evidence[0]));
+            var revoked=await f.Service.SearchAsync(local,Scope.Files,f.Metadata.Catalog,new Dictionary<string,LibraryItem>(),DateTimeOffset.Now,default);
+            Check(revoked.Matches.Count==0);
+        }));
+        test("A superseded semantic lookup cannot return its old scope's evidence",()=>With(async f=>
+        {
+            await f.Metadata.ConfigureAsync(f.Enabled());await Wait(()=>f.Service.Activity.Progress?.Ready==2);
+            var entered=new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);var release=new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            f.Query=async(_,_)=>{entered.TrySetResult();await release.Task;return new(SemanticRetrievalChecks.Unit(),10,1);};
+            var local=SearchEngine.Search("authored evidence",Scope.Files,f.Metadata.Catalog,new Dictionary<string,LibraryItem>(),DateTimeOffset.Now);
+            var pending=f.Service.SearchAsync(local,Scope.Files,f.Metadata.Catalog,new Dictionary<string,LibraryItem>(),DateTimeOffset.Now,default);
+            await entered.Task.WaitAsync(TimeSpan.FromSeconds(10));var disable=f.Service.DisableAsync();release.TrySetResult();
+            try{var batch=await pending;Check(batch.Matches.Count==0);}catch(OperationCanceledException){}
+            await disable;
+        }));
+        test("Forward-slash folder settings retain native identity in semantic lookup",()=>With(async f=>
+        {
+            var value=f.Enabled();value.Multimodal.Folders=[f.Selected.Replace('\\','/')];await f.Metadata.ConfigureAsync(value);
+            await Wait(()=>f.Service.Activity.Progress?.Ready==2);
+            Check(f.Metadata.Catalog.Candidates.Where(item=>item.Kind==ItemKind.File).All(item=>item.Target==Path.GetFullPath(item.Target)));
+        }));
     }
     public static async Task<int> Smoke(string addonRoot,string home)
     {
@@ -140,6 +172,14 @@ static class SemanticServiceChecks
             value.Multimodal.Paused=false;await metadata.ConfigureAsync(value);
             await Wait(()=>metadata.Semantic!.Activity.Progress?.Ready==16,TimeSpan.FromMinutes(5));
             Check(metadata.Semantic!.Index!.Vectors().Select(row=>row.Family).Distinct().Count()==7);
+            foreach(var query in new[]{"file defining a function that returns 42000","image showing a solid blue color"})
+            {
+                var local=SearchEngine.Search(query,Scope.Files,metadata.Catalog,store.Library,DateTimeOffset.Now);
+                var batch=await metadata.Semantic.SearchAsync(local,Scope.Files,metadata.Catalog,store.Library,DateTimeOffset.Now,default);
+                Console.WriteLine("Semantic smoke "+query+": "+string.Join(", ",batch.Matches.Take(3).Select(match=>$"{match.Candidate.Title}={match.Similarity:F3}")));
+                Check(batch.Matches.Count>0,"actual content query did not admit any evidence");
+                foreach(var match in batch.Matches)Check(metadata.Semantic.IsCurrent(match.Evidence[0]));
+            }
             File.WriteAllText(Path.Combine(selected,"arrival.txt"),"new invoice arrival for the North sales region");
             await Wait(()=>metadata.Semantic!.Activity.Progress?.Ready==17,TimeSpan.FromMinutes(2));
             File.Move(Path.Combine(selected,"arrival.txt"),Path.Combine(selected,"renamed.txt"));
@@ -172,6 +212,8 @@ static class SemanticServiceChecks
         public readonly IndexService Metadata;
         public SemanticService Service=>Metadata.Semantic!;
         public int Calls;
+        public int Queries;
+        public Func<string,CancellationToken,Task<EmbeddingResult>> Query=(_,_)=>Task.FromResult(new EmbeddingResult(SemanticRetrievalChecks.Unit(),10,1));
         public string? Blocked;
         public Candidate[] ExtraCandidates=[];
         public Func<SemanticSource,CancellationToken,Task<SemanticExtraction>> Extract=(_,_)=>Task.FromResult(Good());
@@ -181,7 +223,8 @@ static class SemanticServiceChecks
             var store=new ScoutStore(Path.Combine(Root,"scout.db"));Host=new(Path.Combine(Root,"addon"));
             Metadata=new(store,new ContentIndexer(store.ContentIndex),()=>[],()=>ExtraCandidates);
             Metadata.EnableSemantic(Host,Root,Path.Combine(Root,"addon"),(_,_)=>new FakeSession((source,token)=>{Interlocked.Increment(ref Calls);return Extract(source,token);}),
-                ()=>new("cpu-"+new string('a',24),"private-python","private-model","cpu","test-revision"),_=>Blocked);
+                ()=>new("cpu-"+new string('a',24),"private-python","private-model","cpu","test-revision"),_=>Blocked,
+                (text,token)=>{Interlocked.Increment(ref Queries);return Query(text,token);});
         }
         public ScoutSettings Enabled()=>new(){RecentItems=false,WindowsSearch=false,Multimodal=new(){Enabled=true,Folders=[Selected]}};
         public void Dispose(){Metadata.Dispose();Host.Dispose();SemanticExtractor.DeleteJob(Path.GetDirectoryName(Root)!,Root);}

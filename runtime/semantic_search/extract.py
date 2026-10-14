@@ -42,28 +42,30 @@ def extract(request_path):
     if not writer.files: raise ValueError('no_extractable_content')
     return writer.finish(source)
 
+def require_sandbox():
+    """Both extraction and playback require the same zero-capability boundary."""
+    import ctypes
+    from ctypes import wintypes
+    kernel, advapi = ctypes.WinDLL('kernel32',use_last_error=True), ctypes.WinDLL('advapi32',use_last_error=True)
+    kernel.GetCurrentProcess.restype = wintypes.HANDLE
+    kernel.CloseHandle.argtypes = [wintypes.HANDLE]
+    advapi.OpenProcessToken.argtypes = [wintypes.HANDLE,wintypes.DWORD,ctypes.POINTER(wintypes.HANDLE)]
+    advapi.GetTokenInformation.argtypes = [wintypes.HANDLE,ctypes.c_int,ctypes.c_void_p,wintypes.DWORD,ctypes.POINTER(wintypes.DWORD)]
+    token, size, value = wintypes.HANDLE(), wintypes.DWORD(), wintypes.DWORD()
+    if not advapi.OpenProcessToken(kernel.GetCurrentProcess(),8,ctypes.byref(token)): raise ValueError('sandbox_required')
+    try:
+        if not advapi.GetTokenInformation(token,29,ctypes.byref(value),4,ctypes.byref(size)) or value.value != 1: raise ValueError('sandbox_required')
+        advapi.GetTokenInformation(token,30,None,0,ctypes.byref(size))
+        capabilities = ctypes.create_string_buffer(size.value)
+        if not advapi.GetTokenInformation(token,30,capabilities,size.value,ctypes.byref(size)) or wintypes.DWORD.from_buffer(capabilities).value != 0: raise ValueError('sandbox_required')
+    finally: kernel.CloseHandle(token)
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--request', type=Path, required=True)
     options = parser.parse_args()
     try:
-        # The launcher supplies a no-capability AppContainer and Windows job limits.
-        # Refuse direct execution without that security boundary.
-        import ctypes
-        from ctypes import wintypes
-        kernel, advapi = ctypes.WinDLL('kernel32',use_last_error=True), ctypes.WinDLL('advapi32',use_last_error=True)
-        kernel.GetCurrentProcess.restype = wintypes.HANDLE
-        kernel.CloseHandle.argtypes = [wintypes.HANDLE]
-        advapi.OpenProcessToken.argtypes = [wintypes.HANDLE,wintypes.DWORD,ctypes.POINTER(wintypes.HANDLE)]
-        advapi.GetTokenInformation.argtypes = [wintypes.HANDLE,ctypes.c_int,ctypes.c_void_p,wintypes.DWORD,ctypes.POINTER(wintypes.DWORD)]
-        token, size, value = wintypes.HANDLE(), wintypes.DWORD(), wintypes.DWORD()
-        if not advapi.OpenProcessToken(kernel.GetCurrentProcess(),8,ctypes.byref(token)): raise ValueError('sandbox_required')
-        try:
-            if not advapi.GetTokenInformation(token,29,ctypes.byref(value),4,ctypes.byref(size)) or value.value != 1: raise ValueError('sandbox_required')
-            advapi.GetTokenInformation(token,30,None,0,ctypes.byref(size))
-            capabilities = ctypes.create_string_buffer(size.value)
-            if not advapi.GetTokenInformation(token,30,capabilities,size.value,ctypes.byref(size)) or wintypes.DWORD.from_buffer(capabilities).value != 0: raise ValueError('sandbox_required')
-        finally: kernel.CloseHandle(token)
+        require_sandbox()
         extract(options.request)
     except Exception as error:
         # Never persist exception bodies, paths or extracted document text.

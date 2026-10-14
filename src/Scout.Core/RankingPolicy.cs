@@ -5,6 +5,17 @@ public static class RankingPolicy
     public static bool NeedsModel(SearchResult result) => result.ModelShortlist.Count > 0 && !result.Intent.Literal && result.Intent.Kind != ItemKind.Folder && result.Hits.FirstOrDefault()?.Score is not >= 1000 && !(result.Hits.Count > 0 && result.Intent.Recency != RecencyBasis.None && (result.Intent.Latest || result.Intent.Oldest || result.Intent.Terms.Length == 0));
     public static IReadOnlyList<SearchHit> Refine(SearchResult local, RankResult judgment)
     {
+        if(local.Hits.Any(hit=>hit.Semantic!=null))
+        {
+            var ids=local.Hits.Where(hit=>hit.Semantic!=null).Select(hit=>hit.Candidate.Id).ToHashSet();
+            var lexical=local with {Hits=local.Hits.Where(hit=>!ids.Contains(hit.Candidate.Id)).ToArray(),Recall=local.Recall.Where(hit=>!ids.Contains(hit.Candidate.Id)).ToArray()};
+            var remaining=new Queue<SearchHit>(Refine(lexical,judgment));
+            var result=new List<SearchHit>();
+            foreach(var hit in local.Hits)
+                if(hit.Semantic!=null)result.Add(hit);else if(remaining.TryDequeue(out var next))result.Add(next);
+            while(remaining.TryDequeue(out var next))result.Add(next);
+            return result.Take(local.Intent.Count??100).ToArray();
+        }
         if (judgment.Scores.Count == 0 || judgment.None >= judgment.Scores.Values.Max()) return local.Hits;
         // Explicit recency is decided by recorded timestamps, never by an uncalibrated probability.
         if (local.Hits.Count > 0 && local.Intent.Recency != RecencyBasis.None && (local.Intent.Latest || local.Intent.Oldest || local.Intent.Terms.Length == 0)) return local.Hits;
@@ -38,6 +49,7 @@ public static class RankingPolicy
         if (local.Intent.Recency != RecencyBasis.None && (local.Intent.Latest || local.Intent.Oldest || local.Intent.Terms.Length == 0))
             return top.Candidate.Date(local.Intent.Recency) != null && (shown.Count == 1 || top.Candidate.Date(local.Intent.Recency) != shown[1].Candidate.Date(local.Intent.Recency));
         if (top.Score >= 1000 && (shown.Count == 1 || shown[1].Score < 1000)) return true;
+        if(top.Semantic!=null)return false; // Admission/ready calibration remains a release gate.
         // Until Laya is calibrated, its raw confidence alone cannot advertise certainty.
         return local.Intent.Terms.Sum(t => t.Length) >= 3 && top.Score >= 90 && (shown.Count == 1 || top.Score - shown[1].Score >= 80);
     }

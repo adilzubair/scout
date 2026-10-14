@@ -5,9 +5,9 @@ Date: 2026-10-15. Branch: `feature/multimodal-semantic-search`.
 Scout now has an independent setup entry point, authenticated embedding worker,
 Windows process lifetime, and Multimodal settings page. The preview installs and
 tests the full EmbeddingGemma 2 model and indexes explicitly selected folders in
-the background. Semantic matches and evidence navigation are not connected to
-search results yet. The separate durable queue, native snapshots, isolated
-document/image/audio/video readers and app scheduler are implemented.
+the background. Constrained semantic matches and evidence navigation now connect
+to search results. The separate durable queue, native snapshots, isolated
+document/image/audio/video readers, app scheduler and retrieval preview are implemented.
 All content families remain in the release scope. LibreOffice is removed from
 the product path by user direction. Office evidence will use extracted text,
 cells, chart data and embedded images, without exact Office page/slide rendering.
@@ -281,8 +281,40 @@ retry, duplicate metadata representations and corrupt-index removal. A real CPU
 smoke indexed sixteen authored sources across all seven families through the app
 scheduler, then verified watched arrival/rename, maintenance resume and complete
 scope revocation. WPF smoke checks also cover the progress and retry controls.
-Clean-account packaging, forced process-death resume, final retrieval/previews,
+Clean-account packaging, packaged forced process-death resume,
 quality and hardware/resource gates remain required.
+
+The retrieval preview now applies file/folder/type/time constraints before vector
+ranking and checks native source identity before admitting evidence. It combines
+the best segments per file with ordinary results, preserving literal names,
+explicit chronology, count limits and the user's selection. Query responses are
+debounced, cached by index generation and discarded when superseded. Laya remains
+optional and receives metadata only; content evidence survives its refinement.
+The initial cosine admission floor of 0.35 is provisional and uncalibrated.
+It does not establish relevance confidence or satisfy the holdout quality gate.
+
+Content results show their matched page, slide, sheet/cell range, paragraph,
+line or time window. Office previews show extracted text and available images
+with a partial-coverage notice rather than reproducing Office layout. PDF matches
+navigate to their page. Media matches open paused at their time; if Windows lacks
+the source codec, Scout prepares a bounded clip in the same zero-capability
+AppContainer used by its readers. That fallback emits at most 20 seconds of
+640×360 H.264 video or mono 16 kHz PCM audio and accepts only a hash-verified owned
+snapshot. It checks the original source again before playback. Closing or
+revoking a preview cancels preparation and removes its owned files; an abandoned
+clip is recovered before the next preparation. Cross-generation upgrade and
+packaged crash/removal recovery still need release validation.
+
+Current engineering validation passes 289/289 Release checks and the real CPU
+selected-folder scheduler/query smoke. Four Python playback contracts cover
+sixteen authored media fixtures, later windows, malformed requests and external
+resource rejection; the existing thirteen media-reader contracts also pass.
+Actual AppContainer playback tests cover WebM/MKV, later MP4/WAV windows and AAC,
+then forced process exit, recovery, active-owner isolation and cancellation.
+WPF checks retain manual selection after content arrivals, reject revoked content
+actions, clear revoked evidence and advance playback for all eight required
+audio/video extensions. These checks do not establish general retrieval quality,
+minimum-hardware suitability or clean-account release readiness.
 
 Developer verification (use an isolated add-on root and data directory):
 
@@ -291,11 +323,13 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/setup-multimodal.ps1
 .runtime/semantic-search/cpu-venv/Scripts/python.exe runtime/test_multimodal_setup.py
 .runtime/semantic-search/cpu-venv/Scripts/python.exe runtime/test_multimodal_worker.py
 .runtime/semantic-search/cpu-venv/Scripts/python.exe runtime/test_media_readers.py
+.runtime/semantic-search/cpu-venv/Scripts/python.exe runtime/test_playback.py
 .runtime/semantic-search/cpu-venv/Scripts/python.exe runtime/test_multimodal_worker_inference.py --model .runtime/semantic-search/model --device cpu
 dotnet run --project tests/Scout.Tests -c Release -- --multimodal-host C:/Path/To/PrivateTestAddon
 dotnet run --project tests/Scout.Tests -c Release -- --extract-media .runtime/semantic-search/cpu-venv/Scripts/python.exe .runtime/python/cpython-3.12.13-windows-x86_64-none .runtime/semantic-search/model
 dotnet run --project tests/Scout.Tests -c Release -- --semantic-extractor artifacts/diagnostics/multimodal/addon-no-office .runtime/python/cpython-3.12.13-windows-x86_64-none
 dotnet run --project tests/Scout.Tests -c Release -- --semantic-scheduler artifacts/diagnostics/multimodal/addon-no-office .runtime/python/cpython-3.12.13-windows-x86_64-none
+dotnet run --project tests/Scout.Tests -c Release -- --semantic-playback artifacts/diagnostics/multimodal/addon-no-office .runtime/python/cpython-3.12.13-windows-x86_64-none
 .runtime/semantic-search/cpu-venv/Scripts/python.exe runtime/test_extracted_embeddings.py --model .runtime/semantic-search/model --root C:/Path/Printed/By/SandboxTest --device cpu
 ```
 

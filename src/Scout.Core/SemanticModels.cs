@@ -27,7 +27,8 @@ public sealed record ContentLocator(string Kind)
     {
         bool Cells(string? value) => value is { Length: > 1 and <= 10 } &&
             System.Text.RegularExpressions.Regex.IsMatch(value, "^[A-Z]{1,3}[1-9][0-9]{0,6}$") &&
-            int.Parse(new string(value.SkipWhile(char.IsAsciiLetter).ToArray())) <= 1048576;
+            int.Parse(new string(value.SkipWhile(char.IsAsciiLetter).ToArray())) <= 1048576 &&
+            value.TakeWhile(char.IsAsciiLetter).Aggregate(0,(column,c)=>column*26+c-'A'+1)<=16384;
         var valid = Kind switch
         {
             "page" or "slide" or "image" => Page is > 0 and <= 100000,
@@ -47,7 +48,8 @@ public sealed record ContentSegment(string Modality, ContentLocator Locator, str
     public byte[] Thumbnail { get; init; } = [];
 }
 public sealed record SemanticVector(string SegmentId, string CandidateId, string Revision, string Family, string Modality, float[] Vector);
-public sealed record SemanticEvidence(string SegmentId, string CandidateId, string Revision, string Path, string Modality, ContentLocator Locator, string Text, byte[] Thumbnail);
+public sealed record SemanticEvidence(string SegmentId, string CandidateId, string Revision, string Path, string Modality, ContentLocator Locator, string Text, byte[] Thumbnail)
+{public bool Partial {get;init;} public string Coverage {get;init;}="";}
 public sealed record SemanticFileStatus(string CandidateId, string Path, string Status, string Detail, bool Partial, int Segments);
 public sealed record SemanticProgress(int Files, int Ready, int Partial, int Unsupported, int Failed, int Pending, int Running, long DatabaseBytes, long Version, long Generation);
 public enum SemanticPublish { Accepted, Stale, QuotaExceeded }

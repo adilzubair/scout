@@ -146,6 +146,48 @@ public partial class MainWindow
             WindowVisuals.SetTestTheme(null);
         }
         finally { preview.Close(); }
+        var matchedItem=new Candidate(Candidate.Key(ItemKind.File,previewPath),ItemKind.File,"Matched note",previewPath);
+        var match=new SemanticEvidence("authored",matchedItem.Id,new string('a',64),previewPath,"text",new("lines"){StartLine=1,EndLine=1},"Matched local evidence canary",[]){Partial=true};
+        var enabled=true;
+        var matched=new PreviewWindow(matchedItem,match,_=>enabled){Owner=this};
+        try
+        {
+            matched.Show();await matched.CheckAsync();await UiDiagnostics.Snapshot(matched,"semantic-matched-lines");
+            if(matched.MatchedLocator?.Kind!="lines")throw new InvalidOperationException("Matched line navigation was lost.");
+            enabled=false;await Task.Delay(350);await UiDiagnostics.Snapshot(matched,"semantic-revoked-evidence");
+            if(matched.MatchedLocator!=null || UiDiagnostics.Descendants<TextBox>(matched).Any(text=>text.Text.Contains("evidence canary",StringComparison.Ordinal)))
+                throw new InvalidOperationException("Revoked preview retained private evidence.");
+        }
+        finally{matched.Close();}
+        await SearchView("preview benefits",Scope.Files,"semantic-before-arrival");
+        var manualItem=new Candidate("ui:manual",ItemKind.File,"Benefits notes.txt",previewPath);
+        var baseline=current! with {Hits=[new(manualItem,100)]};current=baseline;ApplyRows(baseline.Hits);
+        manualSelection=true;Results.SelectedIndex=0;
+        var fused=SemanticFusion.Apply(baseline,[new(matchedItem,.9,[match])]);current=fused;ApplyRows(fused.Hits);
+        if(Selected?.Id!=manualItem.Id || !((ResultRow[])Results.ItemsSource).Any(row=>row.Candidate.Id==matchedItem.Id && row.Detail.StartsWith("Content match",StringComparison.Ordinal)))
+            throw new InvalidOperationException("Late content results lost manual selection or evidence labels.");
+        await UiDiagnostics.Snapshot(this,"semantic-results-retained-selection");
+        try{ValidateSemanticAction(matchedItem);throw new InvalidOperationException("An out-of-scope content action was admitted.");}
+        catch(IOException){}
+        manualSelection=false;RefreshLocal();await WaitForSearch();
+        var mediaPack=Path.GetFullPath("artifacts/diagnostics/multimodal/media-fixtures-v1");
+        if(Directory.Exists(mediaPack))
+        {
+            var addon=Path.GetFullPath("artifacts/diagnostics/multimodal/addon-no-office");
+            var installation=MultimodalSetup.Find(addon)??throw new IOException("The authored media smoke needs its test add-on.");
+            var pythonHome=Path.GetFullPath(".runtime/python/cpython-3.12.13-windows-x86_64-none");
+            var mediaScope=new SemanticScope(true,[mediaPack],[],["audio","video"],installation.Revision,"preview-test");
+            foreach(var name in new[]{"tone.wav","tone.mp3","tone.m4a","tone.flac","scene.mp4","scene.mov","scene.mkv","scene.webm"})
+            {
+                var path=Path.Combine(mediaPack,name);var candidate=new Candidate(Candidate.Key(ItemKind.File,path),ItemKind.File,name,path);
+                var source=SemanticSourceReader.Read(path,mediaScope)??throw new IOException("Missing authored media source.");
+                var proof=new SemanticEvidence("authored-media",candidate.Id,source.Revision,path,SemanticFormats.Family(path)=="video"?"video":"audio",new("time"){StartSeconds=.5,EndSeconds=2.5},"Authored media window",[]);
+                var window=new PreviewWindow(candidate,proof,e=>SemanticSourceReader.Read(e.Path,mediaScope)?.Revision==e.Revision,
+                    (e,token)=>SemanticPlayback.PrepareAsync(addon,installation,e,()=>mediaScope,token,pythonHome)){Owner=this};
+                try{window.Show();await window.CheckAsync();await window.CheckMediaAsync();await UiDiagnostics.Snapshot(window,"semantic-media-"+Path.GetExtension(name).TrimStart('.'));}
+                finally{window.Close();}
+            }
+        }
     }
 }
 

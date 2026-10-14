@@ -27,10 +27,10 @@ internal sealed class IndexService : IDisposable
     public SemanticService? Semantic { get; private set; }
     internal void EnableSemantic(MultimodalHost host,string dataRoot,string? addonRoot=null,
         Func<MultimodalInstallation,Func<SemanticScope>,ISemanticExtractionSession>? factory=null,
-        Func<MultimodalInstallation?>? find=null,Func<long,string?>? pressure=null)
+        Func<MultimodalInstallation?>? find=null,Func<long,string?>? pressure=null,Func<string,CancellationToken,Task<EmbeddingResult>>? query=null)
     {
         if(Semantic!=null)throw new InvalidOperationException("Content scheduler already attached.");
-        Semantic=new SemanticService(dataRoot,host,()=>Catalog.Candidates.ToArray(),()=>Volatile.Read(ref metadataReady),addonRoot,factory,find,pressure);
+        Semantic=new SemanticService(dataRoot,host,()=>Catalog.Candidates.ToArray(),()=>Volatile.Read(ref metadataReady),addonRoot,factory,find,pressure,query);
         Changed+=_=>Semantic.NotifyCatalogChanged();
     }
     private int dirty = 1;
@@ -227,6 +227,7 @@ internal sealed class IndexService : IDisposable
     }
     private Candidate? ReadFile(string path, bool arrival)
     {
+        path=Path.GetFullPath(path);
         if (Excluded(path)) return null;
         try
         {

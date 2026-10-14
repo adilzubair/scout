@@ -31,6 +31,7 @@ public partial class MainWindow : Window
     private string? editingName;
     private Candidate[] enriched = [];
     private SearchResult? current;
+    private SearchResult? lexicalCurrent;
     private IReadOnlyList<SearchHit> displayedHits = [];
     private RankResult? judgment;
     private readonly EventWaitHandle showEvent = new(false, EventResetMode.AutoReset, "Local\\Scout.Show");
@@ -43,6 +44,9 @@ public partial class MainWindow : Window
     private string hotkey = "";
     private Task localSearchTask = Task.CompletedTask;
     private Task refinementTask = Task.CompletedTask, enrichmentTask = Task.CompletedTask;
+    private Task semanticTask=Task.CompletedTask;
+    private long observedSemanticEpoch=-1,observedSemanticVersion=-1;
+    private readonly Dictionary<string,SemanticContentMatch> semanticProvenance=[];
     private long appliedRevision, observedIndexVersion = -1;
     private double requestedHeight = 76;
     private bool suggestionsRevealed, expanded;
@@ -65,6 +69,21 @@ public partial class MainWindow : Window
         uiRefresh = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
         uiRefresh.Tick += (_, _) =>
         {
+            if(IsVisible && index.Semantic is {} semantic)
+            {
+                if(observedSemanticEpoch!=semantic.Epoch)
+                {
+                    observedSemanticEpoch=semantic.Epoch;
+                    if(current?.Hits.Any(hit=>hit.Semantic!=null)==true)
+                    {current=current with {Hits=current.Hits.Where(hit=>hit.Semantic==null).ToArray()};ApplyRows(current.Hits);ScheduleSearch(false);}
+                }
+                var version=semantic.Activity.Progress?.Version??-1;
+                if(version!=observedSemanticVersion && semanticTask.IsCompleted && current!=null)
+                {
+                    observedSemanticVersion=version;
+                    semanticTask=AugmentSemanticAsync(revision,current,index.Catalog,store.Library,scope,DateTimeOffset.Now,search.Token);
+                }
+            }
             if (!indexChanged || !IsVisible) return;
             indexChanged = false;
             if (observedIndexVersion != index.Version) { observedIndexVersion = index.Version; ScheduleSearch(false); }
@@ -168,6 +187,7 @@ public partial class MainWindow : Window
         // double-click already ignore stale generations through Selected, so
         // disabling the list here only buys a visible flash on every keystroke.
         judgment = null;
+        lexicalCurrent=null;
         localSearchTask = RunLocalSearch(generation, Query.Text, scope, enrich, token);
     }
     private void RefreshLocal() => ScheduleSearch(false);
@@ -182,7 +202,7 @@ public partial class MainWindow : Window
             var now = DateTimeOffset.Now;
             var result = await Task.Run(() => SearchEngine.Search(query, requestedScope, catalog, library, now, cancellationToken: token, extra: extra, contentMatches: index.SearchContent(query, requestedScope, now, token)), token);
             if (token.IsCancellationRequested || generation != revision) return;
-            current = result; appliedRevision = generation;
+            current = result;lexicalCurrent=result; appliedRevision = generation;
             judgment = null;
             if (!groupEdited)
             {
@@ -193,8 +213,30 @@ public partial class MainWindow : Window
             UpdateGroup(); ApplyRows(result.Hits);
             Status.Text = ResultStatus(result);
             refinementTask = RefineAsync(generation, enrich && requestedScope is Scope.All or Scope.Files, token);
+            semanticTask=AugmentSemanticAsync(generation,result,catalog,library,requestedScope,now,token);
         }
         catch (OperationCanceledException) { }
+    }
+    private async Task AugmentSemanticAsync(long generation,SearchResult local,SearchCatalog catalog,IReadOnlyDictionary<string,LibraryItem> library,
+        Scope requestedScope,DateTimeOffset now,CancellationToken token)
+    {
+        if(index.Semantic is not {} semantic || local.Intent.Literal || string.IsNullOrWhiteSpace(local.Query) || local.Query!=Query.Text || generation!=appliedRevision)return;
+        try
+        {
+            await Task.Delay(180,token);
+            var batch=await semantic.SearchAsync(local,requestedScope,catalog,library,now,token);
+            if(token.IsCancellationRequested || generation!=revision || batch.Epoch!=semantic.Epoch || !IsVisible || Query.Text!=local.Query)return;
+            var baseline=lexicalCurrent??local;
+            var fused=SemanticFusion.Apply(baseline,batch.Matches);
+            current=fused;
+            if(!groupEdited)
+            {
+                group.Clear();foreach(var member in RankingPolicy.Group(fused))group[member.Id]=member;
+            }
+            ApplyRows(judgment==null?fused.Hits:RankingPolicy.Refine(fused,judgment));UpdateGroup();
+        }
+        catch(OperationCanceledException){}
+        catch(Exception error)when(error is IOException or InvalidOperationException){ }
     }
     private string ResultStatus(SearchResult result)
     {
@@ -219,7 +261,8 @@ public partial class MainWindow : Window
             if (ranked != null)
             {
                 judgment = ranked;
-                var rows = RankingPolicy.Refine(local, ranked);
+                if(lexicalCurrent!=null)lexicalCurrent=lexicalCurrent with {Hits=RankingPolicy.Refine(lexicalCurrent,ranked)};
+                var rows = RankingPolicy.Refine(current??local, ranked);
                 // Structured local membership is complete. Only offer semantic-only groups when
                 // all shortlisted members were judged, and never overwrite a user's edits.
                 if (!groupEdited && group.Count == 0 && local.Intent.Plural && ranked.All >= .75 && ranked.GroupMembers.Count >= 2)
@@ -249,6 +292,9 @@ public partial class MainWindow : Window
         var selected = manualSelection ? (Results.SelectedItem as ResultRow)?.Candidate.Id : null;
         applying = true;
         displayedHits = hits.ToArray();
+        var semanticIds=displayedHits.Where(hit=>hit.Semantic!=null).Select(hit=>hit.Candidate.Id).Concat(group.Keys).ToHashSet();
+        foreach(var id in semanticProvenance.Keys.Where(id=>!semanticIds.Contains(id)).ToArray())semanticProvenance.Remove(id);
+        foreach(var hit in displayedHits.Where(hit=>hit.Semantic!=null))semanticProvenance[hit.Candidate.Id]=hit.Semantic!;
         var effective = displayedHits.ToList();
         if (scope == Scope.All && current?.Intent.Literal != true && current?.Intent.Folder == null && SyntheticResults.Calculation(Query.Text) is { } calculation) effective.Insert(0, new(calculation, 2000));
         if (store.Settings.WebFallback && current?.Intent.Literal != true && current?.Intent.Folder == null && scope is Scope.All or Scope.Links && SyntheticResults.Web(Query.Text) is { } web) effective.Add(new(web, -100));
@@ -259,7 +305,7 @@ public partial class MainWindow : Window
             effective.Insert(0, new(new Candidate("group:current", ItemKind.Group, $"Open all {group.Count} {noun}", "") { Detail = string.Join(", ", group.Values.Take(3).Select(c => c.Title)) + (group.Count > 3 ? ", …" : ""), Source = "Group" }, 2000));
         }
         var ready = current != null && RankingPolicy.Ready(current, effective, judgment);
-        var rows = effective.Select((h, i) => new ResultRow(h.Candidate, h.Pinned, group.ContainsKey(h.Candidate.Id), current?.Intent.Recency ?? RecencyBasis.None, i == 0 && (ready || h.Candidate.Kind == ItemKind.Group), group.Count > 0)).ToArray();
+        var rows = effective.Select((h, i) => new ResultRow(h.Candidate, h.Pinned, group.ContainsKey(h.Candidate.Id), current?.Intent.Recency ?? RecencyBasis.None, i == 0 && (ready || h.Candidate.Kind == ItemKind.Group), group.Count > 0,h.Evidence)).ToArray();
         Results.ItemsSource = rows;
         lastRenderedQuery = Query.Text;
         lastRenderedIds = rows.Select(row => row.Candidate.Id).ToHashSet();
@@ -351,6 +397,7 @@ public partial class MainWindow : Window
     private async Task OpenSelectedCore()
     {
         if (Selected is not { } item) return;
+        ValidateSemanticAction(item);
         if (item.Kind == ItemKind.Group) { await Execute(group.Values.ToArray()); return; }
         if (item.Kind == ItemKind.Calculation) { Clipboard.SetText(item.Target); Status.Text = "Result copied"; return; }
         if (item.Kind == ItemKind.System)
@@ -382,7 +429,7 @@ public partial class MainWindow : Window
             var failed = new List<string>(); var successes = 0; var query = Query.Text; var generation = revision;
             foreach (var item in items.DistinctBy(c => c.Id).Take(25).ToArray())
             {
-                try { WindowsIntegration.Open(item); if (item.IsPinnable) await Task.Run(() => store.RecordLaunch(item, query, DateTimeOffset.Now)); successes++; }
+                try { ValidateSemanticAction(item); WindowsIntegration.Open(item); if (item.IsPinnable) await Task.Run(() => store.RecordLaunch(item, query, DateTimeOffset.Now)); successes++; }
                 catch (Exception e) when (e is IOException or System.ComponentModel.Win32Exception or InvalidOperationException) { failed.Add(item.Title); }
                 await Task.Delay(60);
             }
@@ -411,15 +458,47 @@ public partial class MainWindow : Window
         if (!group.Remove(row.Candidate.Id) && group.Count < 25) group[row.Candidate.Id] = row.Candidate;
         groupChoices[row.Candidate.Id] = group.ContainsKey(row.Candidate.Id); UpdateGroup(); ApplyRows(displayedHits); e.Handled = true;
     }
-    private void Preview(Candidate item) { if (item.Kind == ItemKind.File) new PreviewWindow(item) { Owner = this }.ShowDialog(); }
+    private void ValidateSemanticAction(Candidate item)
+    {
+        if(semanticProvenance.TryGetValue(item.Id,out var match) && (index.Semantic==null || !index.Semantic.IsCurrent(match.Evidence[0])))
+            throw new IOException("Matched content changed or is no longer enabled. Search again before opening it.");
+    }
+    private void Preview(Candidate item)
+    {
+        if(item.Kind!=ItemKind.File)return;
+        try
+        {
+            ValidateSemanticAction(item);
+            var evidence=semanticProvenance.GetValueOrDefault(item.Id)?.Evidence.FirstOrDefault();
+            new PreviewWindow(item,evidence,index.Semantic==null?null:index.Semantic.IsCurrent,index.Semantic==null?null:index.Semantic.PreparePlaybackAsync){Owner=this}.ShowDialog();
+        }
+        catch(IOException error){Status.Text=error.Message;}
+    }
     private void UpdateGroup() { GroupBar.Visibility = expanded && (group.Count > 0 || editingWorkspace != null) ? Visibility.Visible : Visibility.Collapsed; GroupLabel.Text = $"{group.Count} selected"; UpdateExpansion(); }
     private void ActionsClick(object sender, RoutedEventArgs e) => ShowActions();
     private void ShowActions()
     {
         RevealSuggestions();
         if (Selected is not { } item) return;
+        manualSelection=true;var menuRevision=revision;
         var menu = new ContextMenu { PlacementTarget = ActionsButton, Placement = System.Windows.Controls.Primitives.PlacementMode.Top };
-        void Add(string label, Action action) { var parts = label.Split("    ", 2); var entry = new MenuItem { Header = parts[0], InputGestureText = parts.Length > 1 ? parts[1] : "" }; entry.Click += (_, _) => { try { action(); } catch (Exception e) when (e is IOException or System.Runtime.InteropServices.COMException or System.ComponentModel.Win32Exception) { Status.Text = e.Message; } }; menu.Items.Add(entry); }
+        void Add(string label, Action action)
+        {
+            var parts=label.Split("    ",2);var entry=new MenuItem{Header=parts[0],InputGestureText=parts.Length>1?parts[1]:""};
+            entry.Click+=(_,_)=>
+            {
+                try
+                {
+                    if(menuRevision!=revision)throw new IOException("Results changed. Choose an action again.");
+                    ValidateSemanticAction(item);
+                    var row=Results.Items.Cast<ResultRow>().FirstOrDefault(row=>row.Candidate.Id==item.Id);
+                    if(row==null)throw new IOException("This result is no longer available.");
+                    Results.SelectedItem=row;action();
+                }
+                catch(Exception error)when(error is IOException or System.Runtime.InteropServices.COMException or System.ComponentModel.Win32Exception){Status.Text=error.Message;}
+            };
+            menu.Items.Add(entry);
+        }
         Add(item.Kind == ItemKind.Calculation ? "Copy result    Enter" : "Open    Enter", () => _ = OpenSelected());
         if (item.IsPinnable) Add("Pin / unpin    Ctrl+P", () => { store.TogglePin(item); RefreshLocal(); });
         if (item.IsGroupable || item.Kind is ItemKind.Calculation or ItemKind.WebSearch or ItemKind.Automation)
@@ -500,9 +579,9 @@ public partial class MainWindow : Window
         else if (ctrl && e.Key == Key.Space && Selected is { Kind: ItemKind.File } preview) Preview(preview);
         else if (ctrl && e.Key == Key.P && Selected is { } pin) { store.TogglePin(pin); RefreshLocal(); }
         else if (ctrl && shift && e.Key == Key.C && Selected is { } copy && copy.Kind is not (ItemKind.Workspace or ItemKind.Group or ItemKind.System))
-        { try { Clipboard.SetText(copy.Target); Status.Text = "Copied"; } catch (System.Runtime.InteropServices.COMException) { Status.Text = "Clipboard is busy. Try again."; } }
+        { try { ValidateSemanticAction(copy);Clipboard.SetText(copy.Target); Status.Text = "Copied"; } catch (IOException error){Status.Text=error.Message;} catch (System.Runtime.InteropServices.COMException) { Status.Text = "Clipboard is busy. Try again."; } }
         else if (ctrl && e.Key == Key.R && Selected is { } reveal)
-        { try { WindowsIntegration.Reveal(reveal); } catch (Exception ex) when (ex is IOException or System.ComponentModel.Win32Exception) { Status.Text = ex.Message; } }
+        { try { ValidateSemanticAction(reveal);WindowsIntegration.Reveal(reveal); } catch (Exception ex) when (ex is IOException or System.ComponentModel.Win32Exception) { Status.Text = ex.Message; } }
         else if (e.Key == Key.Tab) { RevealSuggestions(); scope = (Scope)(((int)scope + (shift ? 4 : 1)) % 5); UpdateScopes(); ScheduleSearch(false); }
         else if (e.Key is Key.Up or Key.Down)
         {
@@ -514,7 +593,7 @@ public partial class MainWindow : Window
         else return;
         e.Handled = true;
     }
-    private sealed class ResultRow(Candidate candidate, bool pinned, bool grouped, RecencyBasis basis, bool ready, bool membership) : System.ComponentModel.INotifyPropertyChanged
+    private sealed class ResultRow(Candidate candidate, bool pinned, bool grouped, RecencyBasis basis, bool ready, bool membership,string contentEvidence="") : System.ComponentModel.INotifyPropertyChanged
     {
         public Candidate Candidate => candidate;
         public bool Grouped => grouped;
@@ -528,9 +607,9 @@ public partial class MainWindow : Window
         private async Task LoadIcon() { icon = await NativeIcons.Get(candidate.Target); PropertyChanged?.Invoke(this, new(nameof(Icon))); PropertyChanged?.Invoke(this, new(nameof(GlyphVisibility))); PropertyChanged?.Invoke(this, new(nameof(IconBackground))); }
         public Visibility GlyphVisibility => icon == null ? Visibility.Visible : Visibility.Collapsed;
         public string Title => Candidate.Title;
-        public string Detail => Candidate.Date(basis) is { } date
+        public string Detail => contentEvidence.Length>0?contentEvidence:Candidate.Date(basis) is { } date
             ? $"{(basis == RecencyBasis.Downloaded && Candidate.DownloadedAt == null ? "Arrived" : basis)} {Age(date)} · {Candidate.Detail}" : Candidate.Detail.Length > 0 ? Candidate.Detail : Candidate.Source;
-        public string Evidence => Candidate.Evidence(basis) + (Candidate.Date(basis) is { } date ? $"\n{date.LocalDateTime:F}" : "") + "\n" + Candidate.Target;
+        public string Evidence => (contentEvidence.Length>0?contentEvidence+"\n":"")+Candidate.Evidence(basis) + (Candidate.Date(basis) is { } date ? $"\n{date.LocalDateTime:F}" : "") + "\n" + Candidate.Target;
         private static string Age(DateTimeOffset date)
         {
             var span = DateTimeOffset.Now - date;

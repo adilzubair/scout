@@ -219,6 +219,14 @@ internal sealed record PreparedManifest(PreparedReceipt[] Segments, bool Partial
         ValidateContent(content);
         var locator = JsonSerializer.Deserialize<ContentLocator>(data.GetProperty("locator"), new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }) ?? throw new InvalidDataException("Missing extraction locator.");
         locator.Validate(); var evidence = data.GetProperty("evidence").GetString() ?? "";
+        var validLocator=family switch
+        {
+            "documents"=>locator.Kind is "page" or "paragraphs" or "lines",
+            "presentations"=>locator.Kind=="slide","spreadsheets"=>locator.Kind=="sheet",
+            "code"=>locator.Kind=="lines","images"=>locator.Kind=="image",
+            "audio" or "video"=>locator.Kind=="time",_=>false
+        };
+        if(!validLocator)throw new InvalidDataException("Content locator does not match its source family.");
         if (evidence.Length > 32000) throw new InvalidDataException("Extraction evidence limit.");
         var thumbnail = Bytes(data.GetProperty("thumbnail"), 128*1024, empty: true);
         if (modality is "audio" or "video" && (locator.Kind != "time" || locator.EndSeconds <= locator.StartSeconds)) throw new InvalidDataException("Invalid media locator.");

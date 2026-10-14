@@ -134,6 +134,8 @@ internal sealed class ExtractionSandbox : IDisposable
     }
     private void GrantRule(DirectoryInfo directory, FileSystemAccessRule rule)
     {
+        WithAclLock(directory.FullName,()=>
+        {
         var acl = directory.GetAccessControl();
         if (!grants.ContainsKey(directory.FullName))
         {
@@ -141,6 +143,19 @@ internal sealed class ExtractionSandbox : IDisposable
             SaveGrants(); // Persist the original package-specific rules before changing permissions.
         }
         acl.AddAccessRule(rule); directory.SetAccessControl(acl);
+        });
+    }
+    private static void WithAclLock(string path,Action action)
+    {
+        using var mutex=new Mutex(false,"Local\\Scout.SemanticAcl."+Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(path.ToUpperInvariant())))[..32]);
+        var held=false;
+        try
+        {
+            try{held=mutex.WaitOne(TimeSpan.FromSeconds(30));}catch(AbandonedMutexException){held=true;}
+            if(!held)throw new IOException("Extraction runtime permissions are busy.");
+            action();
+        }
+        finally{if(held)mutex.ReleaseMutex();}
     }
     private void SaveGrants()
     {
@@ -190,6 +205,8 @@ internal sealed class ExtractionSandbox : IDisposable
     }
     private void RestoreGrant(string path, GrantState original)
     {
+        WithAclLock(path,()=>
+        {
         var directory = new DirectoryInfo(path);
         if (!directory.Exists) return;
         _ = MultimodalSetup.OwnedPath(path, "sandbox-access-check");
@@ -198,6 +215,7 @@ internal sealed class ExtractionSandbox : IDisposable
             acl.RemoveAccessRuleSpecific(rule);
         foreach (var rule in original.Rules) acl.AddAccessRule(rule);
         directory.SetAccessControl(acl);
+        });
     }
     private void RestoreGrants()
     {

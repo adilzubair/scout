@@ -11,6 +11,28 @@ static class ExtractionSandboxChecks
 {
     public static void Run(Action<string, Action> test)
     {
+        test("Concurrent parser profiles preserve each other's runtime permissions",()=>
+        {
+            var root=Path.GetFullPath("artifacts/diagnostics/multimodal/sandbox-concurrent-"+Guid.NewGuid().ToString("N"));
+            var shared=Path.Combine(root,"runtime");Directory.CreateDirectory(shared);
+            var owners=Enumerable.Range(0,8).Select(i=>Path.Combine(root,"owner-"+i)).ToArray();
+            foreach(var path in owners)Directory.CreateDirectory(path);
+            ExtractionSandbox[] sandboxes=[];
+            try
+            {
+                sandboxes=Task.WhenAll(owners.Select(path=>Task.Run(()=>new ExtractionSandbox(path,[shared])))).GetAwaiter().GetResult();
+                string[] Sids()=>new DirectoryInfo(shared).GetAccessControl().GetAccessRules(true,false,typeof(SecurityIdentifier))
+                    .Cast<FileSystemAccessRule>().Select(rule=>rule.IdentityReference.Value).ToArray();
+                Check(sandboxes.All(sandbox=>Sids().Contains(sandbox.PackageSid)),"a concurrent grant was lost");
+                Task.WaitAll(sandboxes.Select(sandbox=>Task.Run(sandbox.Dispose)).ToArray());
+                Check(!sandboxes.Any(sandbox=>Sids().Contains(sandbox.PackageSid)),"a parser grant survived disposal");
+            }
+            finally
+            {
+                foreach(var sandbox in sandboxes)sandbox.Dispose();
+                Directory.Delete(root,true);
+            }
+        });
         test("Extraction command arguments preserve quotes and trailing backslashes", () =>
         {
             Check(ExtractionSandbox.Quote(@"C:\folder with spaces\") == "\"C:\\folder with spaces\\\\\"");

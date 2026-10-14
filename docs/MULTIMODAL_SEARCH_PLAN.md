@@ -23,8 +23,10 @@ A trusted extractor bridge validates receipts/payloads and source identity befor
 durable publication; all seven families pass its real CPU pipeline smoke.
 Sandbox permission journals recover after owner crashes, and shared runtime
 leases interlock with setup/removal. Scheduler/progress integration passes real
-all-family CPU indexing and watcher/maintenance/revocation checks. Retrieval and
-previews, clean standard-account installation, further parser lifecycle hardening,
+all-family CPU indexing and watcher/maintenance/revocation checks. Constrained
+retrieval, lexical fusion and locator previews now pass engineering contracts,
+real CPU code/image queries and authored WPF playback checks. Calibrated quality,
+clean standard-account installation, further parser lifecycle hardening,
 distribution review and release
 evaluations remain required. See
 [the runtime screen](MULTIMODAL_RUNTIME_SCREEN.md) for results and reproduction.
@@ -292,7 +294,7 @@ results as end-to-end release evidence.
 | Extractor bridge | Receipt/hash/payload validation, private tokenizer copy, source rechecks, owned-copy cleanup, resource guards and Settings progress | Packaged crash/upgrade checks and full resource/quality evaluation |
 | Document/image readers | Six Office formats through actual no-network AppContainer extraction and CPU embedding (`c6496b8`); PDF/image/CSV foundations | OCR, additional corrupt/large/scan fixtures, coverage fidelity and parser crash cleanup |
 | Audio/video readers | Bounded PyAV readers connected to indexing; all seven families pass CPU scheduler, watcher, maintenance and revocation checks (`7e66ee3`) | Packaged cancellation/crash cleanup, quality and resource gates |
-| Retrieval/UI | In progress: constraint/fusion contracts, real CPU code/image queries and matched-evidence previews pass initial checks | Finish sandboxed media playback fallback, UI/lifecycle verification, review and commit; calibrate admission only after freezing the holdout |
+| Retrieval/UI | Engineering foundation: 289 Release checks, real CPU code/image queries, retained selection/revoked actions, and all eight required media extensions in WPF | Independent quality/admission evaluation, richer locator/format fixtures and packaged lifecycle validation |
 | Release validation | Pending | Frozen independent holdout, throughput/resource measurements, clean packaging/install and every release gate below |
 
 Proceed in this order, committing each verified unit:
@@ -308,9 +310,12 @@ Proceed in this order, committing each verified unit:
    pause/quota/resource behavior, interactive priority and Settings progress pass
    without holding the metadata refresh gate. Packaged forced-exit/upgrade cases
    remain in the release checklist.
-3. Connect constrained retrieval and evidence previews. Preserve literal names,
-   date ordering, actions, manual selection and stale-response handling; test
-   semantic results independently with Laya disabled and enabled.
+3. Retrieval/preview foundation completed: constraints precede ranking, native
+   identity is revalidated, and lexical fusion retains dates/actions, Laya evidence,
+   grouping and manual selection. Authored WPF media playback advances for
+   WAV/MP3/M4A/FLAC/MP4/MOV/MKV/WebM; WebM uses a bounded sandboxed clip.
+   Real process-death tests recover abandoned clips and preserve active owners.
+   These checks do not calibrate admission or establish final quality.
 4. Complete document/image coverage and parser lifecycle hardening, including
    PDF scans/OCR availability and cleanup of sandbox permissions and job files
    after packaged crashes. Preserve explicit unsupported/partial statuses.
@@ -397,14 +402,13 @@ Keep all large or private evaluation outputs under ignored
 
 ## Next implementation task
 
-Finish and verify the current constrained-retrieval and evidence-preview slice.
-The current 288 Release checks and real CPU code/image retrieval smoke are
-engineering checks, not retrieval-quality evidence. Native playback opens the
-authored WAV/MP3/M4A/FLAC/MP4/MOV/MKV fixtures; WebM needs the in-progress bounded,
-no-network clip fallback. Verify that fallback, cancellation, scope revocation,
-temporary-file cleanup and UI selection before committing this milestone.
+Complete document/image coverage next: OCR availability/languages, scanned PDF
+and image fixtures, corrupt/oversized inputs and accurate partial/unsupported
+statuses. Extend locator checks using authored Office/PDF sources. Preserve the
+renderer-free implementation and the current retrieval behavior while doing so.
+The 289 Release checks, real CPU query smoke, sandbox clip recovery and WPF
+playback/selection checks are engineering evidence, not retrieval-quality proof.
 Keep Laya optional and metadata-only. The provisional similarity threshold is
-uncalibrated; freeze independent tasks before tuning it. Then continue with
-OCR/fidelity, packaged forced-death recovery, independent holdout,
-resource/hardware and distribution/install gates remain open; a completed indexing
-smoke does not establish release readiness.
+uncalibrated; freeze independent tasks before tuning it. Packaged forced-death
+recovery, the independent holdout, resource/hardware measurements and
+distribution/install checks remain open. The add-on is not release ready.

@@ -10,7 +10,7 @@ internal sealed class SemanticResourcePause(string reason) : Exception(reason);
 
 // Metadata reconciliation and content jobs have independent tasks. No file body,
 // parser or model request runs under IndexService's metadata refresh gate.
-internal sealed class SemanticService : IDisposable
+internal sealed partial class SemanticService : IDisposable
 {
     private readonly string dataRoot,addonRoot;
     private readonly MultimodalHost host;
@@ -19,6 +19,7 @@ internal sealed class SemanticService : IDisposable
     private readonly Func<MultimodalInstallation,Func<SemanticScope>,ISemanticExtractionSession> factory;
     private readonly Func<MultimodalInstallation?> find;
     private readonly Func<long,string?> pressure;
+    private readonly Func<string,CancellationToken,Task<EmbeddingResult>> query;
     private readonly SemaphoreSlim configuration=new(1);
     private readonly CancellationTokenSource lifetime=new();
     private readonly object stateGate=new();
@@ -48,12 +49,13 @@ internal sealed class SemanticService : IDisposable
     }
     public SemanticService(string dataRoot,MultimodalHost host,Func<Candidate[]> candidates,Func<bool> metadataReady,
         string? addonRoot=null,Func<MultimodalInstallation,Func<SemanticScope>,ISemanticExtractionSession>? factory=null,
-        Func<MultimodalInstallation?>? find=null,Func<long,string?>? pressure=null)
+        Func<MultimodalInstallation?>? find=null,Func<long,string?>? pressure=null,Func<string,CancellationToken,Task<EmbeddingResult>>? query=null)
     {
         this.dataRoot=Path.GetFullPath(dataRoot);this.host=host;this.candidates=candidates;this.metadataReady=metadataReady;
         this.addonRoot=addonRoot??MultimodalSetup.Root;
         this.factory=factory??((installed,current)=>new SemanticExtractor(this.addonRoot,installed,current,host.DocumentAsync));
         this.find=find??(()=>MultimodalSetup.Find(this.addonRoot));this.pressure=pressure??ResourcePressure;
+        this.query=query??host.QueryAsync;
         var runtime=Path.Combine(AppContext.BaseDirectory,"runtime");
         modelIdentity=Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(Path.Combine(runtime,"embeddinggemma2_model.json"))))+":768";
         using var digest=IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
@@ -70,6 +72,7 @@ internal sealed class SemanticService : IDisposable
         var next=new SemanticScope(snapshot.Multimodal.Enabled,snapshot.Multimodal.Folders,snapshot.Exclusions,
             snapshot.Multimodal.Modalities,modelIdentity,extractorIdentity).Normalize();
         var generation=Interlocked.Increment(ref epoch);
+        InvalidateRetrieval();
         Volatile.Write(ref scope,next); // Retrieval eligibility changes before any asynchronous wait.
         lock(stateGate) context?.Stop.Cancel();
         return ConfigureCoreAsync(snapshot,next,generation);
@@ -213,6 +216,7 @@ internal sealed class SemanticService : IDisposable
     public async Task RemoveIndexAsync()
     {
         Interlocked.Increment(ref epoch);
+        InvalidateRetrieval();
         Volatile.Write(ref scope,Scope with {Enabled=false});
         lock(stateGate)context?.Stop.Cancel();
         await configuration.WaitAsync(lifetime.Token).ConfigureAwait(false);
@@ -272,7 +276,7 @@ internal sealed class SemanticService : IDisposable
     [DllImport("kernel32.dll",SetLastError=true)][return:MarshalAs(UnmanagedType.Bool)]private static extern bool GlobalMemoryStatusEx(ref MemoryStatus status);
     public void Dispose()
     {
-        if(disposed)return;disposed=true;lifetime.Cancel();lock(stateGate)context?.Stop.Cancel();
+        if(disposed)return;disposed=true;lifetime.Cancel();InvalidateRetrieval();lock(stateGate)context?.Stop.Cancel();
         configuration.Wait();
         try{StopContextAsync().GetAwaiter().GetResult();index?.Dispose();index=null;}
         finally{configuration.Release();}

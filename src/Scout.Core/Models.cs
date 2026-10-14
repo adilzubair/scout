@@ -58,6 +58,7 @@ public sealed record Workspace(string Id, string Name, Candidate[] Members)
 public sealed record SearchHit(Candidate Candidate, double Score, bool Pinned = false)
 {
     public string Evidence { get; init; } = "";
+    public SemanticContentMatch? Semantic { get; init; }
 }
 public sealed record SearchResult(string Query, QueryIntent Intent, IReadOnlyList<SearchHit> Hits, double ElapsedMs)
 {

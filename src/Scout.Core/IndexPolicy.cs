@@ -13,6 +13,7 @@ public static class IndexPolicy
     public static string[] ActiveRoots(IEnumerable<string> metadataRoots, ScoutSettings settings) => metadataRoots
         .Concat(settings.ContentSearchEnabled ? settings.ContentFolders : [])
         .Concat(settings.Multimodal.Enabled ? settings.Multimodal.Folders : [])
+        .Select(Path.GetFullPath)
         .Where(Directory.Exists)
         .Where(path => !Excluded(path, settings.Exclusions))
         .Distinct(StringComparer.OrdinalIgnoreCase)

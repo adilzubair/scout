@@ -211,9 +211,10 @@ public sealed class SemanticIndex : IDisposable
         return 0;
     });
 
-    public SemanticVector[] Vectors(CancellationToken token = default) => WithConnection(connection =>
+    public SemanticVector[] Vectors(CancellationToken token = default) => VectorSnapshot(token).Vectors;
+    public SemanticVectorSnapshot VectorSnapshot(CancellationToken token=default)=>WithConnection(connection =>
     {
-        if (!scope.Enabled) return [];
+        if (!scope.Enabled) return new SemanticVectorSnapshot(Generation,Version,[]);
         using var query = Command(connection, "SELECT s.id,f.id,f.revision,f.family,s.modality,s.vector,f.path FROM semantic_segments s JOIN semantic_files f ON f.id=s.file_id WHERE f.status='ready' ORDER BY s.id");
         using var reader = query.ExecuteReader();
         var rows = new List<SemanticVector>();
@@ -224,18 +225,18 @@ public sealed class SemanticIndex : IDisposable
             if (rows.Count >= 600000) throw new InvalidDataException("Semantic vector matrix limit exceeded.");
             rows.Add(new(reader.GetString(0), reader.GetString(1), reader.GetString(2), reader.GetString(3), reader.GetString(4), Decode((byte[])reader.GetValue(5))));
         }
-        return rows.ToArray();
+        return new SemanticVectorSnapshot(Generation,Version,rows.ToArray());
     });
     public SemanticEvidence? Evidence(string segmentId) => WithConnection(connection =>
     {
         if (!scope.Enabled) return null;
-        using var query = Command(connection, "SELECT s.id,f.id,f.revision,f.path,f.family,s.modality,s.locator,s.evidence,s.thumbnail FROM semantic_segments s JOIN semantic_files f ON f.id=s.file_id WHERE s.id=$id AND f.status='ready'", null, ("$id", segmentId));
+        using var query = Command(connection, "SELECT s.id,f.id,f.revision,f.path,f.family,s.modality,s.locator,s.evidence,s.thumbnail,f.partial,f.detail FROM semantic_segments s JOIN semantic_files f ON f.id=s.file_id WHERE s.id=$id AND f.status='ready'", null, ("$id", segmentId));
         using var reader = query.ExecuteReader();
         if (!reader.Read() || !scope.Allows(reader.GetString(3), reader.GetString(4))) return null;
         var locator = JsonSerializer.Deserialize<ContentLocator>(reader.GetString(6)) ?? throw new InvalidDataException("Missing locator.");
         locator.Validate();
         return new SemanticEvidence(reader.GetString(0), reader.GetString(1), reader.GetString(2), reader.GetString(3), reader.GetString(5),
-            locator, reader.GetString(7), (byte[])reader.GetValue(8));
+            locator, reader.GetString(7), (byte[])reader.GetValue(8)){Partial=reader.GetInt32(9)!=0,Coverage=reader.GetString(10)};
     });
     public SemanticFileStatus[] Files() => WithConnection(connection =>
     {

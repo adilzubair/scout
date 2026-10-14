@@ -59,15 +59,8 @@ public static class SearchEngine
         {
             if ((position++ & 127) == 0) cancellationToken.ThrowIfCancellationRequested();
             var raw = doc.Candidate;
-            if (!raw.InScope(scope) || intent.Kind != null && raw.Kind != intent.Kind && !(intent.Kind == ItemKind.App && raw.Kind == ItemKind.Automation)) continue;
-            if (intent.Extension != null && !FileTypes.Matches(doc.Extension, intent.Extension)) continue;
-            if (intent.Screenshots && !doc.Screenshot) continue;
             library.TryGetValue(raw.Id, out var memory);
-            var opened = memory?.LastLaunch is { } lastOpened && (raw.OpenedAt == null || lastOpened > raw.OpenedAt) ? lastOpened : raw.OpenedAt;
-            var basis = intent.Recency == RecencyBasis.None && intent.Window != null ? (raw.Kind == ItemKind.Link ? RecencyBasis.Visited : RecencyBasis.Modified) : intent.Recency;
-            var date = basis == RecencyBasis.Opened ? opened : raw.Date(basis);
-            if (basis != RecencyBasis.None && (date == null || date > now.AddSeconds(2))) continue;
-            if (intent.Window is { } w && (date == null || date < w.Since || date >= w.Until)) continue;
+            if(!SearchEligibility.Allows(doc,scope,intent,memory,now,locations,out var opened,out var date))continue;
             double score = 0;
             var contentEvidence = false;
             if (emptyQuery)
