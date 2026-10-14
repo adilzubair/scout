@@ -42,9 +42,9 @@ class SetupContracts(unittest.TestCase):
         with patch('semantic_search.embedding.FullEmbedder') as embedder:
             setup.verify(TEST_ROOT/'model-only-generation', 'cpu')
             calls = embedder.return_value.embed.call_args_list
-            self.assertEqual(len(calls), 4)
+            self.assertEqual(len(calls), 5)
             self.assertTrue(calls[0].kwargs['query'])
-            self.assertEqual([set(call.args[0]) for call in calls[1:]], [{'image'}, {'audio'}, {'video'}])
+            self.assertEqual([set(call.args[0]) for call in calls[1:]], [{'image'}, {'audio'}, {'video'},{'video','audio'}])
 
     def test_failed_dependency_setup_preserves_previous_marker_and_retry_generation(self):
         with tempfile.TemporaryDirectory(dir=TEST_ROOT) as directory:
@@ -76,9 +76,23 @@ class SetupContracts(unittest.TestCase):
             commands = []
             with patch.object(sys, 'argv', ['setup.py', '--root', str(root), '--uv', 'uv.exe']), patch.object(setup, 'run', side_effect=lambda command, env: commands.append(command)):
                 setup.main()
-            self.assertEqual(len(commands), 1)
+            self.assertEqual(len(commands), 2)
             self.assertIn('--verify', commands[0])
+            self.assertTrue(str(commands[1][1]).endswith('notices.py'))
             self.assertEqual(json.loads((root / 'installed.json').read_text()), marker)
+
+    def test_notice_failure_cannot_publish_a_new_ready_generation(self):
+        with tempfile.TemporaryDirectory(dir=TEST_ROOT) as directory:
+            root=Path(directory);previous={'previous':'installation'};setup.atomic_json(root/'installed.json',previous)
+            def run(command,env):
+                if command[1]=='venv':
+                    python=root/'generations'/setup.generation_id('cpu')/'venv/Scripts/python.exe'
+                    python.parent.mkdir(parents=True);python.write_bytes(b'fixture')
+                elif str(command[1]).endswith('notices.py'):raise subprocess.CalledProcessError(1,command)
+            with patch.object(sys,'argv',['setup.py','--root',str(root),'--uv','uv.exe','--existing-model',str(root/'model'),'--offline']),patch.object(setup,'run',side_effect=run),patch.object(setup,'copy_model'):
+                with self.assertRaises(subprocess.CalledProcessError):setup.main()
+            self.assertEqual(json.loads((root/'installed.json').read_text()),previous)
+            self.assertFalse((root/'generations'/setup.generation_id('cpu')/'installed.json').exists())
 
 
 if __name__ == '__main__':

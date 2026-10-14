@@ -77,6 +77,7 @@ def main():
         if (generation / 'installed.json').is_file():
             # Never modify an environment that an existing host may be using.
             run([python, Path(__file__), '--verify', str(generation), '--device', args.device], env)
+            run([python, Path(__file__).with_name('notices.py'), '--generation', generation], env)
             atomic_json(base / 'installed.json', json.loads((generation / 'installed.json').read_text(encoding='utf-8')))
             print('Existing add-on generation verified.', flush=True)
             return
@@ -96,6 +97,7 @@ def main():
         print('Verifying the offline model and all modality encoders...', flush=True)
         run([python, Path(__file__), '--verify', str(generation), '--device', args.device],
             {**env, 'HF_HUB_OFFLINE': '1', 'TRANSFORMERS_OFFLINE': '1'})
+        run([python, Path(__file__).with_name('notices.py'), '--generation', generation], env)
         # No venv rename: Windows launchers can contain absolute interpreter paths.
         marker = dict(schemaVersion=2, generation=generation.name, device=args.device,
             revision=load_manifest()['revision'], modelManifestSha256=sha256(MANIFEST),
@@ -118,7 +120,9 @@ def verify(generation, device):
         ({'audio': np.zeros(16000, dtype=np.float32)}, {}),
         ({'video': np.stack([np.asarray(frame)]*2)}, {'processing_kwargs': {'video': {
             'do_sample_frames': False, 'video_metadata': dict(total_num_frames=2, fps=1,
-                duration=2, frames_indices=[0, 1], video_backend='scout-setup')}}})]:
+                duration=2, frames_indices=[0, 1], video_backend='scout-setup')}}}),
+        ({'video':np.stack([np.asarray(frame)]*2),'audio':np.zeros(32000,dtype=np.float32)},
+            {'processing_kwargs':{'video':{'do_sample_frames':False,'video_metadata':dict(total_num_frames=2,fps=1,duration=2,frames_indices=[0,1],video_backend='scout-setup')}}})]:
         embedder.embed(content, **kwargs)
 
 

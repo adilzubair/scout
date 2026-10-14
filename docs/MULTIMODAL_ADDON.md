@@ -567,3 +567,20 @@ Development setup also accepts explicit `--existing-model`,
 Model imports are checksum-verified. LibreOffice scripts/manifests remain in the
 repository only as historical development probes and are excluded from the base ZIP.
 Diagnostic files and screenshots stay under ignored `artifacts/diagnostics/`.
+
+Setup retains bounded, hash-verified package/interpreter notices and supplemental
+upstream license texts in `generations/<generation>/notices/`. Re-verification
+adds an immutable bundle and atomically updates `current.json`; it does not alter
+the installed dependency environment. A collection failure prevents publication
+of a new ready generation and leaves the prior installation marker intact.
+Readiness now tests joint audiovisual input as well as each individual encoder.
+The notice inventory records native reference hashes and outstanding source/codec
+review; it always reports `distributionApproved: false`. See
+[the third-party audit](THIRD_PARTY.md) for the specific unresolved native artifacts.
+
+```powershell
+.runtime/semantic-search/cpu-venv/Scripts/python.exe runtime/test_notices.py
+.runtime/semantic-search/cpu-venv/Scripts/python.exe runtime/test_multimodal_setup.py
+# Run using that generation's interpreter, so its own installed metadata is collected.
+C:/Path/To/Addon/generations/GENERATION/venv/Scripts/python.exe runtime/semantic_search/notices.py --generation C:/Path/To/Addon/generations/GENERATION
+```

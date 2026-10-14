@@ -416,6 +416,15 @@ Keep all large or private evaluation outputs under ignored
 
 ## Next implementation task
 
+Distribution audit now retains 71 installed package notice inventories, interpreter
+terms and pinned supplemental OCR/tokenizer/model license texts. Eight notice and
+five setup contracts cover path/integrity limits, Windows RECORD separators and
+publication rollback. The exact PyAV wheel has 23 DLL references including x264
+and x265; a publisher patch changes FFmpeg's configure license classification.
+Do not accept the runtime's reported LGPL string as distribution approval. Exact
+source correspondence and the remaining codec/toolchain obligations are still
+open. Continue base-package validation while preserving this release gate.
+
 The first grouped-source scale run is complete on the available 32 GB development
 machine: warm semantic p95 including uncached CPU query embedding is 393/471/893 ms
 at 25K/100K/500K segments. The workload uses 250 synthetic segments per real

@@ -1,2 +1,3 @@
 # Evaluation freezes bind exact protocol bytes across Windows checkouts.
 evaluation/multimodal/protocol.json text eol=lf
+runtime/notices/*.txt text eol=lf

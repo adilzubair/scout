@@ -42,6 +42,33 @@ partial OCR coverage. [PyWinRT source and license](https://github.com/pywinrt/py
 Media experiments use PyAV with bundled FFmpeg libraries; the probe records their
 actual build configuration and reported licenses.
 
+Setup and re-verification now retain the installed Python/package license and
+metadata texts under each add-on generation's `notices/` directory. The
+`current.json` pointer binds an immutable bundle manifest by length and SHA-256.
+Files are bounded, checked against wheel RECORD hashes when present, and copied
+with their exact bytes. Missing package texts for PyWinRT 3.2.1 and tokenizers
+0.23.3 are supplemented from pinned upstream revisions in `runtime/notices/`.
+The model's pinned Apache-2.0 declaration and license terms are retained as well.
+Collection does not change Scout's project license or grant distribution approval.
+
+The exact Windows PyAV wheel is `av-19.0.1-cp312-abi3-win_amd64.whl`,
+SHA-256 `906fc3db09288319a75ea23ffefb59961c7dbe0d1c074601507a89de7d8593d8`.
+`runtime/semantic_search/distribution.json` records its 23 bundled DLL reference
+hashes and a candidate upstream FFmpeg build recipe. This is a development
+reference, not an approved native distribution. The DLLs include x264/x265, while
+the library APIs report LGPL version 3 or later. The candidate publisher recipe
+explicitly moves those codecs out of FFmpeg's GPL configure classification.
+The reported license string therefore cannot establish distribution readiness.
+Exact corresponding source, codec and toolchain notices, and the distribution
+arrangement remain open. The collector always records `distributionApproved: false`.
+
+- [Pinned PyWinRT license](https://github.com/pywinrt/pywinrt/blob/21cbd0fd7ff91422ed76b4e3611d3fb52716e017/LICENSE)
+- [Pinned tokenizer license](https://github.com/huggingface/tokenizers/blob/301277072263fb3830eb66eec7e47adadf76f1dc/LICENSE)
+- [Pinned model declaration](https://huggingface.co/google/embeddinggemma-2/blob/914f7f89142e33e77833254d9c9b90c3cef7303b/README.md)
+- [Candidate FFmpeg recipe and source hashes](https://github.com/PyAV-Org/pyav-ffmpeg/blob/bac889417e26be29615cb6a3f38318151fed55cd/scripts/pkg.py)
+- [Publisher configure-classification patch](https://github.com/PyAV-Org/pyav-ffmpeg/blob/bac889417e26be29615cb6a3f38318151fed55cd/patches/ffmpeg.patch)
+- [FFmpeg distribution checklist](https://ffmpeg.org/legal.html)
+
 The historical Office compatibility spike separately downloaded the official LibreOffice
 26.8.1 Windows x64 MSI, pinned by package length and SHA-256 in
 `runtime/office_renderer.json`. Read-only extraction retains the package's

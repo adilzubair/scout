@@ -1,0 +1,204 @@
+{
+  "schemaVersion": 1,
+  "referenceStatus": "Development Windows x64 wheel; not approved for redistribution",
+  "pyavVersion": "19.0.1",
+  "wheel": {
+    "filename": "av-19.0.1-cp312-abi3-win_amd64.whl",
+    "bytes": 28149519,
+    "sha256": "906fc3db09288319a75ea23ffefb59961c7dbe0d1c074601507a89de7d8593d8",
+    "metadataUrl": "https://pypi.org/pypi/av/19.0.1/json"
+  },
+  "candidateBuildRecipe": {
+    "repository": "https://github.com/PyAV-Org/pyav-ffmpeg",
+    "revision": "bac889417e26be29615cb6a3f38318151fed55cd",
+    "vendorRelease": "9.0.2-1",
+    "pyavRecipe": "https://github.com/PyAV-Org/PyAV/blob/v19.0.1/scripts/ffmpeg-latest.json",
+    "buildScript": "https://github.com/PyAV-Org/pyav-ffmpeg/blob/bac889417e26be29615cb6a3f38318151fed55cd/scripts/build-ffmpeg.py",
+    "dependencySources": "https://github.com/PyAV-Org/pyav-ffmpeg/blob/bac889417e26be29615cb6a3f38318151fed55cd/scripts/pkg.py",
+    "classificationPatch": "https://github.com/PyAV-Org/pyav-ffmpeg/blob/bac889417e26be29615cb6a3f38318151fed55cd/patches/ffmpeg.patch",
+    "exactSourceCorrespondenceVerified": false
+  },
+  "reviewFindings": [
+    "x264_x265_libraries_present",
+    "publisher_changes_ffmpeg_license_classification",
+    "reported_lgpl_string_is_not_distribution_approval",
+    "exact_corresponding_source_not_verified",
+    "additional_native_dependency_notices_and_source_review_required"
+  ],
+  "referenceNativeFiles": [
+    {
+      "name": "avcodec-63-2756d4fffb772585dcdece87427716a4.dll",
+      "bytes": 19569664,
+      "sha256": "8e13fdedbeefb6a8b5d22b567122ec3c00384add569de9e589e53a86bd08422c"
+    },
+    {
+      "name": "avdevice-63-2b26d22512639c049532c0bc6f6c022f.dll",
+      "bytes": 156160,
+      "sha256": "43247c1bdaaec40977738037fdea7e8b779b3e93213dd529b1d25735b3099d8c"
+    },
+    {
+      "name": "avfilter-12-87c7677b784d3ea4ecceb3e6cae9c9f1.dll",
+      "bytes": 5956608,
+      "sha256": "a9b9e84178dd73162f47a3a531c321fad955ca3a7ff04a9517db7e7c78bf9ab2"
+    },
+    {
+      "name": "avformat-63-e8c4f8fc30664f2b7e85dcc683bd4b0d.dll",
+      "bytes": 2888704,
+      "sha256": "49759edae5286f10e4b11a442f51fb70bacde1f92b7b876038231c4d8140c506"
+    },
+    {
+      "name": "avutil-61-e540ec7976bbd26a4a94dc737be3001c.dll",
+      "bytes": 1157632,
+      "sha256": "ff2ba1b0d884336d53f1aee7b05873c5a3bbb987d0ffc79a49b92ed77579cd19"
+    },
+    {
+      "name": "libdav1d-5469d6ef7baf7426269a9483c24587b7.dll",
+      "bytes": 2203136,
+      "sha256": "5469d6ef7baf7426269a9483c24587b77bf6cb6a005f2bd98443a396f528e82b"
+    },
+    {
+      "name": "libgcc_s_seh-1-3e3b83c1f8de213bb810010a5622b180.dll",
+      "bytes": 150016,
+      "sha256": "502e8318a096f0bfb26d9f628f768bfab72853eabc1b6b262f2412263aad605b"
+    },
+    {
+      "name": "libiconv-2-5e7e51fe6a6e182df6c9f30f41700345.dll",
+      "bytes": 1141248,
+      "sha256": "5e7e51fe6a6e182df6c9f30f4170034575acd10d2079c3f1098411d21a311619"
+    },
+    {
+      "name": "libopus-0-278e2dd25a2793d306204c9d966fe0de.dll",
+      "bytes": 482816,
+      "sha256": "278e2dd25a2793d306204c9d966fe0dee6b4f56659b1ea7b759897e406980d79"
+    },
+    {
+      "name": "libsharpyuv-90c3f670f207c806d3e44db799e78832.dll",
+      "bytes": 51712,
+      "sha256": "90c3f670f207c806d3e44db799e78832750826c47a0cf8dea907603d240f9dbe"
+    },
+    {
+      "name": "libstdc++-6-7ad22040206bf70776b13a24ec3f87b2.dll",
+      "bytes": 2660352,
+      "sha256": "1cba2ca3b6f410fa4b03b01b479f7663493ea9903857cd753dc8dbc772f67447"
+    },
+    {
+      "name": "libSvtAv1Enc-7a2b2046575991edd70ef501ca085458.dll",
+      "bytes": 7724032,
+      "sha256": "7a2b2046575991edd70ef501ca085458ebdff3bf96282350057ae1dee0afaf9f"
+    },
+    {
+      "name": "libvmaf-e1698aa5c58a07400697833b5f19b0a3.dll",
+      "bytes": 1639936,
+      "sha256": "12e93e157295be651758eee56af4ed95c6a2ee5b3b91c65a83c8c6818af4c35f"
+    },
+    {
+      "name": "libvpl-45cd70cb42c579529a30ad6fc282c626.dll",
+      "bytes": 444416,
+      "sha256": "1a0bc607afbd8a224cc0c2db6fd5efa51245d7715ff1b659c16b47e773009115"
+    },
+    {
+      "name": "libvpx-1-dd81d2b55a771749d485047772201cc1.dll",
+      "bytes": 2583552,
+      "sha256": "738629b026940c256dfe988a62062bdc96ae5065d13163bf7e579dc95a4634f4"
+    },
+    {
+      "name": "libwebp-abac96c4759f9eb9b31588c8a839816c.dll",
+      "bytes": 759296,
+      "sha256": "e253a4adb1c133a690662e46d8c41e0a3b81b0e62d0f3a5e1a1109484a020dca"
+    },
+    {
+      "name": "libwebpmux-0b9545d83accdb1110a7efa5d1c54007.dll",
+      "bytes": 78336,
+      "sha256": "ce17228391b86192f201da1ce9c345ff5f7a9c1eca95ab04150491c24032f74e"
+    },
+    {
+      "name": "libwinpthread-1-3e9f18fdf7e856e1e9fedd138e84e874.dll",
+      "bytes": 62464,
+      "sha256": "3e9f18fdf7e856e1e9fedd138e84e874542e8717272fa7fdae5d0d826e88658c"
+    },
+    {
+      "name": "libx264-165-0f71f37cf3f3ee0e2ecac2b06829e9ff.dll",
+      "bytes": 2267648,
+      "sha256": "0f71f37cf3f3ee0e2ecac2b06829e9ff3cf2b3e237f25bb14aef6b8de14cd777"
+    },
+    {
+      "name": "libx265-ee9d492f3fb55d0a3b564bb1bf4f6822.dll",
+      "bytes": 12830720,
+      "sha256": "efe075f1ee008c722eb71adfe00d926071836d777cc9ef23b59c9ecb9db7d57f"
+    },
+    {
+      "name": "swresample-7-4f9462a1fb73b949ccad2774dd941624.dll",
+      "bytes": 180736,
+      "sha256": "a8bfee136c4c4e49d95b4439b1b80136504b2783cf93638f64bd3ad7de8e0ebe"
+    },
+    {
+      "name": "swscale-10-9af0a10ad7003982e48548ff39e98465.dll",
+      "bytes": 2124800,
+      "sha256": "f2956978470b3ed26c4f5db80b45d4c3a9188a4a8622133f73ded71504df85d6"
+    },
+    {
+      "name": "zlib1-4d767210e087ff082d94ef0a09ddc7f8.dll",
+      "bytes": 126464,
+      "sha256": "4d767210e087ff082d94ef0a09ddc7f8c04316c64d69d5a7b9ee802ceab407dd"
+    }
+  ],
+  "supplementalNotices": {
+    "winrt-runtime": {
+      "version": "3.2.1",
+      "file": "notices/pywinrt-3.2.1-MIT.txt",
+      "sha256": "6e898069e8b3c6d8d23dc70ac7067cc2b7c9db14c36df873026758db82c0891d",
+      "source": "https://github.com/pywinrt/pywinrt/blob/21cbd0fd7ff91422ed76b4e3611d3fb52716e017/LICENSE"
+    },
+    "winrt-windows-foundation": {
+      "version": "3.2.1",
+      "file": "notices/pywinrt-3.2.1-MIT.txt",
+      "sha256": "6e898069e8b3c6d8d23dc70ac7067cc2b7c9db14c36df873026758db82c0891d",
+      "source": "https://github.com/pywinrt/pywinrt/blob/21cbd0fd7ff91422ed76b4e3611d3fb52716e017/LICENSE"
+    },
+    "winrt-windows-foundation-collections": {
+      "version": "3.2.1",
+      "file": "notices/pywinrt-3.2.1-MIT.txt",
+      "sha256": "6e898069e8b3c6d8d23dc70ac7067cc2b7c9db14c36df873026758db82c0891d",
+      "source": "https://github.com/pywinrt/pywinrt/blob/21cbd0fd7ff91422ed76b4e3611d3fb52716e017/LICENSE"
+    },
+    "winrt-windows-globalization": {
+      "version": "3.2.1",
+      "file": "notices/pywinrt-3.2.1-MIT.txt",
+      "sha256": "6e898069e8b3c6d8d23dc70ac7067cc2b7c9db14c36df873026758db82c0891d",
+      "source": "https://github.com/pywinrt/pywinrt/blob/21cbd0fd7ff91422ed76b4e3611d3fb52716e017/LICENSE"
+    },
+    "winrt-windows-graphics-imaging": {
+      "version": "3.2.1",
+      "file": "notices/pywinrt-3.2.1-MIT.txt",
+      "sha256": "6e898069e8b3c6d8d23dc70ac7067cc2b7c9db14c36df873026758db82c0891d",
+      "source": "https://github.com/pywinrt/pywinrt/blob/21cbd0fd7ff91422ed76b4e3611d3fb52716e017/LICENSE"
+    },
+    "winrt-windows-media-ocr": {
+      "version": "3.2.1",
+      "file": "notices/pywinrt-3.2.1-MIT.txt",
+      "sha256": "6e898069e8b3c6d8d23dc70ac7067cc2b7c9db14c36df873026758db82c0891d",
+      "source": "https://github.com/pywinrt/pywinrt/blob/21cbd0fd7ff91422ed76b4e3611d3fb52716e017/LICENSE"
+    },
+    "winrt-windows-storage-streams": {
+      "version": "3.2.1",
+      "file": "notices/pywinrt-3.2.1-MIT.txt",
+      "sha256": "6e898069e8b3c6d8d23dc70ac7067cc2b7c9db14c36df873026758db82c0891d",
+      "source": "https://github.com/pywinrt/pywinrt/blob/21cbd0fd7ff91422ed76b4e3611d3fb52716e017/LICENSE"
+    },
+    "tokenizers": {
+      "version": "0.23.3",
+      "file": "notices/tokenizers-0.23.3-Apache-2.0.txt",
+      "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+      "source": "https://github.com/huggingface/tokenizers/blob/301277072263fb3830eb66eec7e47adadf76f1dc/LICENSE"
+    }
+  },
+  "modelNotice": {
+    "repository": "google/embeddinggemma-2",
+    "revision": "914f7f89142e33e77833254d9c9b90c3cef7303b",
+    "license": "Apache-2.0",
+    "licenseFile": "notices/tokenizers-0.23.3-Apache-2.0.txt",
+    "licenseSha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+    "declarationSource": "https://huggingface.co/google/embeddinggemma-2/blob/914f7f89142e33e77833254d9c9b90c3cef7303b/README.md",
+    "declarationSha256": "b677a0ee2818c36f091b65fd3d9b4baea9f04d53b02b49cae916c74bf9682037"
+  }
+}
