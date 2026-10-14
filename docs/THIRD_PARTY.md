@@ -37,20 +37,22 @@ PDF page rendering uses the pypdfium2 package and its bundled PDFium dependency.
 Media experiments use PyAV with bundled FFmpeg libraries; the probe records their
 actual build configuration and reported licenses.
 
-The Office compatibility spike separately downloads the official LibreOffice
+The historical Office compatibility spike separately downloaded the official LibreOffice
 26.8.1 Windows x64 MSI, pinned by package length and SHA-256 in
 `runtime/office_renderer.json`. Read-only extraction retains the package's
 `LICENSE.html`, `NOTICE`, and component-specific notices. LibreOffice identifies
 MPL-2.0 as its primary license and includes components under other licenses;
 the corresponding source release location is recorded in the manifest.
 The failed PortableApps 26.2.4 experiment is historical and is not used by the
-successful rendering path. Neither renderer package nor extracted runtime is
-included in Git or Scout's base application package. Review the exact component
-licenses, corresponding source and notice delivery before shipping the add-on.
+historical rendering path. Neither renderer package nor extracted runtime is
+included in Git or Scout's base application package. LibreOffice is removed
+from the revised add-on's installation and runtime dependencies; its helper
+and manifest are excluded from application packaging. These records describe
+the earlier development experiment.
 [LibreOffice licensing](https://www.libreoffice.org/licenses/),
 [26.8.1 source releases](https://download.documentfoundation.org/libreoffice/src/26.8.1/).
 
-The dependency locks and renderer manifest establish development compatibility;
+The dependency locks establish development compatibility;
 they do not complete the distribution review for native/codec dependencies.
 
 The add-on setup separately downloads uv 0.11.27 (MIT/Apache-2.0), pinned by

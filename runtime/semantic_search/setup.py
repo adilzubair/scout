@@ -23,7 +23,7 @@ def atomic_json(path, value):
 
 def generation_id(device):
     import hashlib
-    identity = '|'.join(sha256(path) for path in [MANIFEST, ROOT / 'runtime/office_renderer.json',
+    identity = 'schema2|' + '|'.join(sha256(path) for path in [MANIFEST,
         ROOT / 'runtime/multimodal_setup.json', ROOT / f'runtime/semantic_search/requirements.{device}.lock.txt'])
     return device + '-' + hashlib.sha256(identity.encode()).hexdigest()[:24]
 
@@ -49,7 +49,6 @@ def main():
     parser.add_argument('--uv', type=Path, required=True)
     parser.add_argument('--device', choices=['cpu', 'cuda'], default='cpu')
     parser.add_argument('--existing-model', type=Path, help='Import a verified local development model')
-    parser.add_argument('--existing-office', type=Path, help='Import a verified local development renderer')
     parser.add_argument('--offline', action='store_true', help='Require cached dependencies and explicit local artifacts')
     parser.add_argument('--cache-dir', type=Path, help='Explicit development dependency cache; removal does not own it')
     args = parser.parse_args()
@@ -94,36 +93,15 @@ def main():
             if args.offline:
                 raise ValueError('Offline setup needs a verified local model')
             run([python, ROOT / 'scripts/fetch-embeddinggemma2.py', '--output', model], env)
-        office_spec = json.loads((ROOT / 'runtime/office_renderer.json').read_text(encoding='utf-8'))
-        office = generation / 'office' / ('libreoffice-' + office_spec['version'])
-        print('Preparing the Office page renderer...', flush=True)
-        if args.existing_office:
-            # Import only verified MSI inventory members, never user profile/cache files.
-            from semantic_search.office import OfficeRenderer, package_path
-            verified = OfficeRenderer(args.existing_office)
-            ready = json.loads((verified.root / 'scout-renderer-ready.json').read_text(encoding='utf-8'))
-            office.mkdir(parents=True, exist_ok=True)
-            for name in ready['files']:
-                relative = package_path(name)
-                target = office / relative
-                target.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copyfile(verified.root / relative, target)
-            atomic_json(office / 'scout-renderer-ready.json', ready)
-        elif not (office / 'scout-renderer-ready.json').is_file():
-            if args.offline:
-                raise ValueError('Offline setup needs a verified local renderer')
-            run([python, ROOT / 'scripts/fetch-office-renderer.py', '--output', generation / 'office'], env)
         print('Verifying the offline model and all modality encoders...', flush=True)
         run([python, Path(__file__), '--verify', str(generation), '--device', args.device],
             {**env, 'HF_HUB_OFFLINE': '1', 'TRANSFORMERS_OFFLINE': '1'})
         # No venv rename: Windows launchers can contain absolute interpreter paths.
-        marker = dict(schemaVersion=1, generation=generation.name, device=args.device,
+        marker = dict(schemaVersion=2, generation=generation.name, device=args.device,
             revision=load_manifest()['revision'], modelManifestSha256=sha256(MANIFEST),
             lockSha256=sha256(ROOT / f'runtime/semantic_search/requirements.{args.device}.lock.txt'),
-            officeManifestSha256=sha256(ROOT / 'runtime/office_renderer.json'),
             setupManifestSha256=sha256(ROOT / 'runtime/multimodal_setup.json'),
-            python='venv/Scripts/python.exe', model='model',
-            office='office/libreoffice-' + office_spec['version'])
+            python='venv/Scripts/python.exe', model='model')
         atomic_json(generation / 'installed.json', marker)
         atomic_json(base / 'installed.json', marker)
         print('Multimodal add-on verified. Save settings to enable it.', flush=True)
@@ -131,11 +109,8 @@ def main():
 
 def verify(generation, device):
     from semantic_search.embedding import FullEmbedder
-    from semantic_search.office import OfficeRenderer
     from PIL import Image
     import numpy as np
-    manifest = json.loads((ROOT / 'runtime/office_renderer.json').read_text(encoding='utf-8'))
-    OfficeRenderer(generation / 'office' / ('libreoffice-' + manifest['version']))
     embedder = FullEmbedder(generation / 'model', device=device, threads=4)
     frame = Image.new('RGB', (64, 64), 'blue')
     for content, kwargs in [

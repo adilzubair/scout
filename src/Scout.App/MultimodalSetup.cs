@@ -5,7 +5,7 @@ using System.Text.RegularExpressions;
 
 namespace Scout.App;
 
-internal sealed record MultimodalInstallation(string Generation, string Python, string Model, string Office, string Device, string Revision);
+internal sealed record MultimodalInstallation(string Generation, string Python, string Model, string Device, string Revision);
 
 internal static partial class MultimodalSetup
 {
@@ -21,7 +21,8 @@ internal static partial class MultimodalSetup
             if (new FileInfo(marker).Length > 16384) return null;
             using var json = JsonDocument.Parse(File.ReadAllText(marker));
             var data = json.RootElement;
-            if (data.GetProperty("schemaVersion").GetInt32() != 1) return null;
+            // Existing full-model generations remain usable without their old renderer.
+            if (data.GetProperty("schemaVersion").GetInt32() is not (1 or 2)) return null;
             var generation = data.GetProperty("generation").GetString() ?? "";
             var device = data.GetProperty("device").GetString() ?? "";
             if (device is not ("cpu" or "cuda") || !GenerationPattern().IsMatch(generation) || !generation.StartsWith(device + "-", StringComparison.Ordinal)) return null;
@@ -29,18 +30,16 @@ internal static partial class MultimodalSetup
             string Digest(string file) => Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(file))).ToLowerInvariant();
             if (data.GetProperty("modelManifestSha256").GetString() != Digest(Path.Combine(runtime, "embeddinggemma2_model.json")) ||
                 data.GetProperty("lockSha256").GetString() != Digest(Path.Combine(runtime, "semantic_search", $"requirements.{device}.lock.txt")) ||
-                data.GetProperty("officeManifestSha256").GetString() != Digest(Path.Combine(runtime, "office_renderer.json")) ||
                 data.GetProperty("setupManifestSha256").GetString() != Digest(Path.Combine(runtime, "multimodal_setup.json"))) return null;
             var folder = OwnedPath(root, "generations/" + generation);
             var python = OwnedPath(folder, data.GetProperty("python").GetString() ?? "");
             var model = OwnedPath(folder, data.GetProperty("model").GetString() ?? "");
-            var office = OwnedPath(folder, data.GetProperty("office").GetString() ?? "");
             if (data.GetProperty("python").GetString() != "venv/Scripts/python.exe" || data.GetProperty("model").GetString() != "model" ||
-                !File.Exists(python) || !File.Exists(Path.Combine(model, "config.json")) || !File.Exists(Path.Combine(office, "scout-renderer-ready.json"))) return null;
+                !File.Exists(python) || !File.Exists(Path.Combine(model, "config.json"))) return null;
             using var modelSpec = JsonDocument.Parse(File.ReadAllText(Path.Combine(runtime, "embeddinggemma2_model.json")));
             var revision = data.GetProperty("revision").GetString() ?? "";
             if (revision != modelSpec.RootElement.GetProperty("revision").GetString()) return null;
-            return new(generation, python, model, office, device, revision);
+            return new(generation, python, model, device, revision);
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException or JsonException or KeyNotFoundException or InvalidOperationException or ArgumentException or FormatException) { return null; }
     }

@@ -44,7 +44,10 @@ Scout's private index and is not sent to Laya or the Qwen helper.
 
 This branch also includes a **Settings → Multimodal** development preview for
 the optional full EmbeddingGemma 2 add-on. It installs and tests text, image,
-audio and video support independently of Laya. Folder indexing and semantic
+audio and video support independently of Laya. LibreOffice is not required;
+Office content will use dedicated readers for text, cells, chart data and
+embedded images, with extracted evidence previews rather than exact Office
+layout. Folder indexing and semantic
 search results are still being implemented. Selected content will be supplied
 to the local embedding worker when that pipeline is connected; Laya and Qwen
 continue to receive no document bodies. See [add-on status and checks](docs/MULTIMODAL_ADDON.md).

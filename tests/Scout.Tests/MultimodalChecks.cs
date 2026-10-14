@@ -54,20 +54,21 @@ internal static class MultimodalChecks
                 var generation = "cpu-" + new string('a', 24);
                 Directory.CreateDirectory(Path.Combine(root, "generations", generation, "venv/Scripts"));
                 Directory.CreateDirectory(Path.Combine(root, "generations", generation, "model"));
-                Directory.CreateDirectory(Path.Combine(root, "generations", generation, "office"));
                 File.WriteAllText(Path.Combine(root, "generations", generation, "venv/Scripts/python.exe"), "fixture");
                 File.WriteAllText(Path.Combine(root, "generations", generation, "model/config.json"), "{}");
-                File.WriteAllText(Path.Combine(root, "generations", generation, "office/scout-renderer-ready.json"), "{}");
                 var runtime = Path.Combine(AppContext.BaseDirectory, "runtime");
                 string Digest(string file) => Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(Path.Combine(runtime, file)))).ToLowerInvariant();
                 using var model = JsonDocument.Parse(File.ReadAllText(Path.Combine(runtime, "embeddinggemma2_model.json")));
-                var marker = new Dictionary<string, object> { ["schemaVersion"] = 1, ["generation"] = generation, ["device"] = "cpu",
-                    ["modelManifestSha256"] = Digest("embeddinggemma2_model.json"), ["officeManifestSha256"] = Digest("office_renderer.json"),
+                var marker = new Dictionary<string, object> { ["schemaVersion"] = 2, ["generation"] = generation, ["device"] = "cpu",
+                    ["modelManifestSha256"] = Digest("embeddinggemma2_model.json"),
                     ["setupManifestSha256"] = Digest("multimodal_setup.json"), ["lockSha256"] = Digest("semantic_search/requirements.cpu.lock.txt"),
-                    ["revision"] = model.RootElement.GetProperty("revision").GetString()!, ["python"] = "venv/Scripts/python.exe", ["model"] = "model", ["office"] = "office" };
+                    ["revision"] = model.RootElement.GetProperty("revision").GetString()!, ["python"] = "venv/Scripts/python.exe", ["model"] = "model" };
                 var file = Path.Combine(root, "installed.json");
                 File.WriteAllText(file, JsonSerializer.Serialize(marker));
                 Check(MultimodalSetup.Find(root) != null);
+                marker["schemaVersion"] = 1; File.WriteAllText(file, JsonSerializer.Serialize(marker));
+                Check(MultimodalSetup.Find(root) != null); // Legacy model readiness no longer depends on Office.
+                marker["schemaVersion"] = 2;
                 foreach (var key in new[] { "generation", "python", "modelManifestSha256", "lockSha256", "setupManifestSha256" })
                 {
                     var corrupt = new Dictionary<string, object>(marker) { [key] = "../outside" };

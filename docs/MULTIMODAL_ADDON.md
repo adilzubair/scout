@@ -5,8 +5,11 @@ Date: 2026-10-14. Branch: `feature/multimodal-semantic-search`.
 Scout now has an independent setup entry point, authenticated embedding worker,
 Windows process lifetime, and Multimodal settings page. The preview installs and
 tests the full EmbeddingGemma 2 model; it does not yet index selected folders or
-add semantic matches to search results. The next slice is the durable segment
-index and work queue. All content families remain in the release scope.
+add semantic matches to search results. The durable index and native source
+snapshot foundation is implemented; isolated readers and retrieval are next.
+All content families remain in the release scope. LibreOffice is removed from
+the product path by user direction. Office evidence will use extracted text,
+cells, chart data and embedded images, without exact Office page/slide rendering.
 
 ## Settings and installation
 
@@ -22,8 +25,8 @@ and quota are preferences for the upcoming queue; no background content jobs
 exist in this slice. The existing keyword content-search setting is independent.
 
 Setup uses `%LOCALAPPDATA%\Scout\addons\multimodal` (under `SCOUT_DATA_DIR` in
-isolated diagnostics). Its dedicated Python, dependency cache, model, Office
-renderer and setup tool stay outside the base application installation. The
+isolated diagnostics). Its dedicated Python, dependency cache, model and setup
+tool stay outside the base application installation. No Office suite is required. The
 bootstrap pins uv 0.11.27 by SHA-256 and length and requests Python 3.12.13. It
 disables uv's global executable aliases and Windows registry registration.
 Dependencies use the existing CPU/CUDA hash locks. Downloaded artifacts remain
@@ -33,11 +36,9 @@ outside Git and the base ZIP.
 Each dependency identity gets a stable generation directory. A killed setup
 releases its OS file lock; retry reuses that generation and download caches.
 Windows venv directories are not renamed because launchers may contain absolute
-paths. Model downloads resume through Hugging Face's cache. Office downloads
-resume with validated HTTP ranges and verify the complete artifact before use;
-a mirror that ignores ranges restarts that artifact. The small bootstrap ZIP
+paths. Model downloads resume through Hugging Face's cache. The small bootstrap ZIP
 restarts after an interrupted transfer. Setup publishes an atomic installation
-marker only after full model integrity, Office inventory, and actual text,
+marker only after full model integrity and actual text,
 image, audio and video embedding checks pass. Reverification does not modify a
 completed generation's dependency environment. A failed new generation leaves
 the prior installation marker in place.
@@ -95,7 +96,8 @@ worker performs offline model loading and does not log inputs or API bodies.
 ## Verification and remaining gates
 
 An isolated CPU generation was created from cached locked dependencies and
-previously verified local model/Office artifacts. The exact PowerShell entry
+previously verified local model artifacts (the old renderer-bearing generation
+was a historical setup test). The exact PowerShell entry
 point then downloaded/verified its pinned bootstrap, acquired its private Python,
 and reverified that generation. The corrected bootstrap leaves no Python test
 registry entry. This is not yet an end-to-end clean-account internet install;
@@ -138,8 +140,11 @@ replacement, scope rejection, snapshot cleanup and cancellation; 256 Release
 checks pass. Parser isolation is the next slice; this adapter is not connected
 to personal indexing yet.
 
-The Office helper is not yet invoked by this worker, and its network/resource
-restrictions remain part of the extraction integration. Native source validation,
+The Office helper is excluded from the application package and new setup no
+longer downloads or verifies it. Schema 2 installations contain only the model
+and interpreter paths; existing schema 1 model generations remain usable even
+when their obsolete Office folder is absent. The model and dependency identity
+checks remain mandatory. Structured Office readers and general parser isolation,
 application lifecycle integration, prioritization, query fusion, evidence
 previews, holdout quality, 16 GB hardware measurements and final distribution
 review remain required before release. This preview does not establish general
@@ -155,7 +160,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/setup-multimodal.ps1
 dotnet run --project tests/Scout.Tests -c Release -- --multimodal-host C:/Path/To/PrivateTestAddon
 ```
 
-Development setup also accepts explicit `--existing-model`, `--existing-office`,
+Development setup also accepts explicit `--existing-model`,
 `--cache-dir` and `--offline` arguments to `runtime/semantic_search/setup.py`.
-Those imports are checksum-verified and copy only the renderer's inventory.
+Model imports are checksum-verified. LibreOffice scripts/manifests remain in the
+repository only as historical development probes and are excluded from the base ZIP.
 Diagnostic files and screenshots stay under ignored `artifacts/diagnostics/`.

@@ -9,6 +9,6 @@
   </PropertyGroup>
   <ItemGroup><ProjectReference Include="../Scout.Core/Scout.Core.csproj" /></ItemGroup>
   <ItemGroup><PackageReference Include="System.Management" Version="10.0.12" /></ItemGroup>
-  <ItemGroup><Content Include="../../runtime/**" Exclude="../../runtime/**/__pycache__/**"><Link>runtime/%(RecursiveDir)%(Filename)%(Extension)</Link><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></Content></ItemGroup>
-  <ItemGroup><Content Include="../../scripts/setup-multimodal.ps1;../../scripts/fetch-embeddinggemma2.py;../../scripts/fetch-office-renderer.py"><Link>scripts/%(Filename)%(Extension)</Link><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></Content></ItemGroup>
+  <ItemGroup><Content Include="../../runtime/**" Exclude="../../runtime/**/__pycache__/**;../../runtime/office_renderer.json;../../runtime/test_office_renderer.py;../../runtime/semantic_search/office.py;../../runtime/semantic_search/msi.py"><Link>runtime/%(RecursiveDir)%(Filename)%(Extension)</Link><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></Content></ItemGroup>
+  <ItemGroup><Content Include="../../scripts/setup-multimodal.ps1;../../scripts/fetch-embeddinggemma2.py"><Link>scripts/%(Filename)%(Extension)</Link><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></Content></ItemGroup>
 </Project>

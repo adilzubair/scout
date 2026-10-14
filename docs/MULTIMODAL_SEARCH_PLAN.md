@@ -2,15 +2,18 @@
 
 Date: 2026-10-14. Branch: `feature/multimodal-semantic-search`.
 Status: implementation started. The full-model runtime and content smoke probe
-are implemented and verified on CPU and CUDA. The Office compatibility spike
-now passes DOCX/ODT, PPTX/ODP and XLSX/ODS conversion from a privately extracted
-official Windows package, including native presentation chart rendering.
+are implemented and verified on CPU and CUDA. On 2026-10-14 the user directed
+implementation to proceed without LibreOffice. The earlier renderer spike is
+historical evidence, not a shipping dependency. Office content will use dedicated
+Open XML/OpenDocument readers for text, tables, chart data and embedded images.
+Exact Office layout reproduction is outside this path; PDF page rendering,
+standalone images, audio and video remain required.
 The independent add-on setup, host and settings preview is implemented and
 verified. The separate SQLite segment index and durable queue now pass crash,
 source-change, revocation, atomic replacement and quota contracts. They are not
 yet connected to the application; source acquisition and isolated readers are
 the next integration slice. Clean
-standard-account installation, renderer hardening, distribution review and
+standard-account installation, parser isolation, distribution review and
 release evaluations remain required. See
 [the runtime screen](MULTIMODAL_RUNTIME_SCREEN.md) for results and reproduction.
 See [the add-on preview](MULTIMODAL_ADDON.md) for lifecycle, installation,
@@ -30,9 +33,9 @@ an independently enabled refinement feature.
 
 | Content | Required first-release coverage | Search evidence |
 | --- | --- | --- |
-| Documents | PDF, DOCX, ODT, TXT and Markdown; PDF text and rendered pages; Office text and rendered document pages | Page or section, text excerpt or visual thumbnail |
-| Presentations | PPTX and ODP, including slide text, diagrams and charts | Slide number and thumbnail |
-| Spreadsheets | XLSX, ODS and CSV; cell values, headers and table relationships; rendered charts and relevant sheet regions | Sheet name and cell range |
+| Documents | PDF, DOCX, ODT, TXT and Markdown; PDF text and rendered pages; Office paragraphs, tables and embedded images | PDF page or document section, excerpt or embedded-image thumbnail |
+| Presentations | PPTX and ODP; slide text, shape labels, chart data and embedded images | Slide number with text/data or image evidence |
+| Spreadsheets | XLSX, ODS and CSV; cell values, headers, table relationships and chart data | Sheet name and cell range or chart data |
 | Code | Existing supported source/configuration formats, preserving functions or logical sections where practical | Line range and excerpt |
 | Images | PNG, JPEG, WebP, BMP and TIFF; image content and available OCR text | Image thumbnail and extracted text where present |
 | Audio | WAV, MP3, M4A and FLAC; speech and environmental sounds | Start/end timestamps and in-app playback |
@@ -103,20 +106,14 @@ Proposed extraction stack to validate in milestone 1:
 - Dedicated Open XML/OpenDocument readers for paragraphs, slides, formulas,
   cached cell values and table structure. Never execute workbook formulas,
   macros or external links while extracting.
-- A headless Office rendering worker, initially evaluated with LibreOffice.
-  Validate unattended DOCX/PPTX/XLSX and ODF rendering, chart fidelity, font
-  substitutions, timeouts and a per-user installation without admin rights.
-  The standard LibreOffice installer requires administrator rights, so it
-  cannot be assumed to fit Scout's installation flow. Resolve an appropriate
-  distribution or alternative renderer in the initial spike.
-  [LibreOffice system requirements](https://www.libreoffice.org/system-requirements/).
-  The spike now extracts the pinned 26.8.1 MSI through read-only data APIs and
-  embedded cabinets, without executing installer actions. It validates all
-  extracted application files before conversion. This resolves development
-  runtime viability; it is not a completed standard-account installation test.
-  Formula-bearing spreadsheets and embedded ODF objects currently receive an
-  unsupported status. Cached-value render inputs and additional chart/layout
-  fixtures remain part of the document-reader milestone.
+- No Office suite, automation or headless converter is installed or invoked.
+  Read Open XML/OpenDocument containers directly, with bounded ZIP/XML processing.
+  Preserve cached numeric/boolean/formula values, merges, sheet/slide context,
+  chart series and embedded images. Never calculate formulas or fetch links.
+  Label uncached formulas and unsupported objects explicitly. Office evidence
+  previews show extracted text/data/images; they do not promise exact pagination,
+  shape geometry, font layout or visual chart styling. Visual queries requiring
+  an unsupported Office layout must abstain. PDF and image vision remain enabled.
 - Windows image decoding and local OCR where available; define missing OCR
   language handling. Vision embeddings remain usable without OCR.
 - A pinned FFmpeg/ffprobe build for bounded audio/video decoding. Record the
@@ -176,8 +173,9 @@ excluded folders, changed roots and watcher overflow. Path-derived candidate IDs
 can change on rename; stale IDs must never remain launchable.
 
 Use token-aware text chunks with overlap; preserve document headings and table
-headers. Render PDFs and Office pages/slides separately so diagrams and scans
-are indexed visually. Spreadsheet extraction must include numeric/boolean
+headers. Render PDF pages and decode embedded Office images for visual indexing.
+Read Office chart series/labels and diagram text directly; label visual layout
+that cannot be represented by these readers. Spreadsheet extraction must include numeric/boolean
 cells, cached formula results, shared and inline strings, merged headings and
 sheet context; missing cached formulas are labelled, not recalculated.
 
@@ -252,10 +250,10 @@ diagnostic reports under ignored local directories.
 
 | Milestone | Work and dependencies | Completion check |
 | --- | --- | --- |
-| 1 Runtime and format spike | Pin the full model; verify text, chart/image, speech, sound and video embeddings on Windows CPU and available CUDA hardware; test Office rendering/distribution and media decoders | Reproducible all-modality probe, dependency manifest, licensing notes and measured resource/package report; resolve renderer compatibility before dependent work |
+| 1 Runtime and format spike | Pin the full model; verify text, chart/image, speech, sound and video embeddings on Windows CPU and available CUDA hardware; test media decoders | Reproducible all-modality probe, dependency manifest, licensing notes and measured resource/package report |
 | 2 Add-on host and settings | Build independent setup, host, install states, offline operation, cancel/retry, pause and removal | Interrupted install/restart/offline tests; Scout starts and searches with add-on absent; Laya disabled path works |
 | 3 Index and queue | Add segment schema, durable jobs, scope generations, atomic replacement, quotas and crash recovery | Delete/rename/change/revocation tests; no stale or excluded results; resumed jobs are idempotent |
-| 4 Document and image readers | Dedicated structured text/table readers, PDF and Office rendering, images/OCR and local evidence | Fixture coverage for scans, charts, numeric/formula cells and poor filenames; no preview truncation treated as complete indexing |
+| 4 Document and image readers | Structured Office text/table/chart/image readers, PDF rendering, images/OCR and local evidence | Fixture coverage for scans, chart data, embedded images, numeric/formula cells and poor filenames; explicit unsupported layout and partial coverage |
 | 5 Audio and video readers | Bounded decoding, temporal segmentation, frame/audio embeddings and coverage reporting | Long-file, silent/video-only, speech/sound and timestamp tests; cancellation cleans processes and temporary files |
 | 6 Retrieval and previews | Constrained vector retrieval, lexical fusion, abstention, grouped evidence and locator navigation | Final content hits with Laya off/on; exact/date/action/group behavior preserved; no stale responses |
 | 7 Resource and quality evaluation | Fresh content-grounded holdout, modality ablations, dimension/quantization comparisons and Windows laptop measurements | Meets release targets below with every required content family enabled |
@@ -271,7 +269,7 @@ Target Windows 11 x64 with 16 GB RAM for the first full-modality CPU validation;
 also measure a 32 GB machine and the available NVIDIA GPU. CPU-only support is
 a release goal. Advertise minimum RAM/VRAM, supported CPU instructions and disk
 requirements only after measuring the exact shipped artifacts. Include decoding,
-Office conversion, tokenizer, runtime and download-cache peaks in those figures.
+structured readers, tokenizer, runtime and download-cache peaks in those figures.
 
 The full model's raw FP32 weights are approximately 2.96 GB by parameter-count
 arithmetic; this excludes process overhead and temporary content. Index storage
@@ -325,7 +323,7 @@ actually validated.
 Add C# index/retrieval/lifecycle contracts, Python embedding/decoder contracts,
 authenticated HTTP tests, concurrent update/revocation tests and packaged WPF
 checks. Exercise corrupt files, zip expansion, missing codecs/OCR languages,
-unsupported Office rendering, GPU OOM, worker crashes and offline startup.
+unsupported Office objects/layout, GPU OOM, worker crashes and offline startup.
 Test clean setup/update/removal under a standard Windows account.
 
 Use `scripts/build.ps1` for the existing Release build and C# checks. Extend
@@ -338,7 +336,8 @@ Keep all large or private evaluation outputs under ignored
 
 Start milestone 1 with a pinned full-model probe and a small public/authored
 fixture pack spanning every modality. Produce the compatibility and footprint
-report, choose the Office renderer distribution, and finalize the runtime lock
+report and finalize the runtime lock
 before building permanent settings or installing the add-on into a normal Scout
 user profile. This resolves the two largest dependencies: a viable Windows
-multimodal runtime and faithful Office content rendering.
+multimodal runtime. The subsequent structured readers use the revised Office
+coverage above without a converter dependency.

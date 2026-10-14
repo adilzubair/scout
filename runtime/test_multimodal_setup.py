@@ -1,8 +1,6 @@
 """Installation publication and interrupted-download contracts, without model weights."""
 
 import hashlib
-import importlib.util
-import io
 import json
 from pathlib import Path
 import subprocess
@@ -15,16 +13,6 @@ from semantic_search import setup
 
 ROOT = Path(__file__).resolve().parents[1]
 TEST_ROOT = ROOT / 'artifacts/diagnostics/multimodal/setup-contracts'
-spec = importlib.util.spec_from_file_location('office_download', ROOT / 'scripts/fetch-office-renderer.py')
-download = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(download)
-
-
-class Response(io.BytesIO):
-    url = 'https://publisher.example/package'
-    def __init__(self, content, status=200, headers=None):
-        super().__init__(content)
-        self.status, self.headers = status, headers or {}
 
 
 class SetupContracts(unittest.TestCase):
@@ -32,36 +20,31 @@ class SetupContracts(unittest.TestCase):
     def setUpClass(cls):
         TEST_ROOT.mkdir(parents=True, exist_ok=True)
 
-    def test_office_download_resumes_and_checks_the_full_artifact(self):
+    def test_fresh_generation_publishes_without_any_renderer(self):
         with tempfile.TemporaryDirectory(dir=TEST_ROOT) as directory:
-            file = Path(directory) / 'office.msi'
-            file.with_suffix('.partial').write_bytes(b'first')
-            content = b'firstsecond'
-            pinned = dict(url='https://publisher.example/package', bytes=len(content), sha256=hashlib.sha256(content).hexdigest())
-            def fetch(request, **kwargs):
-                self.assertEqual(request.get_header('Range'), 'bytes=5-')
-                return Response(b'second', 206, {'Content-Range': 'bytes 5-10/11'})
-            with patch('urllib.request.urlopen', side_effect=fetch):
-                download.download_package(pinned, file)
-            self.assertEqual(file.read_bytes(), content)
-            self.assertFalse(file.with_suffix('.partial').exists())
+            root = Path(directory)
+            commands = []
+            def run(command, env):
+                commands.append(command)
+                if command[1] == 'venv':
+                    python = root / 'generations' / setup.generation_id('cpu') / 'venv/Scripts/python.exe'
+                    python.parent.mkdir(parents=True); python.write_bytes(b'fixture')
+            with patch.object(sys, 'argv', ['setup.py', '--root', str(root), '--uv', 'uv.exe', '--existing-model', str(root/'model'), '--offline']), patch.object(setup, 'run', side_effect=run), patch.object(setup, 'copy_model'):
+                setup.main()
+            marker = json.loads((root/'installed.json').read_text())
+            self.assertEqual(marker['schemaVersion'], 2)
+            self.assertNotIn('office', marker)
+            self.assertNotIn('officeManifestSha256', marker)
+            self.assertFalse(any('office' in str(command).casefold() for command in commands))
+            self.assertEqual(marker, json.loads((root/'generations'/marker['generation']/'installed.json').read_text()))
 
-    def test_ignored_ranges_restart_and_bad_ranges_or_hashes_never_publish(self):
-        with tempfile.TemporaryDirectory(dir=TEST_ROOT) as directory:
-            file = Path(directory) / 'office.msi'
-            content = b'complete'
-            pinned = dict(url='https://publisher.example/package', bytes=len(content), sha256=hashlib.sha256(content).hexdigest())
-            file.with_suffix('.partial').write_bytes(b'com')
-            with patch('urllib.request.urlopen', return_value=Response(content)):
-                download.download_package(pinned, file)
-            self.assertEqual(file.read_bytes(), content)
-            file.unlink()
-            for response in [Response(b'bad', 206, {'Content-Range': 'bytes 2-7/8'}), Response(b'corrupt!')]:
-                file.with_suffix('.partial').write_bytes(b'com')
-                with patch('urllib.request.urlopen', return_value=response):
-                    with self.assertRaises(ValueError):
-                        download.download_package(pinned, file)
-                self.assertFalse(file.exists())
+    def test_readiness_checks_every_encoder_without_a_renderer(self):
+        with patch('semantic_search.embedding.FullEmbedder') as embedder:
+            setup.verify(TEST_ROOT/'model-only-generation', 'cpu')
+            calls = embedder.return_value.embed.call_args_list
+            self.assertEqual(len(calls), 4)
+            self.assertTrue(calls[0].kwargs['query'])
+            self.assertEqual([set(call.args[0]) for call in calls[1:]], [{'image'}, {'audio'}, {'video'}])
 
     def test_failed_dependency_setup_preserves_previous_marker_and_retry_generation(self):
         with tempfile.TemporaryDirectory(dir=TEST_ROOT) as directory:
@@ -88,7 +71,7 @@ class SetupContracts(unittest.TestCase):
             root = Path(directory)
             generation = root / 'generations' / setup.generation_id('cpu')
             generation.mkdir(parents=True)
-            marker = {'generation': generation.name, 'schemaVersion': 1}
+            marker = {'generation': generation.name, 'schemaVersion': 2}
             setup.atomic_json(generation / 'installed.json', marker)
             commands = []
             with patch.object(sys, 'argv', ['setup.py', '--root', str(root), '--uv', 'uv.exe']), patch.object(setup, 'run', side_effect=lambda command, env: commands.append(command)):
