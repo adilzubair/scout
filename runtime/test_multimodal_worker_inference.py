@@ -69,11 +69,13 @@ def main():
                     *[dict(schemaVersion=1, mode='document', content=content) for content in [
                         dict(type='text', text='meeting notes about deployment'), dict(type='image', data=image),
                         dict(type='audio', data=audio, sampleRate=16000),
-                        dict(type='video', frames=[image, image], indices=[0, 1], fps=1, totalFrames=2)]]]:
+                        dict(type='video', frames=[image, image], indices=[0, 1], fps=1, totalFrames=2),
+                        dict(type='video',frames=[image,image],indices=[0,1],fps=1,totalFrames=2,
+                            audio=dict(data=base64.b64encode(np.zeros(32000,dtype='<f4')).decode(),sampleRate=16000))]]]:
                     result = request('embed', body)
                     vector = np.asarray(result['vector'])
                     assert len(vector) == 768 and np.isfinite(vector).all() and abs(np.linalg.norm(vector)-1) < 1e-5
-                print(f'PASS: independent {args.device} worker, authenticated HTTP, full-model text/image/audio/video, outgoing sockets blocked')
+                print(f'PASS: independent {args.device} worker, authenticated HTTP, full-model text/image/audio/video and joint AV, outgoing sockets blocked')
             finally:
                 stop_tree(process)
 

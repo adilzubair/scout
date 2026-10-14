@@ -171,7 +171,7 @@ Protocol version 1 supports query text and prepared document segments:
 | Text | Bounded Unicode text, with the full-model token check before inference |
 | Image | Base64 single-frame PNG/JPEG/WebP/BMP/TIFF; 8 MiB encoded artifact budget and 4 million decoded pixels |
 | Audio | Base64 little-endian mono float32 at 16 kHz; finite samples in [-1, 1], at most 60 seconds |
-| Video | At most 16 equal-sized prepared frames, 16 million total pixels, ordered frame indices and a window of at most 60 seconds |
+| Video | At most 16 equal-sized prepared frames, 16 million total pixels, ordered frame indices and a window of at most 60 seconds; optional synchronized mono 16 kHz audio for the same window |
 
 The entire request is limited to 32 MiB. Filesystem paths, URLs and unknown
 content fields are rejected. Office/PDF extraction, audio/video decoding and
@@ -275,6 +275,37 @@ The prepared video metadata uses a virtual 100 Hz timeline to represent sampled
 timestamps; it does not describe the original file's frame rate. Receipts also
 retain actual sampled timestamps.
 
+When audio covers an entire video window, the reader also emits a joint audiovisual
+representation. It stitches overlapping audio windows by sample position, keeps
+only two decoded audio windows in memory, and never pads missing sound with
+silence. Frame-only and audio-only vectors remain available. Missing audio coverage,
+the shared 90-second preparation deadline, or the existing segment/output limits
+leave explicit partial-coverage reasons. Joint windows use the existing `video`
+modality and timestamp preview; their evidence identifies synchronized frames and
+sound. Changing reader/protocol bytes invalidates the app's reader identity, so
+earlier separate-only vectors are reindexed.
+
+The memory-only protocol accepts a strict nested `audio` object with `data` and
+`sampleRate`; paths, URLs and unknown fields remain forbidden. Python verifies
+audio duration against the virtual video clock within its 10 ms rounding precision.
+The trusted C# bridge additionally requires audio samples to match the actual
+locator span within two samples. Both channels share the model's 8,192-token limit;
+oversized combined inputs are rejected before inference, without truncation.
+
+An authored offline compatibility probe runs the exact pinned model on CPU and
+CUDA. Hooks verify both encoders run for a joint input; changing either channel
+changes its vector. The two-second example uses 300 tokens, versus 248 for its
+frames and 54 for its sound separately. This establishes runtime compatibility,
+not accuracy on natural audiovisual events. Nineteen reader and seven worker
+contracts cover stitching, missing audio, budgets and strict nested payloads.
+The independent natural-media and 400-task holdout gates remain open.
+
+The actual CPU extractor smoke publishes seventeen files across all seven families,
+including two joint MP4/MKV requests through the authenticated full-model host and
+SQLite timestamp evidence. Mutation, revocation, cancellation and snapshot cleanup
+still pass. Independent CPU and CUDA worker HTTP smokes accept combined payloads
+with outgoing Python sockets blocked. The Release suite passes 305/305 checks.
+
 Decoding reads the owned snapshot through an explicit demuxer, denies secondary
 I/O and URL protocols, and runs inside the same zero-capability AppContainer.
 Bounds include 600 seconds per track timeline, 60,000 decoded frames and 200,000
@@ -285,15 +316,15 @@ its process/job memory and wall limits. Sampling, uncovered tracks, clipping,
 estimated end times and reached limits produce explicit partial-coverage reasons.
 No speech transcript or visual caption is fabricated.
 
-Thirteen new Python contracts cover real codec combinations, silence, video-only
+The initial thirteen Python contracts covered real codec combinations, silence, video-only
 and audio/video input, overlapping windows, variable timestamps, coarse audio
 timestamps, sparse held frames, genuine gaps, corrupt/renamed playlists and
 duration/frame/output limits. Sixteen authored smoke files pass actual sandboxed
 extraction and C# locator/receipt checks. Validated combinations include WAV PCM,
 MP3, AAC in M4A and raw AAC, FLAC, Ogg Opus, H.264 in MP4/MOV/MKV/M4V, VP8 in
 WebM and MPEG-4 video in AVI. These do not establish support for every codec that
-can occur inside those containers. All 22 prepared segments (12 audio, 10 video)
-pass full-model offline CPU and CUDA embedding with normalized 768-dimensional
+can occur inside those containers. Before joint windows were added, all 22 prepared
+segments (12 audio, 10 video) passed full-model offline CPU and CUDA embedding with normalized 768-dimensional
 vectors and checked token counts. The largest input in this pack uses 1,098
 tokens; smoke inference totals are 68.4 seconds on CPU and 4.0 seconds on CUDA.
 Those totals exclude extraction/startup and are not query-latency, quality or
@@ -478,6 +509,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/setup-multimodal.ps1
 .runtime/semantic-search/cpu-venv/Scripts/python.exe runtime/test_ocr.py
 .runtime/semantic-search/cpu-venv/Scripts/python.exe runtime/author_format_fixtures.py
 .runtime/semantic-search/cpu-venv/Scripts/python.exe runtime/test_multimodal_worker_inference.py --model .runtime/semantic-search/model --device cpu
+.runtime/semantic-search/cpu-venv/Scripts/python.exe runtime/test_joint_av_inference.py --model .runtime/semantic-search/model --device cpu --output artifacts/diagnostics/multimodal/joint-av-cpu.json
+.runtime/semantic-search/.venv/Scripts/python.exe runtime/test_joint_av_inference.py --model .runtime/semantic-search/model --device cuda --output artifacts/diagnostics/multimodal/joint-av-cuda.json
 dotnet run --project tests/Scout.Tests -c Release -- --multimodal-host C:/Path/To/PrivateTestAddon
 dotnet run --project tests/Scout.Tests -c Release -- --extract-media .runtime/semantic-search/cpu-venv/Scripts/python.exe .runtime/python/cpython-3.12.13-windows-x86_64-none .runtime/semantic-search/model
 dotnet run --project tests/Scout.Tests -c Release -- --semantic-extractor artifacts/diagnostics/multimodal/addon-no-office .runtime/python/cpython-3.12.13-windows-x86_64-none

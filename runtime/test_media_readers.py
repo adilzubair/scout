@@ -11,7 +11,7 @@ from unittest.mock import patch
 
 import av
 import numpy as np
-from semantic_search.media_readers import AudioWindows, VideoWindows, MediaBudget, media, opened, audio_track, Counter
+from semantic_search.media_readers import AudioWindows, VideoWindows, MediaBudget, media, opened, audio_track, Counter, joint_windows
 from semantic_search.readers import SegmentWriter, image_bytes
 from semantic_search.protocol import decode_request
 
@@ -202,7 +202,8 @@ class MediaReaders(unittest.TestCase):
         self.assertEqual([(s['locator']['startSeconds'],s['locator']['endSeconds']) for s in contents(writer)],[(0,1),(3,4)])
     def test_matroska_millisecond_audio_timestamps_do_not_invent_gaps(self):
         writer, segments = self.run_reader('scene.mkv','video')
-        self.assertEqual([s['modality'] for s in segments],['video','audio'])
+        self.assertEqual([s['modality'] for s in segments],['video','audio','video'])
+        self.assertIn('audio',segments[-1]['content'])
         self.assertNotIn('audio_timeline_gap',writer.reasons)
         self.assertGreater(segments[1]['locator']['endSeconds'],2.99)
     def test_regressing_or_nonfinite_audio_is_rejected(self):
@@ -227,6 +228,7 @@ class MediaReaders(unittest.TestCase):
         self.assertTrue(ready['partial']); self.assertEqual(ready['coverage']['audioTracks'],1)
         self.assertEqual(ready['coverage']['videoSampleIntervalSeconds'],1)
         self.assertEqual(ready['coverage']['audioSegments'],1); self.assertEqual(ready['coverage']['videoSegments'],1)
+        self.assertEqual(ready['coverage']['jointAvSegments'],1)
         for receipt in ready['segments']: self.assertEqual((writer.output/receipt['name']).stat().st_size,receipt['bytes'])
     def test_sparse_held_video_frames_never_exceed_the_window_budget(self):
         from PIL import Image
@@ -239,6 +241,43 @@ class MediaReaders(unittest.TestCase):
         segment = contents(writer)[0]
         self.assertEqual(segment['locator']['endSeconds'],8)
         decode_request(dict(schemaVersion=1,mode='document',content=segment['content']))
+
+    def test_joint_windows_stitch_overlapping_audio_by_sample_position(self):
+        from PIL import Image
+        folder=tempfile.TemporaryDirectory(dir=TEST_ROOT);self.addCleanup(folder.cleanup)
+        writer=SegmentWriter(Path(folder.name)/'out',tokens)
+        picture,thumbnail=image_bytes(Image.new('RGB',(64,64),'green'))
+        for start in (0,7):
+            writer.emit(dict(type='video',frames=[picture],fps=100,indices=[0],totalFrames=800),
+                dict(kind='time',startSeconds=start,endSeconds=start+8),thumbnail=thumbnail,coverage=dict(sampleTimesSeconds=[start]))
+        videos=writer.files.copy();source=(np.arange(22*16000,dtype=np.float32)%16000/32000).astype('<f4')
+        for start in (0,10):
+            writer.emit(dict(type='audio',data=base64.b64encode(source[start*16000:(start+12)*16000]).decode(),sampleRate=16000),
+                dict(kind='time',startSeconds=start,endSeconds=start+12))
+        audios=writer.files[2:].copy()
+        self.assertEqual(joint_windows(writer,videos,audios,Counter(MediaBudget())),2)
+        for start,segment in zip((0,7),contents(writer)[4:]):
+            values=np.frombuffer(base64.b64decode(segment['content']['audio']['data']),dtype='<f4')
+            np.testing.assert_array_equal(values,source[start*16000:(start+8)*16000])
+            decoded,_,_=decode_request(dict(schemaVersion=1,mode='document',content=segment['content']))
+            self.assertEqual(set(decoded),{'audio','video'})
+        self.assertFalse(writer.reasons)
+
+    def test_joint_windows_never_pad_missing_audio_and_respect_segment_limit(self):
+        from PIL import Image
+        for gap,limit in [(True,256),(False,2)]:
+            with self.subTest(gap=gap):
+                folder=tempfile.TemporaryDirectory(dir=TEST_ROOT);self.addCleanup(folder.cleanup)
+                writer=SegmentWriter(Path(folder.name)/'out',tokens,max_segments=limit)
+                picture,thumbnail=image_bytes(Image.new('RGB',(64,64),'green'))
+                writer.emit(dict(type='video',frames=[picture],fps=100,indices=[0],totalFrames=800),
+                    dict(kind='time',startSeconds=0,endSeconds=8),thumbnail=thumbnail,coverage=dict(sampleTimesSeconds=[0]))
+                videos=writer.files.copy();samples=np.zeros((7 if gap else 8)*16000,dtype='<f4')
+                writer.emit(dict(type='audio',data=base64.b64encode(samples).decode(),sampleRate=16000),
+                    dict(kind='time',startSeconds=1 if gap else 0,endSeconds=8))
+                self.assertEqual(joint_windows(writer,videos,writer.files[1:].copy(),Counter(MediaBudget())),0)
+                self.assertIn('joint_av_audio_incomplete' if gap else 'joint_av_not_indexed',writer.reasons)
+                self.assertEqual(len(writer.files),2)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(); parser.add_argument('--author-pack',action='store_true')

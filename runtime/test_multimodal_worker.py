@@ -99,6 +99,18 @@ class WorkerContracts(unittest.TestCase):
             with self.assertRaises(ValueError):
                 decode_request(document(content))
 
+    def test_joint_video_audio_has_strict_nested_fields_and_one_duration(self):
+        sound=dict(data=base64.b64encode(np.zeros(32000,dtype='<f4')).decode(),sampleRate=16000)
+        content=dict(type='video',frames=[picture(),picture()],indices=[0,1],fps=1,totalFrames=2,audio=sound)
+        decoded,_,processing=decode_request(document(content))
+        self.assertEqual(set(decoded),{'video','audio'});self.assertEqual(len(decoded['audio']),32000)
+        self.assertFalse(processing['video']['do_sample_frames'])
+        self.assertEqual(self.request('embed',document(content))[0],200)
+        for invalid in [dict(sound,url='https://example.com/audio'),dict(sound,sampleRate=True),dict(sound,sampleRate=48000),
+            dict(sound,data=base64.b64encode(np.zeros(16000,dtype='<f4')).decode()),
+            dict(sound,data=base64.b64encode(np.full(32000,np.nan,dtype='<f4')).decode())]:
+            self.assertEqual(self.request('embed',document(dict(content,audio=invalid)))[0],422)
+
     def test_busy_requests_cannot_queue_unbounded_decoding_or_parallel_inference(self):
         self.embedder.block = True
         results = []

@@ -8,6 +8,24 @@ static class SemanticExtractorChecks
 {
     public static void Run(Action<string, Action> test)
     {
+        test("Joint audiovisual receipts require strict finite audio aligned to the locator",()=>With(f=>
+        {
+            var image="iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aBZkAAAAASUVORK5CYII=";
+            var coverage=new{sampleTimesSeconds=new[]{0.0}};var location=new{kind="time",startSeconds=0,endSeconds=1};
+            object Content(object audio)=>new{type="video",frames=new[]{image},indices=new[]{0},fps=100,totalFrames=100,audio};
+            var pcm=new byte[16000*4];
+            var good=f.Write(Content(new{data=Convert.ToBase64String(pcm),sampleRate=16000}),location,coverage);
+            Check(PreparedManifest.ReadSegmentAsync(f.Root,good,"video",default).Result.Content.TryGetProperty("audio",out _));
+            foreach(var invalid in new object[]{new{data=Convert.ToBase64String(new byte[16080*4]),sampleRate=16000},
+                new{data=Convert.ToBase64String(pcm),sampleRate=48000},new{data=Convert.ToBase64String(pcm),sampleRate=16000,path="C:/private.wav"}})
+            {
+                var receipt=f.Write(Content(invalid),location,coverage);
+                Throws<InvalidDataException>(()=>PreparedManifest.ReadSegmentAsync(f.Root,receipt,"video",default).GetAwaiter().GetResult());
+            }
+            BinaryPrimitives.WriteSingleLittleEndian(pcm,float.NaN);
+            var nonfinite=f.Write(Content(new{data=Convert.ToBase64String(pcm),sampleRate=16000}),location,coverage);
+            Throws<InvalidDataException>(()=>PreparedManifest.ReadSegmentAsync(f.Root,nonfinite,"video",default).GetAwaiter().GetResult());
+        }));
         test("Sheet evidence rejects reversed or out-of-grid cell ranges",()=>
         {
             new ContentLocator("sheet"){Sheet="Sparse",StartCell="A1",EndCell="Z2"}.Validate();
@@ -86,7 +104,13 @@ static class SemanticExtractorChecks
         try
         {
             using var index = new SemanticIndex(Path.Combine(root,"semantic.db")); index.Configure(scope);
-            await using(var extractor=new SemanticExtractor(addonRoot,installation,()=>scope,host.DocumentAsync,home))
+            var jointRequests=0;
+            Task<EmbeddingResult> Embed(object content,CancellationToken token)
+            {
+                if(content is JsonElement data && data.GetProperty("type").GetString()=="video" && data.TryGetProperty("audio",out _))jointRequests++;
+                return host.DocumentAsync(content,token);
+            }
+            await using(var extractor=new SemanticExtractor(addonRoot,installation,()=>scope,Embed,home))
             {
                 var files=new[] {"notes.docx","notes.odt","growth.pptx","growth.odp","sales.xlsx","sales.ods"};
                 foreach(var file in files) File.Copy(Path.GetFullPath("artifacts/diagnostics/multimodal/office-fixtures-v2/"+file),Path.Combine(selected,file));
@@ -107,6 +131,9 @@ static class SemanticExtractorChecks
                     Console.WriteLine("PASS extractor host "+Path.GetExtension(path)+" · "+result.Segments.Count+" segments");
                 }
                 Check(index.Progress.Ready==17 && index.Vectors().Select(row=>row.Family).Distinct().Count()==7,"all content families did not publish");
+                Check(jointRequests==2,"MP4/MKV joint audiovisual inputs did not reach the actual full-model host");
+                Check(index.Vectors().Where(row=>row.Family=="video").Any(row=>index.Evidence(row.SegmentId)!.Text.Contains("Synchronized")),"joint audiovisual evidence was not durably published");
+                Console.WriteLine("PASS actual CPU joint AV requests, normalized vectors and durable timestamp evidence");
             }
             // Use an embedding boundary double only for deterministic mutation/revocation races.
             var original=Path.Combine(selected,"race.txt");File.WriteAllText(original,"original content");
@@ -152,9 +179,9 @@ static class SemanticExtractorChecks
         public readonly string Root=Path.GetFullPath("artifacts/diagnostics/multimodal/receipt-contracts/"+Guid.NewGuid().ToString("N"));
         public readonly string Hash=new('a',64);
         public Fixture(){Directory.CreateDirectory(Path.Combine(Root,"output"));}
-        public PreparedReceipt Write(object content,object locator)
+        public PreparedReceipt Write(object content,object locator,object? coverage=null)
         {
-            var value=JsonSerializer.SerializeToElement(content);var bytes=JsonSerializer.SerializeToUtf8Bytes(new {content,modality=value.GetProperty("type").GetString(),locator,evidence="",thumbnail=""});
+            var value=JsonSerializer.SerializeToElement(content);var bytes=JsonSerializer.SerializeToUtf8Bytes(new {content,modality=value.GetProperty("type").GetString(),locator,evidence="",thumbnail="",coverage});
             var name="segment-0000.json";var hash=Convert.ToHexString(SHA256.HashData(bytes));File.WriteAllBytes(Path.Combine(Root,"output",name),bytes);
             File.WriteAllText(Path.Combine(Root,"output/ready.json"),JsonSerializer.Serialize(new {schemaVersion=1,sourceSha256=Hash,segments=new[]{new{name,bytes=bytes.Length,sha256=hash}},partial=false,reasons=Array.Empty<string>(),bytes=bytes.Length}));
             return new(name,bytes.Length,hash);

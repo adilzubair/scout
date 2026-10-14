@@ -30,6 +30,17 @@ def image(value):
         return source.convert('RGB')
 
 
+def audio(value):
+    import numpy as np
+    if not isinstance(value,dict) or set(value)!={'data','sampleRate'} or type(value['sampleRate']) is not int or value['sampleRate']!=16000:
+        raise ValueError('Audio must be prepared mono 16 kHz float32')
+    data=decode_bytes(value['data'],60*16000*4)
+    if len(data)%4:raise ValueError('Invalid audio sample alignment')
+    samples=np.frombuffer(data,dtype='<f4').copy()
+    if not np.isfinite(samples).all() or np.max(np.abs(samples))>1:raise ValueError('Invalid audio samples')
+    return samples
+
+
 def decode_request(body):
     import numpy as np
     if not isinstance(body, dict) or type(body.get('schemaVersion')) is not int or body.get('schemaVersion') != 1:
@@ -56,16 +67,8 @@ def decode_request(body):
     if kind == 'image' and set(content) == {'type', 'data'}:
         return {'image': image(content['data'])}, False, None
     if kind == 'audio' and set(content) == {'type', 'data', 'sampleRate'}:
-        if type(content['sampleRate']) is not int or content['sampleRate'] != 16000:
-            raise ValueError('Audio must be prepared mono 16 kHz float32')
-        data = decode_bytes(content['data'], 60*16000*4)
-        if len(data) % 4:
-            raise ValueError('Invalid audio sample alignment')
-        samples = np.frombuffer(data, dtype='<f4').copy()
-        if not np.isfinite(samples).all() or np.max(np.abs(samples)) > 1:
-            raise ValueError('Invalid audio samples')
-        return {'audio': samples}, False, None
-    if kind == 'video' and set(content) == {'type', 'frames', 'fps', 'indices', 'totalFrames'}:
+        return {'audio':audio({key:content[key] for key in ('data','sampleRate')})},False,None
+    if kind == 'video' and set(content) in ({'type','frames','fps','indices','totalFrames'},{'type','frames','fps','indices','totalFrames','audio'}):
         frames, indices, fps, total = (content[key] for key in ('frames', 'indices', 'fps', 'totalFrames'))
         if (not isinstance(frames, list) or not 1 <= len(frames) <= 16 or not isinstance(indices, list)
                 or len(indices) != len(frames) or type(total) is not int or not 1 <= total <= 1_000_000
@@ -83,5 +86,9 @@ def decode_request(body):
             decoded.append(frame)
         metadata = dict(total_num_frames=total, fps=float(fps), duration=total/fps,
                         frames_indices=indices, video_backend='scout-prepared')
-        return {'video': np.stack(decoded)}, False, {'video': {'do_sample_frames': False, 'video_metadata': metadata}}
+        result={'video':np.stack(decoded)}
+        if 'audio' in content:
+            result['audio']=audio(content['audio'])
+            if abs(len(result['audio'])/16000-total/fps)>.0101:raise ValueError('Joint audiovisual duration mismatch')
+        return result,False,{'video':{'do_sample_frames':False,'video_metadata':metadata}}
     raise ValueError('Unsupported prepared content')

@@ -1,8 +1,10 @@
 """Streaming local media readers. The production CLI requires a no-network sandbox."""
 import base64
+from collections import OrderedDict
 from contextlib import contextmanager
 from dataclasses import dataclass
 import math
+import json
 from pathlib import Path
 import time
 
@@ -47,9 +49,11 @@ class Counter:
         self.frames = self.packets = 0
     def tick(self, packet=False):
         self.packets += int(packet); self.frames += int(not packet)
-        if time.monotonic()-self.started > self.budget.wall_seconds: raise DecodeLimit('media_time_limit')
+        self.check_time()
         if self.frames > self.budget.decode_frames: raise DecodeLimit('decode_frame_limit')
         if self.packets > self.budget.decode_packets: raise DecodeLimit('decode_packet_limit')
+    def check_time(self):
+        if time.monotonic()-self.started > self.budget.wall_seconds:raise DecodeLimit('media_time_limit')
 
 def deny_external(url, flags, options):
     raise ValueError('external_media_resource')
@@ -255,6 +259,53 @@ def video_track(container, stream, writer, budget, counter):
     except DecodeLimit as error: writer.reasons.add(str(error))
     finally: sink.emit(sink.end)
 
+def joint_windows(writer,videos,audios,counter):
+    """Add synchronized AV vectors only for complete, unpadded audio spans.
+
+    Two cached audio windows bound memory; overlap is removed by sample position.
+    Frame-only and audio-only segments remain independently searchable.
+    """
+    import numpy as np
+    intervals=[];cache=OrderedDict();made=0
+    def load(receipt):
+        counter.check_time()
+        path=writer.output/receipt['name']
+        if path.stat().st_size!=receipt['bytes'] or receipt['bytes']>32*1024**2:raise ValueError('prepared_output_changed')
+        with path.open(encoding='utf-8') as stream:return json.load(stream)
+    try:
+        for receipt in audios:
+            segment=load(receipt);location=segment['locator']
+            intervals.append((round(location['startSeconds']*RATE),round(location['endSeconds']*RATE),receipt))
+        for receipt in videos:
+            if writer.full:writer.reasons.add('joint_av_not_indexed');break
+            segment=load(receipt);location=segment['locator']
+            start,end=(round(location[key]*RATE) for key in ('startSeconds','endSeconds'))
+            if not 0<end-start<=60*RATE:raise ValueError('joint_av_window_budget')
+            result=np.empty(end-start,dtype='<f4');cursor=start
+            for first,last,audio_receipt in intervals:
+                if last<=cursor:continue
+                if first>cursor:break # preserve gaps rather than inventing silence
+                name=audio_receipt['name']
+                if name not in cache:
+                    data=load(audio_receipt)['content']
+                    values=np.frombuffer(base64.b64decode(data['data'],validate=True),dtype='<f4')
+                    if data['sampleRate']!=RATE or len(values)!=last-first:raise ValueError('joint_av_audio_clock')
+                    cache[name]=values
+                    while len(cache)>2:cache.popitem(last=False)
+                cache.move_to_end(name)
+                count=min(last,end)-cursor
+                result[cursor-start:cursor-start+count]=cache[name][cursor-first:cursor-first+count]
+                cursor+=count
+                if cursor==end:break
+            if cursor!=end:writer.reasons.add('joint_av_audio_incomplete');continue
+            content={**segment['content'],'audio':dict(data=base64.b64encode(result.tobytes()).decode('ascii'),sampleRate=RATE)}
+            if not writer.emit(content,location,'Synchronized sampled video frames and audio.',segment['thumbnail'],coverage=segment['coverage']):
+                writer.reasons.add('joint_av_not_indexed');break
+            made+=1
+    except DecodeLimit as error:writer.reasons.add(str(error));writer.reasons.add('joint_av_not_indexed')
+    return made
+
+
 def media(source, writer, family, budget=None):
     if family not in ('audio', 'video'): raise ValueError('unsupported_media_family')
     budget = budget or MediaBudget()
@@ -262,7 +313,7 @@ def media(source, writer, family, budget=None):
     writer.coverage = dict(audioWindowSeconds=budget.audio_window, audioOverlapSeconds=budget.audio_overlap,
                            videoWindowSeconds=budget.video_window, videoOverlapSeconds=budget.video_overlap,
                            videoSampleIntervalSeconds=budget.sample_interval, maximumSeconds=budget.seconds,
-                           audioSegments=0, videoSegments=0)
+                           audioSegments=0, videoSegments=0,jointAvSegments=0)
     with opened(source) as container:
         audio, video = list(container.streams.audio), list(container.streams.video)
         if family == 'audio' and not audio: raise ValueError('no_audio_track')
@@ -271,8 +322,10 @@ def media(source, writer, family, budget=None):
         if len(audio) > 1: writer.reasons.add('additional_audio_tracks_not_indexed')
         if family == 'video':
             if len(video) > 1: writer.reasons.add('additional_video_tracks_not_indexed')
+            before=len(writer.files)
             video_track(container, video[0], writer, budget, counter)
-            writer.coverage['videoSegments'] = len(writer.files)
+            videos=writer.files[before:].copy()
+            writer.coverage['videoSegments'] = len(videos)
         else:
             audio_track(container, audio[0], writer, budget, counter)
             writer.coverage['audioSegments'] = len(writer.files)
@@ -283,3 +336,4 @@ def media(source, writer, family, budget=None):
         with opened(source) as container: audio_track(container, container.streams.audio[0], writer, budget, counter)
         writer.coverage['audioSegments'] = len(writer.files)-before
         if not writer.coverage['audioSegments']: writer.reasons.add('audio_track_not_indexed')
+        else:writer.coverage['jointAvSegments']=joint_windows(writer,videos,writer.files[before:].copy(),counter)

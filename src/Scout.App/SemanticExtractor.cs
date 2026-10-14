@@ -256,6 +256,8 @@ internal sealed record PreparedManifest(PreparedReceipt[] Segments, bool Partial
             var indices = content.GetProperty("indices").EnumerateArray().Select(item => item.GetInt32()).ToArray(); var fps = content.GetProperty("fps").GetDouble();
             if (times.Length != indices.Length || Math.Abs(content.GetProperty("totalFrames").GetInt32()/fps-(locator.EndSeconds!.Value-locator.StartSeconds!.Value)) > .0101 ||
                 times.Where((t,i) => !double.IsFinite(t) || t < locator.StartSeconds || t >= locator.EndSeconds || Math.Abs(t-locator.StartSeconds!.Value-indices[i]/fps) > .0101).Any()) throw new InvalidDataException("Invalid sampled-frame timestamps.");
+            if(content.TryGetProperty("audio",out var jointAudio) && Math.Abs(Bytes(jointAudio.GetProperty("data"),60*16000*4).Length/(4.0*16000)-(locator.EndSeconds!.Value-locator.StartSeconds!.Value))>2.0/16000)
+                throw new InvalidDataException("Joint audiovisual locator duration mismatch.");
         }
         return new(content.Clone(), modality, locator, evidence, thumbnail);
     }
@@ -280,6 +282,18 @@ internal sealed record PreparedManifest(PreparedReceipt[] Segments, bool Partial
         if (!(bytes.Length >= 3 && bytes[0] == 0xff && bytes[1] == 0xd8 && bytes[2] == 0xff ||
               bytes.Length >= 8 && bytes.AsSpan(0,8).SequenceEqual(new byte[] { 137,80,78,71,13,10,26,10 }))) throw new InvalidDataException("Unexpected prepared image encoding.");
     }
+    private static byte[] Audio(JsonElement content,bool standalone=false)
+    {
+        SemanticExtractor.Fields(content,standalone?["type","data","sampleRate"]:["data","sampleRate"]);
+        var audio=Bytes(content.GetProperty("data"),60*16000*4);
+        if(content.GetProperty("sampleRate").GetInt32()!=16000 || audio.Length%4!=0)throw new InvalidDataException("Invalid prepared audio.");
+        for(var i=0;i<audio.Length;i+=4)
+        {
+            var sample=BinaryPrimitives.ReadSingleLittleEndian(audio.AsSpan(i,4));
+            if(!float.IsFinite(sample) || Math.Abs(sample)>1)throw new InvalidDataException("Invalid audio samples.");
+        }
+        return audio;
+    }
     private static void ValidateContent(JsonElement content)
     {
         switch (content.GetProperty("type").GetString())
@@ -290,22 +304,17 @@ internal sealed record PreparedManifest(PreparedReceipt[] Segments, bool Partial
                 break;
             case "image": SemanticExtractor.Fields(content, ["type", "data"]); Image(content.GetProperty("data")); break;
             case "audio":
-                SemanticExtractor.Fields(content, ["type", "data", "sampleRate"]);
-                var audio = Bytes(content.GetProperty("data"), 60*16000*4);
-                if (content.GetProperty("sampleRate").GetInt32() != 16000 || audio.Length % 4 != 0) throw new InvalidDataException("Invalid prepared audio.");
-                for (var i=0; i<audio.Length; i+=4)
-                {
-                    var sample = BinaryPrimitives.ReadSingleLittleEndian(audio.AsSpan(i,4));
-                    if (!float.IsFinite(sample) || Math.Abs(sample) > 1) throw new InvalidDataException("Invalid audio samples.");
-                }
+                Audio(content,true);
                 break;
             case "video":
-                SemanticExtractor.Fields(content, ["type", "frames", "fps", "indices", "totalFrames"]);
+                SemanticExtractor.Fields(content, ["type", "frames", "fps", "indices", "totalFrames"],"audio");
                 var frames = content.GetProperty("frames").EnumerateArray().ToArray(); var indices = content.GetProperty("indices").EnumerateArray().Select(item => item.GetInt32()).ToArray();
                 var fps = content.GetProperty("fps").GetDouble(); var total = content.GetProperty("totalFrames").GetInt32();
                 if (frames.Length is < 1 or > 16 || indices.Length != frames.Length || !double.IsFinite(fps) || fps is <= 0 or > 240 || total is < 1 or > 1000000 || total/fps > 60 ||
                     indices.Where((value,i) => value < 0 || value >= total || i > 0 && value <= indices[i-1]).Any()) throw new InvalidDataException("Invalid prepared video metadata.");
                 foreach (var frame in frames) Image(frame);
+                if(content.TryGetProperty("audio",out var combinedAudio) && Math.Abs(Audio(combinedAudio).Length/(4.0*16000)-total/fps)>.0101)
+                    throw new InvalidDataException("Joint audiovisual duration mismatch.");
                 break;
             default: throw new InvalidDataException("Unsupported prepared content.");
         }

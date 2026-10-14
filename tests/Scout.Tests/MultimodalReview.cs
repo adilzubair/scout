@@ -96,6 +96,7 @@ static class MultimodalReview
                         var frames=element.GetProperty("frames").EnumerateArray().ToArray();var indices=element.GetProperty("indices").EnumerateArray().Select(i=>i.GetInt32()).ToArray();
                         var fps=element.GetProperty("fps").GetDouble();
                         for(var i=0;i<frames.Length;i++)await Image(stem+$"-frame-{i:00}",frames[i].GetString()!,"video-frame",indices[i]/fps);
+                        if(element.TryGetProperty("audio",out var jointAudio))await Write(stem+"-audio.wav","audio",Wave(Convert.FromBase64String(jointAudio.GetProperty("data").GetString()!)));
                         break;
                     default:throw new InvalidDataException("Unexpected review modality.");
                 }

@@ -3,7 +3,7 @@
 Date: 2026-10-15. Branch: `feature/multimodal-semantic-search`.
 Status: implementation resumed on 2026-10-15 from checkpoint `6e666ca`.
 Retrieval, previews, OCR and format coverage are committed. The frozen evaluation
-foundation passes 304 Release checks; independent quality and release gates remain open.
+foundation passes 305 Release checks; independent quality and release gates remain open.
 This plan is the implementation checklist; the add-on remains a
 preview until the release gates below pass. The full-model runtime and content smoke probe
 are implemented and verified on CPU and CUDA. On 2026-10-14 the user directed
@@ -296,7 +296,7 @@ results as end-to-end release evidence.
 | Source acquisition | Native identity checks and hashed owned snapshots (`f87fb8b`) | Revalidate source and scope across extraction, embedding, display and launch |
 | Extractor bridge | Receipt/hash/payload validation, private tokenizer copy, source rechecks, owned-copy cleanup, resource guards and Settings progress | Packaged crash/upgrade checks and full resource/quality evaluation |
 | Document/image readers | Six Office formats with sandbox-backed WPF locator previews; bounded OCR; explicit unsupported/encrypted/corrupt statuses and scoped coverage review | Independent content/language quality, additional fidelity cases exposed by evaluation and packaged parser crash cleanup |
-| Audio/video readers | Bounded PyAV readers connected to indexing; all seven families pass CPU scheduler, watcher, maintenance and revocation checks (`7e66ee3`) | Packaged cancellation/crash cleanup, quality and resource gates |
+| Audio/video readers | Bounded PyAV readers connected to indexing; separate and synchronized AV windows; full-model CPU/CUDA joint-input compatibility | Independent natural audiovisual quality, packaged cancellation/crash cleanup and resource gates |
 | Retrieval/UI | Constrained retrieval and preview engineering contracts, real CPU code/image queries, retained selection/revoked actions, and all eight required media extensions in WPF | Independent quality/admission evaluation, richer locator/format fixtures and packaged lifecycle validation |
 | Release validation | Fixed quality protocol and frozen development pilot; scorer compares content keyword/semantic/fusion, dimensions and production-adapter replay | Independent 400-task holdout, abstention calibration, Laya on/off, throughput/resource measurements, clean packaging/install and every release gate below |
 
@@ -330,8 +330,9 @@ Proceed in this order, committing each verified unit:
    families, including natural sound and joint audiovisual queries, before tuning
    admission. Preserve the opened development pilot as regression evidence.
    Run file/locator/abstention and dimension comparisons, then fix measured failures
-   and validate with a fresh unopened holdout when necessary. Prove joint AV inputs
-   consume both channels; separate sound/frame smoke checks do not establish this.
+   and validate with a fresh unopened holdout when necessary. Joint AV inputs now
+   consume both encoders on CPU/CUDA and change when either channel changes;
+   independently grounded sound-plus-visual retrieval still needs evaluation.
 7. Run the specified 25K/100K/500K corpus-size, CPU/GPU, ordinary-search regression,
    throughput, memory, battery, disk and lifecycle benchmarks. Validate the physical
    16 GB CPU laptop separately from the available 32 GB development machine.
@@ -414,6 +415,13 @@ Keep all large or private evaluation outputs under ignored
 `artifacts/diagnostics/multimodal/` and model/runtime downloads outside Git.
 
 ## Next implementation task
+
+Joint audiovisual prepared windows now preserve separate sound/frame vectors and
+add synchronized representations only where audio covers the whole frame window.
+CPU/CUDA encoder hooks and channel-change probes pass; protocol and locator
+duration checks reject mismatched combined payloads. This is engineering evidence,
+not proof of audiovisual retrieval quality. Keep natural joint-event tasks in the
+independent holdout and measure the added indexing/resource cost.
 
 Intake and content-review export foundations are complete. Fourteen offline intake
 contracts pass; the production sandbox exports verified media without inference or
