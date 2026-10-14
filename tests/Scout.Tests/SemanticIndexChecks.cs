@@ -8,6 +8,16 @@ static class SemanticIndexChecks
     private static readonly DateTimeOffset Now = new(2026, 10, 14, 12, 0, 0, TimeSpan.Zero);
     public static void Run(Action<string, Action> test)
     {
+        test("Legacy formats and archives have metadata-only unsupported coverage without content jobs",()=>With(f=>
+        {
+            f.Index.Configure(f.Scope with {Families=MultimodalSettings.ContentTypes});
+            var files=new[]{"old.doc","macro.docm","slides.ppt","sheet.xls","bundle.zip","drawing.svg"}.Select(name=>f.Source("selected/"+name)).ToArray();
+            f.Index.Reconcile(files);
+            Check(f.Index.Progress is {Unsupported:6,Pending:0,Ready:0} && f.Index.Claim(Now)==null);
+            Check(f.Index.Files(2,incompleteOnly:true).Length==2 && f.Index.Files().All(file=>file.Status=="unsupported" && SemanticCoverage.Describe(file.Detail).Length>0));
+            var version=f.Index.Version;f.Index.Reconcile(files);Check(f.Index.Version==version);
+            f.Index.Configure(f.Scope with {Enabled=false});Check(f.Index.Progress.Files==0);
+        }));
         test("OCR language changes invalidate existing evidence and outstanding reader leases",()=>With(f=>
         {
             f.Seed("selected/a.txt");var old=f.Index.Vectors().Single();

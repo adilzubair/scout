@@ -29,11 +29,18 @@ public sealed record ContentLocator(string Kind)
             System.Text.RegularExpressions.Regex.IsMatch(value, "^[A-Z]{1,3}[1-9][0-9]{0,6}$") &&
             int.Parse(new string(value.SkipWhile(char.IsAsciiLetter).ToArray())) <= 1048576 &&
             value.TakeWhile(char.IsAsciiLetter).Aggregate(0,(column,c)=>column*26+c-'A'+1)<=16384;
+        bool CellRange()
+        {
+            if(!Cells(StartCell) || !Cells(EndCell))return false;
+            int Col(string cell)=>cell.TakeWhile(char.IsAsciiLetter).Aggregate(0,(column,c)=>column*26+c-'A'+1);
+            int Row(string cell)=>int.Parse(new string(cell.SkipWhile(char.IsAsciiLetter).ToArray()));
+            return Col(StartCell!)<=Col(EndCell!) && Row(StartCell!)<=Row(EndCell!);
+        }
         var valid = Kind switch
         {
             "page" or "slide" or "image" => Page is > 0 and <= 100000,
             "lines" or "paragraphs" => StartLine is > 0 && EndLine >= StartLine && EndLine <= 10000000 && (Section == null || Section.Length <= 200),
-            "sheet" => Sheet is { Length: > 0 and <= 200 } && Cells(StartCell) && Cells(EndCell),
+            "sheet" => Sheet is { Length: > 0 and <= 200 } && CellRange(),
             "time" => StartSeconds is { } start && EndSeconds is { } end && double.IsFinite(start) && double.IsFinite(end) && start >= 0 && end >= start && end <= 864000,
             _ => false
         };
@@ -86,7 +93,8 @@ public sealed record SemanticScope(bool Enabled, string[] Folders, string[] Excl
     }
     [System.Text.Json.Serialization.JsonIgnore]
     public string Fingerprint => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(this))));
-    public bool Allows(string path, string family) => Enabled && Families.Contains(family) &&
+    // Archives are tracked by name for coverage only; their bodies never enter extraction.
+    public bool Allows(string path, string family) => Enabled && (Families.Contains(family) || family=="archives" && Families.Length>0) &&
         Folders.Any(root => IndexPolicy.Within(path, root)) && !IndexPolicy.Excluded(path, Exclusions);
 }
 
@@ -94,11 +102,24 @@ public static class SemanticFormats
 {
     public static string? Family(string path) => System.IO.Path.GetExtension(path).ToLowerInvariant() switch
     {
-        ".pdf" or ".docx" or ".odt" or ".txt" or ".md" or ".rtf" => "documents",
-        ".pptx" or ".odp" => "presentations", ".xlsx" or ".ods" or ".csv" or ".tsv" => "spreadsheets",
-        ".png" or ".jpg" or ".jpeg" or ".webp" or ".bmp" or ".tif" or ".tiff" => "images",
-        ".wav" or ".mp3" or ".m4a" or ".flac" or ".ogg" or ".aac" => "audio",
-        ".mp4" or ".mov" or ".mkv" or ".webm" or ".avi" or ".m4v" => "video",
+        ".pdf" or ".docx" or ".odt" or ".txt" or ".md" or ".markdown" or ".rtf" or ".doc" or ".docm" or ".dot" or ".dotx" or ".dotm" or ".pages" or ".epub" => "documents",
+        ".pptx" or ".odp" or ".ppt" or ".pptm" or ".pps" or ".ppsx" or ".potx" or ".key" => "presentations",
+        ".xlsx" or ".ods" or ".csv" or ".tsv" or ".xls" or ".xlsm" or ".xlsb" or ".xltx" or ".numbers" => "spreadsheets",
+        ".zip" or ".7z" or ".rar" or ".tar" or ".gz" or ".bz2" or ".xz" or ".cab" or ".iso" => "archives",
+        ".png" or ".jpg" or ".jpeg" or ".webp" or ".bmp" or ".tif" or ".tiff" or ".gif" or ".heic" or ".heif" or ".svg" or ".raw" or ".dng" => "images",
+        ".wav" or ".mp3" or ".m4a" or ".flac" or ".ogg" or ".aac" or ".wma" or ".aif" or ".aiff" or ".opus" => "audio",
+        ".mp4" or ".mov" or ".mkv" or ".webm" or ".avi" or ".m4v" or ".wmv" or ".mpeg" or ".mpg" or ".flv" => "video",
         _ => PreviewText.Supports(path) ? "code" : null
+    };
+    public static string? UnsupportedReason(string path)=>System.IO.Path.GetExtension(path).ToLowerInvariant() switch
+    {
+        ".doc" or ".dot" or ".ppt" or ".pps" or ".xls" or ".xlsb"=>"legacy_office_format",
+        ".docm" or ".dotm" or ".pptm" or ".xlsm"=>"macro_enabled_office_format",
+        ".dotx" or ".ppsx" or ".potx" or ".xltx"=>"office_variant_unavailable",
+        ".pages" or ".key" or ".numbers" or ".epub"=>"unsupported_content_format",
+        ".rtf"=>"unsupported_content_format",
+        ".heic" or ".heif" or ".svg" or ".raw" or ".dng"=>"image_decoder_unavailable",
+        ".wma" or ".aif" or ".aiff" or ".opus" or ".wmv" or ".mpeg" or ".mpg" or ".flv"=>"media_container_unavailable",
+        _=>Family(path)=="archives"?"archive_contents_unavailable":null
     };
 }

@@ -19,6 +19,7 @@ public sealed class SemanticIndexer(
             job = index.Claim(now);
             if (job == null) return SemanticWork.Empty;
             if (!await Unchanged(job, token).ConfigureAwait(false)) return SemanticWork.Changed;
+            if(SemanticFormats.UnsupportedReason(job.Source.Path) is {} unsupported)throw new UnsupportedContentException(unsupported);
             var result = await extract(job.Source, token).ConfigureAwait(false);
             token.ThrowIfCancellationRequested();
             if (!await Unchanged(job, token).ConfigureAwait(false)) return SemanticWork.Changed;

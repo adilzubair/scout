@@ -64,6 +64,15 @@ def require_sandbox():
         if not advapi.GetTokenInformation(token,30,capabilities,size.value,ctypes.byref(size)) or wintypes.DWORD.from_buffer(capabilities).value != 0: raise ValueError('sandbox_required')
     finally: kernel.CloseHandle(token)
 
+def failure_reason(error):
+    # Stable reason codes only. Exception bodies may contain source paths/content.
+    if type(error) is ValueError and str(error).isascii() and all(c.isalnum() or c=='_' for c in str(error)) and 0<len(str(error))<=80:return str(error)
+    known={('PIL.Image','DecompressionBombError'):'image_pixel_budget',('PIL','UnidentifiedImageError'):'malformed_image',
+           ('zipfile','BadZipFile'):'malformed_package',('xml.etree.ElementTree','ParseError'):'malformed_xml',
+           ('pypdf.errors','PdfReadError'):'malformed_pdf',('builtins','UnicodeDecodeError'):'unsupported_text_encoding',
+           ('av.error','InvalidDataError'):'malformed_media',('av.error','DecoderNotFoundError'):'media_decoder_unavailable'}
+    return known.get((type(error).__module__,type(error).__name__),'extraction_failed')
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--request', type=Path, required=True)
@@ -73,6 +82,6 @@ if __name__ == '__main__':
         extract(options.request)
     except Exception as error:
         # Never persist exception bodies, paths or extracted document text.
-        reason = str(error) if type(error) is ValueError and str(error).isascii() and all(c.isalnum() or c == '_' for c in str(error)) and len(str(error)) <=80 else 'extraction_failed'
+        reason = failure_reason(error)
         (options.request.absolute().parent/'failed.json').write_text(json.dumps(dict(schemaVersion=1,reason=reason)),encoding='utf-8')
         raise SystemExit(2)

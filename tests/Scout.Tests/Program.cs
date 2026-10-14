@@ -12,6 +12,7 @@ if (args.Length == 4 && args[0] == "--extract-media") return await ExtractionSan
 if (args.Length == 3 && args[0] == "--semantic-playback") return await SemanticPlaybackChecks.Run(args[1], args[2]);
 if (args.Length == 3 && args[0] == "--playback-crash") return await SemanticPlaybackChecks.Crash(args[1], args[2]);
 if (args.Length == 3 && args[0] == "--semantic-scans") return await SemanticScanChecks.Run(args[1], args[2]);
+if (args.Length == 3 && args[0] == "--semantic-formats") return await SemanticFormatChecks.Run(args[1], args[2]);
 if (args.Length == 3 && args[0] == "--semantic-extractor") return await SemanticExtractorChecks.Smoke(args[1], args[2]);
 if (args.Length == 3 && args[0] == "--semantic-scheduler") return await SemanticServiceChecks.Smoke(args[1], args[2]);
 if (args.Length == 3 && args[0] == "--sandbox-crash") return ExtractionSandboxChecks.Crash(args[1], args[2]);

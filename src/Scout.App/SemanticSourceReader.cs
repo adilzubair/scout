@@ -31,6 +31,7 @@ internal static class SemanticSourceReader
     public static async Task<SourceSnapshot> SnapshotAsync(SemanticSource expected, SemanticScope scope, string workRoot, CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
+        if(SemanticFormats.UnsupportedReason(expected.Path) is {} unsupported)throw new UnsupportedContentException(unsupported);
         Ancestors(expected.Path);
         // Block writers and rename/delete while hashing and copying the same validated handle.
         using var source = new FileStream(expected.Path, FileMode.Open, FileAccess.Read, FileShare.Read, 65536, FileOptions.Asynchronous | FileOptions.SequentialScan);

@@ -94,9 +94,11 @@ public sealed class SemanticIndex : IDisposable
                 reader.Close();
                 if (current && !force) continue;
                 Execute(connection, "DELETE FROM semantic_files WHERE id=$id", transaction, ("$id", source.CandidateId));
+                var unsupported=SemanticFormats.UnsupportedReason(source.Path);
                 Execute(connection, "INSERT INTO semantic_files(id,path,revision,family,length,status) VALUES($id,$path,$revision,$family,$length,'pending')", transaction,
                     ("$id", source.CandidateId), ("$path", source.Path), ("$revision", source.Revision), ("$family", source.Family), ("$length", source.Length));
-                Execute(connection, "INSERT INTO semantic_jobs(id,revision,generation,state) VALUES($id,$revision,$generation,'pending')", transaction,
+                if(unsupported!=null)Execute(connection,"UPDATE semantic_files SET status='unsupported',detail=$detail WHERE id=$id",transaction,("$detail",unsupported),("$id",source.CandidateId));
+                else Execute(connection, "INSERT INTO semantic_jobs(id,revision,generation,state) VALUES($id,$revision,$generation,'pending')", transaction,
                     ("$id", source.CandidateId), ("$revision", source.Revision), ("$generation", Generation));
                 changed = true;
             }
@@ -139,7 +141,7 @@ public sealed class SemanticIndex : IDisposable
 
     public SemanticPublish Publish(SemanticJob job, string actualRevision, string contentHash, IReadOnlyList<ContentSegment> segments, bool partial, string detail, long quotaBytes)
     {
-        if (segments.Count is < 1 or > MaximumSegmentsPerFile || detail.Length > 1000 || !Digest(contentHash) || quotaBytes <= 0) throw new InvalidDataException("Invalid semantic extraction result.");
+        if (SemanticFormats.UnsupportedReason(job.Source.Path)!=null || segments.Count is < 1 or > MaximumSegmentsPerFile || detail.Length > 1000 || !Digest(contentHash) || quotaBytes <= 0) throw new InvalidDataException("Invalid semantic extraction result.");
         foreach (var segment in segments) ValidateSegment(segment);
         return WithConnection(connection =>
         {
@@ -238,9 +240,10 @@ public sealed class SemanticIndex : IDisposable
         return new SemanticEvidence(reader.GetString(0), reader.GetString(1), reader.GetString(2), reader.GetString(3), reader.GetString(5),
             locator, reader.GetString(7), (byte[])reader.GetValue(8)){Partial=reader.GetInt32(9)!=0,Coverage=reader.GetString(10)};
     });
-    public SemanticFileStatus[] Files() => WithConnection(connection =>
+    public SemanticFileStatus[] Files(int maximum=600000,bool incompleteOnly=false) => WithConnection(connection =>
     {
-        using var query = Command(connection, "SELECT f.id,f.path,f.status,f.detail,f.partial,count(s.id) FROM semantic_files f LEFT JOIN semantic_segments s ON s.file_id=f.id GROUP BY f.id ORDER BY f.id");
+        if(maximum is < 1 or > 600000)throw new ArgumentOutOfRangeException(nameof(maximum));
+        using var query = Command(connection, "SELECT f.id,f.path,f.status,f.detail,f.partial,count(s.id) FROM semantic_files f LEFT JOIN semantic_segments s ON s.file_id=f.id WHERE ($incomplete=0 OR f.status!='ready' OR f.partial=1) GROUP BY f.id ORDER BY f.path COLLATE NOCASE LIMIT $maximum",null,("$incomplete",incompleteOnly?1:0),("$maximum",maximum));
         using var reader = query.ExecuteReader();
         var result = new List<SemanticFileStatus>();
         while (reader.Read()) result.Add(new(reader.GetString(0), reader.GetString(1), reader.GetString(2), reader.GetString(3), reader.GetInt32(4) != 0, reader.GetInt32(5)));

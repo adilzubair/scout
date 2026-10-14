@@ -29,11 +29,19 @@ def package(path):
         for entry in entries:
             member_path(entry.filename.rstrip('/'))
             name = entry.filename.casefold()
-            if name in seen or entry.flag_bits & 1 or entry.file_size > 64*1024**2: raise ValueError('unsafe_package_entry')
+            if entry.flag_bits & 1:raise ValueError('encrypted_archive_entry')
+            if name in seen or entry.file_size > 64*1024**2: raise ValueError('unsafe_package_entry')
             seen.add(name)
             if any(part in name for part in ('vbaproject', '/activex/', 'scripts/', 'basic/', 'encryptedpackage')):
                 raise ValueError('active_or_encrypted_package')
-            if not entry.is_dir() and name.endswith(('.xml', '.rels')): xml(archive, entry.filename)
+        # ODF encrypts individual streams, not ZIP entries. Inspect the inert
+        # manifest before attempting to decode an encrypted content.xml stream.
+        if 'META-INF/manifest.xml' in archive.namelist():
+            manifest=xml(archive,'META-INF/manifest.xml')
+            if any(node.tag=='{urn:oasis:names:tc:opendocument:xmlns:manifest:1.0}encryption-data' for node in manifest.iter()):
+                raise ValueError('encrypted_odf')
+        for entry in entries:
+            if not entry.is_dir() and entry.filename.lower().endswith(('.xml', '.rels')): xml(archive, entry.filename)
         yield archive
 
 def relationships(archive, part):

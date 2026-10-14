@@ -5,6 +5,13 @@ static class SemanticSourceChecks
 {
     public static void Run(Action<string, Action> test)
     {
+        test("Status-only sources cannot be copied into a parser workspace",()=>With(f=>
+        {
+            var path=Path.Combine(f.Selected,"bundle.zip");File.WriteAllText(path,"private archive body");
+            var source=SemanticSourceReader.Read(path,f.Scope)!;Check(source.Family=="archives");
+            Throws<UnsupportedContentException>(()=>SemanticSourceReader.SnapshotAsync(source,f.Scope,f.Work,default).GetAwaiter().GetResult());
+            Check(!Directory.Exists(f.Work));
+        }));
         test("Native semantic source identity detects replacement with preserved metadata", () => With(f =>
         {
             var original = f.Read()!; Check(original.Length == 5);

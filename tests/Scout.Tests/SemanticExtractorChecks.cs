@@ -8,6 +8,12 @@ static class SemanticExtractorChecks
 {
     public static void Run(Action<string, Action> test)
     {
+        test("Sheet evidence rejects reversed or out-of-grid cell ranges",()=>
+        {
+            new ContentLocator("sheet"){Sheet="Sparse",StartCell="A1",EndCell="Z2"}.Validate();
+            foreach(var (first,last) in new[]{("Z1","A2"),("A3","B2"),("A1","XFE2")})
+                Throws<InvalidDataException>(()=>new ContentLocator("sheet"){Sheet="Sparse",StartCell=first,EndCell=last}.Validate());
+        });
         test("OCR coverage cannot claim unavailable languages or arbitrary engine fields",()=>With(f=>
         {
             f.Write(new{type="text",text="recognized"},new{kind="image",page=1});

@@ -41,10 +41,11 @@ class WindowsOcr:
         began=time.monotonic()
         try:
             from PIL import Image
+            from .readers import opaque_image
             from winrt.windows.graphics.imaging import SoftwareBitmap,BitmapPixelFormat
             from winrt.windows.storage.streams import DataWriter
             if min(image.size)<=0 or image.width*image.height>100_000_000:raise ValueError('image_pixel_budget')
-            image=image.copy();image.thumbnail((self.max_dimension,self.max_dimension),Image.Resampling.LANCZOS)
+            image=opaque_image(image);image.thumbnail((self.max_dimension,self.max_dimension),Image.Resampling.LANCZOS)
             if image.width*image.height>4_000_000:
                 scale=(4_000_000/(image.width*image.height))**.5
                 image=image.resize((max(1,int(image.width*scale)),max(1,int(image.height*scale))),Image.Resampling.LANCZOS)

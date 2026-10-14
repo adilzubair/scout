@@ -256,6 +256,9 @@ internal sealed class SettingsWindow : Window
         Closed+=(_,_)=>progressTimer.Stop();
         var retryContent=new Button{Content="Retry partial or failed content files",HorizontalAlignment=HorizontalAlignment.Left,Margin=new Thickness(0,0,0,8),IsEnabled=semantic!=null};
         multimodal.Children.Add(retryContent);
+        var coverage=new Button{Content="Review content coverage",HorizontalAlignment=HorizontalAlignment.Left,Margin=new Thickness(0,0,0,8),IsEnabled=semantic!=null};
+        coverage.Click+=(_,_)=>{if(semantic is {IsDisposed:false})new SemanticCoverageWindow(semantic){Owner=this}.ShowDialog();};
+        multimodal.Children.Add(coverage);
         retryContent.Click+=async(_,_)=>
         {
             retryContent.IsEnabled=false;

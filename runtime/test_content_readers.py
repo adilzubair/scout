@@ -26,6 +26,39 @@ def content(writer):
 class Readers(unittest.TestCase):
     @classmethod
     def setUpClass(cls): TEST_ROOT.mkdir(parents=True, exist_ok=True)
+    def test_supported_image_formats_and_transparency_retain_visible_pixels(self):
+        with tempfile.TemporaryDirectory(dir=TEST_ROOT) as folder:
+            for suffix in ('png','jpg','webp','bmp','tiff','gif'):
+                with self.subTest(suffix=suffix):
+                    source=Path(folder)/('picture.'+suffix);Image.new('RGB',(320,180),'red').save(source)
+                    writer=SegmentWriter(Path(folder)/suffix,tokens);images(source,writer)
+                    prepared,_,_=decode_request(dict(schemaVersion=1,mode='document',content=content(writer)[0]['content']))
+                    self.assertEqual(prepared['image'].size,(320,180));self.assertGreater(prepared['image'].getpixel((30,30))[0],200)
+            source=Path(folder)/'transparent.png';image=Image.new('RGBA',(320,180),(0,0,0,0));image.putpixel((50,50),(255,0,0,255));image.save(source)
+            writer=SegmentWriter(Path(folder)/'transparent',tokens);images(source,writer)
+            prepared,_,_=decode_request(dict(schemaVersion=1,mode='document',content=content(writer)[0]['content']))
+            self.assertTrue(all(value>245 for value in prepared['image'].getpixel((0,0))))
+    def test_encrypted_odf_is_classified_before_decoding_ciphertext(self):
+        with tempfile.TemporaryDirectory(dir=TEST_ROOT) as folder:
+            source=Path(folder)/'locked.odt'
+            entries(source,{'META-INF/manifest.xml':'<manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><manifest:file-entry manifest:full-path="content.xml"><manifest:encryption-data/></manifest:file-entry></manifest:manifest>',
+                            'content.xml':b'\x00encrypted bytes are not XML\xff'})
+            with self.assertRaisesRegex(ValueError,'encrypted_odf'):
+                office(source,SegmentWriter(Path(folder)/'out',tokens))
+    def test_binary_office_container_is_not_treated_as_a_zip(self):
+        with tempfile.TemporaryDirectory(dir=TEST_ROOT) as folder:
+            source=Path(folder)/'locked.docx';source.write_bytes(b'\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1'+b'authored binary container')
+            with self.assertRaisesRegex(ValueError,'binary_office_container'):
+                office(source,SegmentWriter(Path(folder)/'out',tokens))
+    def test_sparse_sheet_locator_encloses_all_matching_cells(self):
+        with tempfile.TemporaryDirectory(dir=TEST_ROOT) as folder:
+            source=Path(folder)/'sparse.xlsx';ns='http://schemas.openxmlformats.org/spreadsheetml/2006/main'
+            entries(source,{'xl/workbook.xml':f'<workbook xmlns="{ns}" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Sparse" r:id="s"/></sheets></workbook>',
+                'xl/_rels/workbook.xml.rels':'<Relationships><Relationship Id="s" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>',
+                'xl/worksheets/sheet1.xml':f'<worksheet xmlns="{ns}"><sheetData><row r="1"><c r="Z1"><v>120</v></c></row><row r="2"><c r="A2"><v>42000</v></c></row></sheetData></worksheet>'})
+            writer=SegmentWriter(Path(folder)/'out',tokens);office(source,writer)
+            self.assertEqual(content(writer)[0]['locator'],dict(kind='sheet',sheet='Sparse',startCell='A1',endCell='Z2'))
+            self.assertIn('Z1: 120',content(writer)[0]['evidence']);self.assertIn('A2: 42000',content(writer)[0]['evidence'])
     def test_token_aware_chunks_preserve_all_text(self):
         source = 'مرحبا '+'alpha\n'*1000
         chunks = list(text_chunks(source,tokens,limit=257))

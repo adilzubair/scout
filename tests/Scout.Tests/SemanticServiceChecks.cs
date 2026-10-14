@@ -6,6 +6,18 @@ static class SemanticServiceChecks
 {
     public static void Run(Action<string,Action> test)
     {
+        test("Unsupported coverage preserves filename discovery without extracting bodies or starting a model",()=>With(async f=>
+        {
+            foreach(var path in Directory.EnumerateFiles(f.Selected))File.Delete(path);
+            foreach(var name in new[]{"old.doc","macro.docm","slides.ppt","table.xls","bundle.zip","drawing.svg"})File.WriteAllText(Path.Combine(f.Selected,name),"unsupportedprivatebodycanary");
+            f.Blocked="low_memory";await f.Metadata.ConfigureAsync(f.Enabled());
+            await Wait(()=>f.Service.Activity.Progress?.Unsupported==6);
+            var coverage=await f.Service.CoverageAsync(default);Check(coverage.Length==6 && f.Calls==0 && f.Host.ProcessId==null && f.Service.Index!.Progress.Pending==0);
+            var search=SearchEngine.Search("bundle.zip",Scope.Files,f.Metadata.Catalog,new Dictionary<string,LibraryItem>(),DateTimeOffset.Now);
+            Check(search.Hits.Single().Candidate.Title=="bundle.zip");
+            Check(!System.Text.Encoding.UTF8.GetString(File.ReadAllBytes(f.Service.DatabasePath)).Contains("unsupportedprivatebodycanary"));
+            await f.Service.DisableAsync();Check((await f.Service.CoverageAsync(default)).Length==0);
+        }));
         test("Disabled content scheduler creates no semantic database or worker",()=>With(async f=>
         {
             await f.Metadata.ConfigureAsync(new(){RecentItems=false,WindowsSearch=false});

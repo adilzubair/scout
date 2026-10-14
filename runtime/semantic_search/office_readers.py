@@ -19,7 +19,7 @@ def embedded_image(archive, name, writer, locator):
         writer.reasons.add('embedded_image_size'); return True
     try:
         with Image.open(io.BytesIO(archive.read(entry))) as image:
-            if image.format not in ('PNG', 'JPEG', 'WEBP', 'BMP', 'TIFF'):
+            if image.format not in ('PNG', 'JPEG', 'WEBP', 'BMP', 'TIFF', 'GIF'):
                 writer.reasons.add('embedded_image_format'); return True
             frames = getattr(image, 'n_frames', 1)
             for frame in range(frames):
@@ -132,11 +132,12 @@ def xlsx(archive, writer):
         for merged in merges:
             if ':' not in merged: raise ValueError('invalid_merged_range')
             for endpoint in merged.split(':'): cell_position(endpoint)
-        lines, first, last, heading = [], None, None, []
+        lines, bounds, heading = [], None, []
         def flush():
             if not lines: return True
             context = 'Sheet: '+name+'\nHeaders: '+' | '.join(heading)+'\nMerged ranges: '+', '.join(merges[:256])+'\n'
-            return writer.text(context+'\n'.join(lines), dict(kind='sheet', sheet=name, startCell=first, endCell=last))
+            left,top,right,bottom=bounds
+            return writer.text(context+'\n'.join(lines), dict(kind='sheet', sheet=name, startCell=column(left)+str(top), endCell=column(right)+str(bottom)))
         count = 0
         for row in content.findall('./s:sheetData/s:row', NS):
             row_lines = []
@@ -144,7 +145,7 @@ def xlsx(archive, writer):
                 count += 1
                 if count > 1000000: writer.reasons.add('sheet_cell_limit'); flush(); return
                 address = cell.get('r', '')
-                cell_position(address)
+                col_number,row_number=cell_position(address)
                 value = cell.find('s:v', NS)
                 cached = value.text or '' if value is not None else ''
                 kind = cell.get('t', 'n')
@@ -158,31 +159,34 @@ def xlsx(archive, writer):
                 if cell.find('s:f', NS) is not None and value is None:
                     cached = '[Formula result unavailable]'; writer.reasons.add('formula_cache_unavailable')
                 if not cached: continue
-                if first is None: first = address
-                last = address; row_lines.append(address+': '+cached)
+                bounds=(col_number,row_number,col_number,row_number) if bounds is None else (min(bounds[0],col_number),min(bounds[1],row_number),max(bounds[2],col_number),max(bounds[3],row_number))
+                row_lines.append(address+': '+cached)
             if not heading and row_lines: heading = row_lines.copy()
             lines.extend(row_lines)
             if len(lines) >= 128:
                 if not flush(): return
-                lines, first, last = [], None, None
+                lines, bounds = [], None
         if not flush(): return
         # Drawing anchors supply sheet/cell evidence for embedded images and charts.
         for drawing in content.findall('./s:drawing', NS):
             drawing_part, relation = relationships(archive, target)[drawing.get(R+'id')]
             if drawing_part is None: writer.reasons.add('external_resource_unavailable'); continue
             drawing_tree = xml(archive, drawing_part)
-            locator = dict(kind='sheet', sheet=name, startCell='A1', endCell='A1')
             for anchor in drawing_tree:
+                locator = dict(kind='sheet', sheet=name, startCell='A1', endCell='A1')
                 starts = [node for node in anchor if node.tag.rsplit('}', 1)[-1] == 'from']
                 if starts:
                     vals = {node.tag.rsplit('}', 1)[-1]: node.text for node in starts[0]}
                     start = column(int(vals.get('col', 0))+1)+str(int(vals.get('row', 0))+1)
                     cell_position(start); locator = dict(locator, startCell=start, endCell=start)
+                else:writer.reasons.add('drawing_position_unavailable')
                 if not assets(archive, drawing_part, anchor, writer, locator): return
     writer.reasons.add('office_visual_layout_unavailable')
 
 def office(source, writer):
     suffix = Path(source).suffix.lower()
+    with Path(source).open('rb') as stream:
+        if stream.read(8)==b'\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1':raise ValueError('binary_office_container')
     with package(source) as archive:
         if suffix == '.docx': docx(archive, writer)
         elif suffix == '.pptx': pptx(archive, writer)
@@ -272,7 +276,7 @@ def odf(archive, writer, suffix):
                     if cell.get(T+'formula') and cached is None and not text:
                         value = '[Formula result unavailable]'; writer.reasons.add('formula_cache_unavailable')
                     span_columns, span_rows = int(cell.get(T+'number-columns-spanned', '1')), int(cell.get(T+'number-rows-spanned', '1'))
-                    if not 1 <= span_columns <= 16384 or not 1 <= span_rows <= 1048576: raise ValueError('merged_cell_budget')
+                    if not 1 <= span_columns <= 16384 or not 1 <= span_rows <= 1048576 or col+repetitions+span_columns-2>16384 or row_number+repeat+span_rows-2>1048576: raise ValueError('merged_cell_budget')
                     if value:
                         for offset in range(repetitions):
                             values.append((col+offset, value, span_columns, span_rows))

@@ -52,6 +52,33 @@ installed on the test host. The scan fixtures also exposed and fixed PDFium
 page/bitmap cleanup against the pinned wrapper. These are compatibility checks,
 not the independent quality evaluation.
 
+**Review content coverage** lists up to 500 queued, partial, unsupported or failed
+files with explanations. It follows the enabled scope and clears rows after
+revocation. Known legacy Office, macro-enabled formats and unsupported image/media
+containers receive explicit statuses. Known archives in enabled content folders
+are recorded by filename for coverage whenever a content family is selected;
+archive bodies are never copied, expanded or embedded. Ordinary filename search
+remains available for unsupported content. Generic archives do not grant content
+processing permission for any of their members.
+
+Encrypted PDFs and ODF streams, binary Office containers, malformed images and
+oversized image headers have bounded, terminal statuses. A binary Office status
+does not distinguish encryption from a mislabeled legacy container. Transient
+access/process failures retain retry behavior. Sparse XLSX ranges now enclose
+all included cells; reversed cell ranges are rejected, and unsupported drawing
+positions/ODF merged-cell overflow are explicit. Transparent images are composited
+onto white before JPEG preparation and OCR. GIF frames join the supported image
+reader; HEIC, SVG and raw-camera formats currently remain unsupported.
+
+This slice passes 296/296 Release checks, fourteen document/image reader contracts,
+the seven OCR and thirteen media-reader contracts, plus nine actual AppContainer
+format-status fixtures. WPF verifies the scoped coverage list and revocation and
+uses actual sandbox extraction for DOCX/ODT/PPTX/ODP/XLSX/ODS evidence previews.
+Those UI checks use a deterministic embedding boundary; actual model quality is
+evaluated separately. They preserve paragraph, slide and sheet/cell evidence,
+without promising exact Office layout. Packaged crash/upgrade and quality/resource
+gates remain open.
+
 Setup uses `%LOCALAPPDATA%\Scout\addons\multimodal` (under `SCOUT_DATA_DIR` in
 isolated diagnostics). Its dedicated Python, dependency cache, model and setup
 tool stay outside the base application installation. No Office suite is required. The
@@ -350,6 +377,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/setup-multimodal.ps1
 .runtime/semantic-search/cpu-venv/Scripts/python.exe runtime/test_media_readers.py
 .runtime/semantic-search/cpu-venv/Scripts/python.exe runtime/test_playback.py
 .runtime/semantic-search/cpu-venv/Scripts/python.exe runtime/test_ocr.py
+.runtime/semantic-search/cpu-venv/Scripts/python.exe runtime/author_format_fixtures.py
 .runtime/semantic-search/cpu-venv/Scripts/python.exe runtime/test_multimodal_worker_inference.py --model .runtime/semantic-search/model --device cpu
 dotnet run --project tests/Scout.Tests -c Release -- --multimodal-host C:/Path/To/PrivateTestAddon
 dotnet run --project tests/Scout.Tests -c Release -- --extract-media .runtime/semantic-search/cpu-venv/Scripts/python.exe .runtime/python/cpython-3.12.13-windows-x86_64-none .runtime/semantic-search/model
@@ -357,6 +385,7 @@ dotnet run --project tests/Scout.Tests -c Release -- --semantic-extractor artifa
 dotnet run --project tests/Scout.Tests -c Release -- --semantic-scheduler artifacts/diagnostics/multimodal/addon-no-office .runtime/python/cpython-3.12.13-windows-x86_64-none
 dotnet run --project tests/Scout.Tests -c Release -- --semantic-playback artifacts/diagnostics/multimodal/addon-no-office .runtime/python/cpython-3.12.13-windows-x86_64-none
 dotnet run --project tests/Scout.Tests -c Release -- --semantic-scans artifacts/diagnostics/multimodal/addon-no-office .runtime/python/cpython-3.12.13-windows-x86_64-none
+dotnet run --project tests/Scout.Tests -c Release -- --semantic-formats artifacts/diagnostics/multimodal/addon-no-office .runtime/python/cpython-3.12.13-windows-x86_64-none
 .runtime/semantic-search/cpu-venv/Scripts/python.exe runtime/test_extracted_embeddings.py --model .runtime/semantic-search/model --root C:/Path/Printed/By/SandboxTest --device cpu
 ```
 

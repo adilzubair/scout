@@ -36,11 +36,18 @@ def text_chunks(text, tokenize, limit=2048, max_chars=12000):
             yield value, offset, end
         offset = end
 
+def opaque_image(image):
+    from PIL import Image
+    if image.mode in ('RGBA','LA') or 'transparency' in image.info:
+        rgba=image.convert('RGBA')
+        return Image.alpha_composite(Image.new('RGBA',image.size,'white'),rgba).convert('RGB')
+    return image.convert('RGB')
+
 def image_bytes(image, pixels=1_000_000):
     from PIL import Image
     if min(image.size) <= 0 or image.width*image.height > 100_000_000:
         raise ValueError('image_pixel_budget')
-    image = image.convert('RGB')
+    image = opaque_image(image)
     scale = min(1, math.sqrt(pixels/(image.width*image.height)))
     if scale < 1:
         image = image.resize((max(1, int(image.width*scale)), max(1, int(image.height*scale))), Image.Resampling.LANCZOS)

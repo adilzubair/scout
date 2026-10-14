@@ -159,6 +159,7 @@ public partial class MainWindow
                 throw new InvalidOperationException("Revoked preview retained private evidence.");
         }
         finally{matched.Close();}
+        await CaptureSemanticFormatChecks();
         var scanPath=Path.GetFullPath("artifacts/diagnostics/multimodal/scan-fixtures-v1/f003.pdf");
         if(File.Exists(scanPath))
         {

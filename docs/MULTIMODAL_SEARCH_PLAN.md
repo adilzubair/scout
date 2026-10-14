@@ -294,7 +294,7 @@ results as end-to-end release evidence.
 | Durable index | SQLite queue and app scheduler: source replacement, quota/resource pauses, revocation, retry and metadata events | Packaged process-death recovery and large-library performance |
 | Source acquisition | Native identity checks and hashed owned snapshots (`f87fb8b`) | Revalidate source and scope across extraction, embedding, display and launch |
 | Extractor bridge | Receipt/hash/payload validation, private tokenizer copy, source rechecks, owned-copy cleanup, resource guards and Settings progress | Packaged crash/upgrade checks and full resource/quality evaluation |
-| Document/image readers | Six Office formats; bounded Windows OCR for PNG/TIFF/scanned PDF through actual AppContainer extraction, CPU embedding, publication and page-two retrieval | Wider Office/image fidelity, language quality, unsupported-format status coverage and packaged parser crash cleanup |
+| Document/image readers | Six Office formats with sandbox-backed WPF locator previews; bounded OCR; explicit unsupported/encrypted/corrupt statuses and scoped coverage review | Independent content/language quality, additional fidelity cases exposed by evaluation and packaged parser crash cleanup |
 | Audio/video readers | Bounded PyAV readers connected to indexing; all seven families pass CPU scheduler, watcher, maintenance and revocation checks (`7e66ee3`) | Packaged cancellation/crash cleanup, quality and resource gates |
 | Retrieval/UI | Engineering foundation: 289 Release checks, real CPU code/image queries, retained selection/revoked actions, and all eight required media extensions in WPF | Independent quality/admission evaluation, richer locator/format fixtures and packaged lifecycle validation |
 | Release validation | Pending | Frozen independent holdout, throughput/resource measurements, clean packaging/install and every release gate below |
@@ -404,16 +404,19 @@ Keep all large or private evaluation outputs under ignored
 
 ## Next implementation task
 
-Finish the remaining document/format coverage audit: authored Office locator
-previews, explicit legacy/encrypted/unsupported status coverage, additional
-corrupt/oversized cases and packaged parser lifecycle recovery. Bounded Windows
-OCR now passes authored PNG, multipage TIFF and scanned PDF extraction, CPU
-embedding, publication and page-two retrieval; unavailable languages preserve
-vision and report partial coverage. The pinned PDFium page/bitmap cleanup was
-corrected against actual scan fixtures. English (US) OCR is smoke-tested on the
-available host; Arabic is not installed and has no recognition-quality evidence.
-These contracts and runtime/UI smokes are engineering evidence, not holdout proof.
-Keep Laya optional and metadata-only. The provisional similarity threshold is
-uncalibrated; freeze independent tasks before tuning it. Packaged forced-death
-recovery, the independent holdout, resource/hardware measurements and
-distribution/install checks remain open. The add-on is not release ready.
+Freeze the independent content-grounded evaluation corpus and at least 400
+holdout tasks before changing admission/ranking policy. Build the file/locator,
+abstention, dimension and latency evaluation harness against final retrieval.
+Keep related sources, derivatives and paraphrases in one split and exclude the
+engineering smoke fixtures from quality claims. Exercise every required family,
+close distractors, negatives and ambiguous descriptions with Laya off/on.
+
+The format audit now has 296 Release checks, nine actual sandbox format-status
+fixtures and all six Office evidence previews in WPF. Unsupported legacy formats
+and archive names are accounted for without reading their bodies; encrypted and
+malformed content has explicit terminal reasons. Sparse spreadsheet locators and
+transparent-image preparation were corrected. These are engineering checks,
+not independent quality proof. English (US) OCR is smoke-tested; Arabic is not
+installed and has no recognition-quality evidence. Packaged forced-death recovery,
+resource/hardware measurements and distribution/install checks remain open.
+The add-on is not release ready.
