@@ -1,7 +1,9 @@
 # Scout multimodal semantic search implementation plan
 
 Date: 2026-10-14. Branch: `feature/multimodal-semantic-search`.
-Status: implementation started. The full-model runtime and content smoke probe
+Status: implementation resumed on 2026-10-14 after the renderer-free checkpoint
+`c6496b8`. This plan is the implementation checklist; the add-on remains a
+preview until the release gates below pass. The full-model runtime and content smoke probe
 are implemented and verified on CPU and CUDA. On 2026-10-14 the user directed
 implementation to proceed without LibreOffice. The earlier renderer spike is
 historical evidence, not a shipping dependency. Office content will use dedicated
@@ -118,9 +120,11 @@ Proposed extraction stack to validate in milestone 1:
   an unsupported Office layout must abstain. PDF and image vision remain enabled.
 - Windows image decoding and local OCR where available; define missing OCR
   language handling. Vision embeddings remain usable without OCR.
-- A pinned FFmpeg/ffprobe build for bounded audio/video decoding. Record the
-  actual build configuration and corresponding source/notices; optional
-  components can change its license. Select the build before packaging.
+- Bounded audio/video decoding through the already pinned PyAV 19 wheel and its
+  bundled FFmpeg libraries, without installing a separate FFmpeg executable.
+  Validate the actual codecs, timestamp handling and Windows sandbox behavior.
+  Record the wheel's actual build configuration and corresponding source/notices;
+  optional components can change its license. Complete that review before packaging.
   [FFmpeg licensing](https://www.ffmpeg.org/legal.html).
 
 Model setup must pin the repository revision, artifact hashes, processor,
@@ -265,6 +269,51 @@ Land each verified milestone as a focused local commit on this branch. A milesto
 does not enable the unfinished feature by default. Do not merge or publish a
 release as part of writing this plan.
 
+### Restart checkpoint and execution order
+
+The existing foundations are committed and verified; their integration and
+release checks remain open. Do not restart completed spikes or treat their smoke
+results as end-to-end release evidence.
+
+| Area | Verified checkpoint | Remaining work |
+| --- | --- | --- |
+| Runtime | Full-model CPU/CUDA and all-encoder prepared-input probes; pinned artifacts (`c9febee`) | Exact shipped-resource, codec distribution and minimum-hardware validation |
+| Add-on lifecycle | Independent host/settings/setup (`6c6be38`); model-only readiness without LibreOffice (`df62e0b`) | Clean standard-account installation, interrupted upgrade/removal, cache reclamation and app lifecycle integration |
+| Durable index | SQLite queue, atomic source replacement, quota, revocation and restart contracts (`33aaf86`) | Connect file reconciliation and background scheduling to Scout |
+| Source acquisition | Native identity checks and hashed owned snapshots (`f87fb8b`) | Revalidate source and scope across extraction, embedding, display and launch |
+| Document/image readers | Six Office formats through actual no-network AppContainer extraction and CPU embedding (`c6496b8`); PDF/image/CSV foundations | OCR, additional corrupt/large/scan fixtures, coverage fidelity and parser crash cleanup |
+| Audio/video readers | Full model accepts prepared audio/video; file readers pending | Implement bounded local decoding, windows, frame sampling, audio tracks, timestamp evidence and explicit partial coverage |
+| Retrieval/UI | Pending | Constrained vector search, lexical fusion, calibrated admission, grouped evidence and locator previews with Laya off/on |
+| Release validation | Pending | Frozen independent holdout, throughput/resource measurements, clean packaging/install and every release gate below |
+
+Proceed in this order, committing each verified unit:
+
+1. Implement audio/video file readers using the pinned PyAV runtime. Verify real
+   codec fixtures, overlapping audio windows, timestamps, video-only/silent input,
+   frame/pixel/duration/output limits and no-network AppContainer execution. Test
+   the resulting prepared segments with the full model.
+2. Build the extractor host and connect the durable queue to Scout's selected
+   folders and file reconciliation. Validate snapshot receipts and source hashes,
+   cancellation, immediate scope revocation, pause/quota/resource behavior,
+   interactive priority and crash recovery without holding the metadata refresh gate.
+3. Complete document/image coverage and parser lifecycle hardening, including
+   PDF scans/OCR availability and cleanup of sandbox permissions and job files
+   after crashes. Preserve explicit unsupported/partial statuses.
+4. Connect constrained retrieval and evidence previews. Preserve literal names,
+   date ordering, actions, manual selection and stale-response handling; test
+   semantic results independently with Laya disabled and enabled.
+5. Freeze at least 400 independent content-grounded holdout tasks before tuning
+   admission. Run quality/locator/abstention and dimension comparisons, plus the
+   specified corpus-size, CPU/GPU, disk and lifecycle benchmarks.
+6. Finish distribution notices and clean standard-account install/update/removal
+   checks, rebuild the package and run packaged WPF checks. Physical 16 GB CPU
+   hardware validation is still outstanding; a memory cap on the available 32 GB
+   machine is not a substitute. Report any failed or unavailable gate explicitly.
+
+The user-authorized restart does not change the all-content scope or relax the
+release targets. No LibreOffice installation, renderer troubleshooting or Office
+automation is part of the remaining work.
+
 ## Hardware and release targets
 
 Target Windows 11 x64 with 16 GB RAM for the first full-modality CPU validation;
@@ -334,12 +383,11 @@ dedicated semantic smoke/evaluation commands once their interfaces exist.
 Keep all large or private evaluation outputs under ignored
 `artifacts/diagnostics/multimodal/` and model/runtime downloads outside Git.
 
-## First implementation task
+## Next implementation task
 
-Start milestone 1 with a pinned full-model probe and a small public/authored
-fixture pack spanning every modality. Produce the compatibility and footprint
-report and finalize the runtime lock
-before building permanent settings or installing the add-on into a normal Scout
-user profile. This resolves the two largest dependencies: a viable Windows
-multimodal runtime. The subsequent structured readers use the revised Office
-coverage above without a converter dependency.
+Start the audio/video reader milestone from the verified prepared-input runtime
+and sandbox foundations. Use authored fixtures under ignored diagnostic folders;
+keep codec/resource smoke tests separate from the frozen release holdout. The
+next completion check is actual bounded media-file extraction in the no-network
+sandbox followed by full-model embedding, with source timestamp locators and
+honest sampling/partial coverage receipts.
