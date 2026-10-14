@@ -8,6 +8,16 @@ static class SemanticIndexChecks
     private static readonly DateTimeOffset Now = new(2026, 10, 14, 12, 0, 0, TimeSpan.Zero);
     public static void Run(Action<string, Action> test)
     {
+        test("OCR language changes invalidate existing evidence and outstanding reader leases",()=>With(f=>
+        {
+            f.Seed("selected/a.txt");var old=f.Index.Vectors().Single();
+            var next=(f.Scope with {OcrLanguages=["en-US","EN-us"]}).Normalize();
+            Check(next.OcrLanguages.SequenceEqual(["en-us"]));
+            f.Index.Configure(next);
+            Check(f.Index.Vectors().Length==0 && f.Index.Evidence(old.SegmentId)==null);
+            Throws<ArgumentException>(()=>SemanticScope.NormalizeOcrLanguages(["en-US+ara"]));
+            Throws<ArgumentException>(()=>SemanticScope.NormalizeOcrLanguages(["en-US","ar-SA","fr-FR","de-DE"]));
+        }));
         test("Semantic database starts empty and enforces a single scheduler owner", () => With(f =>
         {
             Check(f.Index.Progress.Files == 0 && f.Index.Claim(Now) == null);

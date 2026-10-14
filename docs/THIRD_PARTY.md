@@ -34,6 +34,11 @@ No model weights, native dependency environment or generated fixture media are
 included in Git or the base application package.
 
 PDF page rendering uses the pypdfium2 package and its bundled PDFium dependency.
+Local OCR uses Windows' installed OCR engines through hash-pinned PyWinRT 3.2.1
+bindings (MIT). Language packs are supplied by Windows and are not downloaded
+or redistributed by Scout. Missing languages retain visual embeddings and report
+partial OCR coverage. [PyWinRT source and license](https://github.com/pywinrt/pywinrt),
+[Windows OCR API](https://learn.microsoft.com/en-us/uwp/api/windows.media.ocr).
 Media experiments use PyAV with bundled FFmpeg libraries; the probe records their
 actual build configuration and reported licenses.
 

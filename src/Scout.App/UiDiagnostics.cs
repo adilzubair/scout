@@ -117,10 +117,10 @@ public partial class MainWindow
                 if(name=="Multimodal")
                 {
                     var progress=UiDiagnostics.Descendants<TextBlock>(settings).Single(text=>AutomationProperties.GetName(text)=="Multimodal indexing progress");
-                    var retry=UiDiagnostics.Descendants<Button>(settings).Single(button=>button.Content as string=="Retry failed content files");
+                    var retry=UiDiagnostics.Descendants<Button>(settings).Single(button=>button.Content as string=="Retry partial or failed content files");
                     retry.BringIntoView();settings.UpdateLayout();
                     await UiDiagnostics.Snapshot(settings,"settings-multimodal-progress");
-                    if(string.IsNullOrWhiteSpace(progress.Text) || !UiDiagnostics.Descendants<Button>(settings).Any(button=>button.Content as string=="Retry failed content files"))
+                    if(string.IsNullOrWhiteSpace(progress.Text) || !UiDiagnostics.Descendants<Button>(settings).Any(button=>button.Content as string=="Retry partial or failed content files"))
                         throw new InvalidOperationException("Content progress or retry control is missing.");
                 }
                 if (AutomationProperties.GetItemStatus(navigation) != "Selected") throw new InvalidOperationException("Settings navigation lost its selected state.");
@@ -159,6 +159,20 @@ public partial class MainWindow
                 throw new InvalidOperationException("Revoked preview retained private evidence.");
         }
         finally{matched.Close();}
+        var scanPath=Path.GetFullPath("artifacts/diagnostics/multimodal/scan-fixtures-v1/f003.pdf");
+        if(File.Exists(scanPath))
+        {
+            var scanItem=new Candidate(Candidate.Key(ItemKind.File,scanPath),ItemKind.File,"Authored scanned PDF",scanPath);
+            var scanEvidence=new SemanticEvidence("authored-scan",scanItem.Id,new string('a',64),scanPath,"text",new("page"){Page=2},"RIVER DELTA PURCHASE Invoice total 73510",[]);
+            var scanWindow=new PreviewWindow(scanItem,scanEvidence,_=>true){Owner=this};
+            try
+            {
+                scanWindow.Show();await scanWindow.CheckAsync();
+                if(scanWindow.RenderedPdfPage!=2)throw new InvalidOperationException("Scanned PDF did not navigate to its actual matched page.");
+                await UiDiagnostics.Snapshot(scanWindow,"semantic-scanned-pdf-page-two");
+            }
+            finally{scanWindow.Close();}
+        }
         await SearchView("preview benefits",Scope.Files,"semantic-before-arrival");
         var manualItem=new Candidate("ui:manual",ItemKind.File,"Benefits notes.txt",previewPath);
         var baseline=current! with {Hits=[new(manualItem,100)]};current=baseline;ApplyRows(baseline.Hits);

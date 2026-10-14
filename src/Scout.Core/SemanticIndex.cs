@@ -57,7 +57,7 @@ public sealed class SemanticIndex : IDisposable
             if ((string)Scalar(connection, "SELECT scope FROM semantic_meta WHERE id=1")! == value.Fingerprint) { scope = value; return 0; }
             using var transaction = connection.BeginTransaction();
             var incompatible = (string)Scalar(connection, "SELECT model FROM semantic_meta WHERE id=1", transaction)! != value.ModelIdentity ||
-                               (string)Scalar(connection, "SELECT extractor FROM semantic_meta WHERE id=1", transaction)! != value.ExtractorIdentity;
+                               (string)Scalar(connection, "SELECT extractor FROM semantic_meta WHERE id=1", transaction)! != value.ReaderIdentity;
             var remove = new List<string>();
             using (var query = Command(connection, "SELECT id,path,family FROM semantic_files", transaction))
             using (var reader = query.ExecuteReader())
@@ -66,7 +66,7 @@ public sealed class SemanticIndex : IDisposable
             var nextGeneration = Generation + 1;
             Execute(connection, "UPDATE semantic_jobs SET generation=$generation,lease=NULL,state='pending'", transaction, ("$generation", nextGeneration));
             Execute(connection, "UPDATE semantic_meta SET generation=$generation,scope=$scope,model=$model,extractor=$extractor WHERE id=1", transaction,
-                ("$generation", nextGeneration), ("$scope", value.Fingerprint), ("$model", value.ModelIdentity), ("$extractor", value.ExtractorIdentity));
+                ("$generation", nextGeneration), ("$scope", value.Fingerprint), ("$model", value.ModelIdentity), ("$extractor", value.ReaderIdentity));
             Bump(connection, transaction);
             transaction.Commit();
             scope = value;

@@ -7,6 +7,7 @@ from pathlib import Path
 import re
 import xml.etree.ElementTree as ET
 import zipfile
+from contextlib import closing
 from .packages import xml
 
 from .manifest import sha256
@@ -51,12 +52,13 @@ def image_bytes(image, pixels=1_000_000):
     return base64.b64encode(output.getvalue()).decode('ascii'), base64.b64encode(preview.getvalue()).decode('ascii')
 
 class SegmentWriter:
-    def __init__(self, output, tokenize, max_segments=256, max_bytes=256*1024**2):
+    def __init__(self, output, tokenize, max_segments=256, max_bytes=256*1024**2, *, ocr=None):
         self.output = Path(output)
         self.output.mkdir(exist_ok=True)
         self.tokenize = tokenize
         self.max_segments, self.max_bytes = max_segments, max_bytes
         self.files, self.reasons, self.bytes, self.coverage = [], set(), 0, {}
+        self.ocr=ocr
     @property
     def full(self):
         return len(self.files) >= self.max_segments or self.bytes >= self.max_bytes
@@ -85,7 +87,17 @@ class SegmentWriter:
         return True
     def image(self, image, locator, evidence=''):
         data, thumbnail = image_bytes(image)
-        return self.emit(dict(type='image', data=data), locator, evidence, thumbnail)
+        if not self.emit(dict(type='image', data=data), locator, evidence, thumbnail):return False
+        if self.ocr is not None:
+            results=self.ocr.recognize(image)
+            self.reasons.update(self.ocr.reasons)
+            self.coverage['ocr']=self.ocr.coverage()
+            seen=set()
+            for language,text in results:
+                if text in seen:continue
+                seen.add(text)
+                if not self.text(text,locator):return False
+        return True
     def finish(self, source):
         result = dict(schemaVersion=1, sourceSha256=sha256(source), segments=self.files,
                       partial=bool(self.reasons), reasons=sorted(self.reasons), bytes=self.bytes)
@@ -121,7 +133,7 @@ def images(source, writer):
             image.seek(index)
             if not writer.image(ImageOps.exif_transpose(image), dict(kind='image', page=index+1)):
                 return
-        # Vision coverage is independent of optional Windows OCR availability.
+        # Vision coverage is independent of installed Windows OCR languages.
 
 def pdf(source, writer, *, kind='page', max_pages=128):
     from pypdf import PdfReader
@@ -136,12 +148,12 @@ def pdf(source, writer, *, kind='page', max_pages=128):
             locator = dict(kind=kind, page=index+1)
             text = reader.pages[index].extract_text() or ''
             if text and not writer.text(text, locator): return
-            with document[index] as page:
+            with closing(document[index]) as page:
                 width, height = page.get_size()
                 if min(width, height) <= 0 or not math.isfinite(width*height): raise ValueError('pdf_dimensions')
                 scale = min(1.5, math.sqrt(1_000_000/(width*height)))
                 while math.ceil(width*scale)*math.ceil(height*scale) > 1_000_000: scale *= .99
-                with page.render(scale=scale) as bitmap:
+                with closing(page.render(scale=scale)) as bitmap:
                     if not writer.image(bitmap.to_pil(), locator, text[:1000]): return
 
 def column(number):

@@ -8,6 +8,18 @@ static class SemanticExtractorChecks
 {
     public static void Run(Action<string, Action> test)
     {
+        test("OCR coverage cannot claim unavailable languages or arbitrary engine fields",()=>With(f=>
+        {
+            f.Write(new{type="text",text="recognized"},new{kind="image",page=1});
+            var path=Path.Combine(f.Root,"output/ready.json");var original=System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(path))!;
+            foreach(var selected in new[]{"en-US","ar-SA","../../private"})
+            {
+                var data=original.DeepClone();data["coverage"]=System.Text.Json.Nodes.JsonNode.Parse(JsonSerializer.Serialize(new{ocr=new{engine="windows",languages=new[]{selected},availableLanguages=new[]{"en-US"}}}));
+                File.WriteAllText(path,data.ToJsonString());
+                if(selected=="en-US")Check(PreparedManifest.ReadAsync(f.Root,f.Hash,default).Result.Detail.Contains("ocr_languages=en-US"));
+                else Throws<InvalidDataException>(()=>PreparedManifest.ReadAsync(f.Root,f.Hash,default).GetAwaiter().GetResult());
+            }
+        }));
         test("Prepared manifests reject source mismatch, path escapes and duplicate fields", () => With(f =>
         {
             var receipt = f.Write(new { type = "text", text = "invoice total 42000" }, new { kind = "lines", startLine = 1, endLine = 1 });

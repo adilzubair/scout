@@ -12,3 +12,11 @@ soundfile==0.14.0
 psutil==7.2.2
 pypdf==6.20.1
 pypdfium2==5.14.0
+# Local Windows OCR runs inside the parser's zero-capability AppContainer.
+winrt-runtime==3.2.1
+winrt-Windows.Foundation==3.2.1
+winrt-Windows.Foundation.Collections==3.2.1
+winrt-Windows.Globalization==3.2.1
+winrt-Windows.Graphics.Imaging==3.2.1
+winrt-Windows.Media.Ocr==3.2.1
+winrt-Windows.Storage.Streams==3.2.1

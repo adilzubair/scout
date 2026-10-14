@@ -89,7 +89,7 @@ internal sealed class SemanticExtractor : ISemanticExtractionSession
             {
                 var path = Path.Combine(snapshot.Directory, "request.json");
                 await File.WriteAllBytesAsync(path, JsonSerializer.SerializeToUtf8Bytes(new { schemaVersion = 1, source = Path.GetFileName(snapshot.Path),
-                    sourceSha256 = snapshot.ContentHash.ToLowerInvariant(), family = source.Family, tokenizer }), request.Token).ConfigureAwait(false);
+                    sourceSha256 = snapshot.ContentHash.ToLowerInvariant(), family = source.Family, tokenizer,ocrLanguages=scope.OcrLanguages }), request.Token).ConfigureAwait(false);
                 var exit = await sandbox!.RunAsync(installation.Python, [Path.Combine(runtime, "semantic_search", "extract.py"), "--request", path],
                     snapshot.Directory, TimeSpan.FromMinutes(3), request.Token).ConfigureAwait(false);
                 if (exit != 0)
@@ -203,6 +203,22 @@ internal sealed record PreparedManifest(PreparedReceipt[] Segments, bool Partial
         var detail = string.Join(',', reasons); var partial = data.GetProperty("partial").GetBoolean();
         if (reasons.Length > 16 || detail.Length > 1000 || partial != (reasons.Length > 0) || reasons.Distinct().Count() != reasons.Length ||
             reasons.Any(reason => reason.Length is < 1 or > 80 || reason.Any(c => !char.IsAsciiLetterOrDigit(c) && c != '_'))) throw new InvalidDataException("Invalid extraction coverage reasons.");
+        if(data.TryGetProperty("coverage",out var coverage) && coverage.TryGetProperty("ocr",out var ocr))
+        {
+            SemanticExtractor.Fields(ocr,["engine","languages","availableLanguages"]);
+            if(ocr.GetProperty("engine").GetString()!="windows")throw new InvalidDataException("Invalid OCR engine.");
+            string[] Tags(string field,int maximum)
+            {
+                var tags=ocr.GetProperty(field).EnumerateArray().Select(value=>value.GetString()??"").ToArray();
+                if(tags.Length>maximum || tags.Distinct(StringComparer.OrdinalIgnoreCase).Count()!=tags.Length ||
+                    tags.Any(tag=>!System.Text.RegularExpressions.Regex.IsMatch(tag,"^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8}){0,3}$")))throw new InvalidDataException("Invalid OCR language coverage.");
+                return tags;
+            }
+            var selected=Tags("languages",3);var available=Tags("availableLanguages",100);
+            if(selected.Any(tag=>!available.Contains(tag,StringComparer.OrdinalIgnoreCase)))throw new InvalidDataException("Unavailable OCR language was reported as used.");
+            detail+=";ocr_languages="+string.Join('+',selected);
+            if(detail.Length>1000)throw new InvalidDataException("OCR coverage detail limit.");
+        }
         return new(receipts.ToArray(), partial, detail);
     }
     public static async Task<PreparedSegment> ReadSegmentAsync(string job, PreparedReceipt receipt, string family, CancellationToken token)

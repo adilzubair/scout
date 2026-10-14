@@ -16,11 +16,13 @@ def extract(request_path):
     from semantic_search.readers import SegmentWriter, plain, images, pdf, csv_sheet
     from semantic_search.office_readers import office
     from semantic_search.media_readers import media
+    from semantic_search.ocr import WindowsOcr, languages
     root = Path(request_path).absolute().parent
     request_path = local_file(request_path, root)
     if request_path.stat().st_size > 16384: raise ValueError('request_budget')
     request = json.loads(request_path.read_text(encoding='utf-8-sig'))
-    if set(request) != {'schemaVersion','source','sourceSha256','family','tokenizer'} or type(request['schemaVersion']) is not int or request['schemaVersion'] != 1:
+    required={'schemaVersion','source','sourceSha256','family','tokenizer'}
+    if (not required<=set(request) or set(request)-required-{'ocrLanguages'} or type(request['schemaVersion']) is not int or request['schemaVersion'] != 1):
         raise ValueError('invalid_extract_request')
     if request['family'] not in FAMILIES: raise ValueError('unsupported_family')
     name = request['source']
@@ -29,7 +31,9 @@ def extract(request_path):
     source = local_file(root/name, root)
     if sha256(source) != request['sourceSha256']: raise ValueError('snapshot_hash_mismatch')
     tokenizer = Tokenizer.from_file(str(Path(request['tokenizer'])))
-    writer = SegmentWriter(root/'output', tokenizer.encode)
+    ocr_languages=languages(request.get('ocrLanguages',[]))
+    use_ocr=request['family'] in ('documents','presentations','spreadsheets','images')
+    writer = SegmentWriter(root/'output', tokenizer.encode,ocr=WindowsOcr(ocr_languages) if use_ocr else None)
     suffix = source.suffix.lower()
     if suffix in ('.docx','.odt','.pptx','.odp','.xlsx','.ods'): office(source,writer)
     elif suffix == '.pdf': pdf(source,writer)

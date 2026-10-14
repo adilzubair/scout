@@ -32,6 +32,7 @@ internal sealed class PreviewWindow : Window
     private readonly Func<SemanticEvidence,bool>? validate;
     private readonly System.Windows.Threading.DispatcherTimer evidenceTimer=new(){Interval=TimeSpan.FromMilliseconds(250)};
     internal ContentLocator? MatchedLocator=>evidence?.Locator;
+    internal uint? RenderedPdfPage=>pdf==null?null:page+1;
     public PreviewWindow(Candidate item,SemanticEvidence? evidence=null,Func<SemanticEvidence,bool>? validate=null,
         Func<SemanticEvidence,CancellationToken,Task<PreparedPlayback>>? preparePlayback=null)
     {
@@ -85,6 +86,8 @@ internal sealed class PreviewWindow : Window
         }
         panel.Children.Add(new TextBox{Text=match.Text,IsReadOnly=true,TextWrapping=TextWrapping.Wrap,BorderThickness=new Thickness(0),Background=System.Windows.Media.Brushes.Transparent,
             FontFamily=new FontFamily("Cascadia Mono, Consolas"),FontSize=13});
+        var ocr=match.Coverage.Split(';').FirstOrDefault(value=>value.StartsWith("ocr_languages=",StringComparison.Ordinal))?[14..];
+        if(ocr is {Length:>0})panel.Children.Add(new TextBlock{Text="Text recognition: "+ocr.Replace('+',','),Margin=new Thickness(0,12,0,0),Foreground=WindowVisuals.Brush("Muted")});
         if(match.Partial)panel.Children.Add(new TextBlock{Text="Partial content coverage. Open the original file for its full contents and layout.",TextWrapping=TextWrapping.Wrap,Margin=new Thickness(0,12,0,0),Foreground=WindowVisuals.Brush("Muted")});
         preview.Content=new ScrollViewer{Content=panel,VerticalScrollBarVisibility=ScrollBarVisibility.Auto};
         status.Text="Content match · "+match.Locator.Label+(match.Partial?" · Partial coverage":"");

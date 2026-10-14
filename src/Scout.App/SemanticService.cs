@@ -59,7 +59,7 @@ internal sealed partial class SemanticService : IDisposable
         var runtime=Path.Combine(AppContext.BaseDirectory,"runtime");
         modelIdentity=Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(Path.Combine(runtime,"embeddinggemma2_model.json"))))+":768";
         using var digest=IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
-        foreach(var name in new[]{"extract.py","readers.py","office_readers.py","media_readers.py","packages.py","paths.py","protocol.py","embedding.py"})
+        foreach(var name in new[]{"extract.py","readers.py","ocr.py","office_readers.py","media_readers.py","packages.py","paths.py","protocol.py","embedding.py"})
             digest.AppendData(File.ReadAllBytes(Path.Combine(runtime,"semantic_search",name)));
         digest.AppendData(File.ReadAllBytes(typeof(SemanticService).Assembly.Location));
         extractorIdentity=Convert.ToHexString(digest.GetHashAndReset());
@@ -70,7 +70,7 @@ internal sealed partial class SemanticService : IDisposable
         ObjectDisposedException.ThrowIf(disposed,this);
         var snapshot=JsonSerializer.Deserialize<ScoutSettings>(JsonSerializer.Serialize(value))!;
         var next=new SemanticScope(snapshot.Multimodal.Enabled,snapshot.Multimodal.Folders,snapshot.Exclusions,
-            snapshot.Multimodal.Modalities,modelIdentity,extractorIdentity).Normalize();
+            snapshot.Multimodal.Modalities,modelIdentity,extractorIdentity){OcrLanguages=snapshot.Multimodal.OcrLanguages}.Normalize();
         var generation=Interlocked.Increment(ref epoch);
         InvalidateRetrieval();
         Volatile.Write(ref scope,next); // Retrieval eligibility changes before any asynchronous wait.
@@ -248,7 +248,7 @@ internal sealed partial class SemanticService : IDisposable
             await Task.Run(()=>
             {
                 var sources=new List<SemanticSource>();
-                foreach(var file in target.Files().Where(file=>file.Status=="failed"))
+                foreach(var file in target.Files().Where(file=>file.Status=="failed" || file.Partial))
                 {
                     lifetime.Token.ThrowIfCancellationRequested();
                     if(generation!=Interlocked.Read(ref epoch))return;

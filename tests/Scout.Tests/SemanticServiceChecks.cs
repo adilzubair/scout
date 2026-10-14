@@ -98,6 +98,13 @@ static class SemanticServiceChecks
             await Wait(()=>f.Service.Activity.Progress?.Ready==2);
             Check(f.Service.Activity.Progress?.Failed==0 && f.Calls==8);
         }));
+        test("Manual retry rebuilds partial OCR content after a language becomes available",()=>With(async f=>
+        {
+            f.Extract=(_,_)=>Task.FromResult(Good() with {Partial=true,Detail="ocr_language_unavailable"});
+            await f.Metadata.ConfigureAsync(f.Enabled());await Wait(()=>f.Service.Activity.Progress?.Partial==2);
+            f.Extract=(_,_)=>Task.FromResult(Good());await f.Service.RetryFailedAsync();
+            await Wait(()=>f.Service.Activity.Progress is {Ready:2,Partial:0});Check(f.Calls==4);
+        }));
         test("Duplicate metadata representations queue each native source only once",()=>With(async f=>
         {
             f.ExtraCandidates=[new("alternate-metadata-id",ItemKind.File,"Alternate representation",Path.Combine(f.Selected,"first.txt"))];

@@ -62,6 +62,16 @@ public sealed class UnsupportedContentException(string reason) : IOException(rea
 
 public sealed record SemanticScope(bool Enabled, string[] Folders, string[] Exclusions, string[] Families, string ModelIdentity, string ExtractorIdentity)
 {
+    public string[] OcrLanguages {get;init;}=[];
+    public static string[] NormalizeOcrLanguages(IEnumerable<string> values)
+    {
+        var tags=values.Select(value=>value.Trim().ToLowerInvariant()).Distinct().Order().ToArray();
+        if(tags.Length>3 || tags.Any(tag=>!System.Text.RegularExpressions.Regex.IsMatch(tag,"^[a-z]{2,3}(?:-[a-z0-9]{2,8}){0,3}$")))
+            throw new ArgumentException("Use up to three OCR language tags, such as en-US or ar-SA.");
+        return tags;
+    }
+    [System.Text.Json.Serialization.JsonIgnore]
+    public string ReaderIdentity=>ExtractorIdentity+":"+Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(string.Join('|',OcrLanguages))));
     public SemanticScope Normalize()
     {
         string[] Paths(string[] paths) => paths.Select(path =>
@@ -72,7 +82,7 @@ public sealed record SemanticScope(bool Enabled, string[] Folders, string[] Excl
         }).Distinct(StringComparer.OrdinalIgnoreCase).Order(StringComparer.OrdinalIgnoreCase).ToArray();
         if (Families.Any(family => !MultimodalSettings.ContentTypes.Contains(family))) throw new ArgumentException("Unknown content family.");
         if (ModelIdentity.Length > 200 || ExtractorIdentity.Length > 200) throw new ArgumentException("Invalid content configuration identity.");
-        return this with { Folders = Paths(Folders), Exclusions = Paths(Exclusions), Families = Families.Distinct().Order().ToArray() };
+        return this with { Folders = Paths(Folders), Exclusions = Paths(Exclusions), Families = Families.Distinct().Order().ToArray(),OcrLanguages=NormalizeOcrLanguages(OcrLanguages) };
     }
     [System.Text.Json.Serialization.JsonIgnore]
     public string Fingerprint => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(this))));

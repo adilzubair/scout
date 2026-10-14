@@ -27,6 +27,31 @@ metadata library while enabled. The existing keyword content-search setting is
 independent. Content indexing is off by default; all seven families are selected
 when users opt in, and indexing pauses on battery by default.
 
+OCR uses locally installed Windows language packs inside the same no-network
+AppContainer as the readers. Settings lists available languages. Leave the OCR
+field blank to follow Windows preferences, or select up to three language tags
+such as `en-US, ar-SA`. Scout does not install language packs. A missing pack or
+OCR budget exhaustion reports partial coverage and retains visual embeddings.
+Changing OCR languages invalidates prior content evidence and rebuilds the index.
+After adding a pack in Windows Settings, use **Retry partial or failed content
+files** to rebuild incomplete reads. OCR evidence keeps the image/PDF page, slide
+or sheet locator and records the actual recognition languages.
+
+Each source gets at most 64 OCR images and 20 seconds of OCR work; a recognition
+operation has a three-second deadline. Input is normalized to at most four million
+pixels and 4096 pixels per dimension, within the parser's existing memory/job
+limits. Visual segments remain when text recognition is unavailable. OCR can make
+transcription errors; supported-language quality is still a holdout gate.
+
+The OCR slice passes 292/292 Release checks, seven Python OCR/scan contracts and
+the existing ten document-reader contracts. Authored PNG, multipage TIFF and
+scanned PDF sources pass actual AppContainer OCR, full-model CPU embedding,
+SQLite publication and page-two retrieval evidence. Missing-language coverage
+retains image vectors. English (US) is validated by this smoke; Arabic OCR is not
+installed on the test host. The scan fixtures also exposed and fixed PDFium
+page/bitmap cleanup against the pinned wrapper. These are compatibility checks,
+not the independent quality evaluation.
+
 Setup uses `%LOCALAPPDATA%\Scout\addons\multimodal` (under `SCOUT_DATA_DIR` in
 isolated diagnostics). Its dedicated Python, dependency cache, model and setup
 tool stay outside the base application installation. No Office suite is required. The
@@ -324,12 +349,14 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/setup-multimodal.ps1
 .runtime/semantic-search/cpu-venv/Scripts/python.exe runtime/test_multimodal_worker.py
 .runtime/semantic-search/cpu-venv/Scripts/python.exe runtime/test_media_readers.py
 .runtime/semantic-search/cpu-venv/Scripts/python.exe runtime/test_playback.py
+.runtime/semantic-search/cpu-venv/Scripts/python.exe runtime/test_ocr.py
 .runtime/semantic-search/cpu-venv/Scripts/python.exe runtime/test_multimodal_worker_inference.py --model .runtime/semantic-search/model --device cpu
 dotnet run --project tests/Scout.Tests -c Release -- --multimodal-host C:/Path/To/PrivateTestAddon
 dotnet run --project tests/Scout.Tests -c Release -- --extract-media .runtime/semantic-search/cpu-venv/Scripts/python.exe .runtime/python/cpython-3.12.13-windows-x86_64-none .runtime/semantic-search/model
 dotnet run --project tests/Scout.Tests -c Release -- --semantic-extractor artifacts/diagnostics/multimodal/addon-no-office .runtime/python/cpython-3.12.13-windows-x86_64-none
 dotnet run --project tests/Scout.Tests -c Release -- --semantic-scheduler artifacts/diagnostics/multimodal/addon-no-office .runtime/python/cpython-3.12.13-windows-x86_64-none
 dotnet run --project tests/Scout.Tests -c Release -- --semantic-playback artifacts/diagnostics/multimodal/addon-no-office .runtime/python/cpython-3.12.13-windows-x86_64-none
+dotnet run --project tests/Scout.Tests -c Release -- --semantic-scans artifacts/diagnostics/multimodal/addon-no-office .runtime/python/cpython-3.12.13-windows-x86_64-none
 .runtime/semantic-search/cpu-venv/Scripts/python.exe runtime/test_extracted_embeddings.py --model .runtime/semantic-search/model --root C:/Path/Printed/By/SandboxTest --device cpu
 ```
 

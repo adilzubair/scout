@@ -197,7 +197,7 @@ internal sealed class SettingsWindow : Window
 
         var multimodalOptions = settings.Multimodal ?? new MultimodalSettings();
         var multimodal = Page("Multimodal", "\uE8A5", "Prepare local content search across documents, images, audio, and video.");
-        Note(multimodal, "Development preview: selected content can be indexed in the background. Semantic search results and evidence previews are still being implemented.");
+        Note(multimodal, "Development preview: searches selected content and shows matched evidence. Quality and hardware validation are still in progress.");
         var embeddingEnabled = Check(multimodal, "Enable the multimodal add-on", multimodalOptions.Enabled);
         var embeddingPaused = Check(multimodal, "Pause background content indexing", multimodalOptions.Paused);
         var embeddingBattery = Check(multimodal,"Pause content indexing on battery power",multimodalOptions.PauseOnBattery);
@@ -207,6 +207,11 @@ internal sealed class SettingsWindow : Window
         Heading(multimodal, "Content types");
         var embeddingTypes = MultimodalSettings.ContentTypes.ToDictionary(type => type, type => Check(multimodal,
             char.ToUpperInvariant(type[0]) + type[1..], multimodalOptions.Modalities.Contains(type)));
+        var ocrLanguages=Field(multimodal,"OCR languages",string.Join(", ",multimodalOptions.OcrLanguages));
+        string installedOcr;
+        try{installedOcr=string.Join(", ",Windows.Media.Ocr.OcrEngine.AvailableRecognizerLanguages.Select(language=>language.LanguageTag));}
+        catch(Exception error)when(error is System.Runtime.InteropServices.COMException or TypeLoadException){installedOcr="unavailable";}
+        Note(multimodal,"Installed OCR languages: "+(installedOcr.Length>0?installedOcr:"none")+". Leave blank to use Windows preferences, or enter up to three tags such as en-US, ar-SA. Add OCR language packs in Windows Settings. Visual search continues when OCR is unavailable; changing languages rebuilds the content index.");
         Heading(multimodal, "Processing device");
         var embeddingDevice = new ComboBox { ItemsSource = new[] { "cpu", "cuda" }, SelectedItem = multimodalOptions.Device, Padding = new Thickness(10) };
         AutomationProperties.SetName(embeddingDevice, "Multimodal processing device"); multimodal.Children.Add(embeddingDevice);
@@ -249,7 +254,7 @@ internal sealed class SettingsWindow : Window
         }
         progressTimer.Tick+=(_,_)=>UpdateProgress();UpdateProgress();progressTimer.Start();
         Closed+=(_,_)=>progressTimer.Stop();
-        var retryContent=new Button{Content="Retry failed content files",HorizontalAlignment=HorizontalAlignment.Left,Margin=new Thickness(0,0,0,8),IsEnabled=semantic!=null};
+        var retryContent=new Button{Content="Retry partial or failed content files",HorizontalAlignment=HorizontalAlignment.Left,Margin=new Thickness(0,0,0,8),IsEnabled=semantic!=null};
         multimodal.Children.Add(retryContent);
         retryContent.Click+=async(_,_)=>
         {
@@ -356,13 +361,16 @@ internal sealed class SettingsWindow : Window
             var embeddingRoots = Lines(embeddingFolders.Text);
             if (embeddingEnabled.IsChecked == true && (embeddingRoots.Length == 0 || embeddingRoots.Any(p => !Path.IsPathFullyQualified(p) || !Directory.Exists(p)))) { Error("Choose at least one existing folder for multimodal content search.", 3, embeddingFolders); return; }
             var selectedTypes = embeddingTypes.Where(entry => entry.Value.IsChecked == true).Select(entry => entry.Key).ToArray();
+            string[] selectedOcr;
+            try{selectedOcr=SemanticScope.NormalizeOcrLanguages(ocrLanguages.Text.Split([',',';',' ','\r','\n'],StringSplitOptions.RemoveEmptyEntries));}
+            catch(ArgumentException error){Error(error.Message,3,ocrLanguages);return;}
             if (embeddingEnabled.IsChecked == true && selectedTypes.Length == 0) { Error("Choose at least one content type.", 3, embeddingTypes.First().Value); return; }
             if (embeddingEnabled.IsChecked == true && MultimodalSetup.Find()?.Device != (string)embeddingDevice.SelectedItem) { Error("Install the add-on for the selected processing device first.", 3, embeddingInstall); return; }
             if (!applyHotkey(shortcut.Text.Trim())) { Error("That shortcut is invalid or already in use. Try Ctrl+Alt+S.", 0, shortcut); return; }
             Value = new ScoutSettings { ChromeHistory = chrome.IsChecked == true, EdgeHistory = edge.IsChecked == true, WindowsSearch = windows.IsChecked == true, RecentItems = recent.IsChecked == true, WebFallback = web.IsChecked == true, AutomationFolders = automationFolders, ContentSearchEnabled = contentSearch.IsChecked == true, ContentFolders = indexedContentFolders, AiEnabled = ai.IsChecked == true, SemanticHelper = semanticHelper?.IsChecked == true, PythonPath = python.Text.Trim(), Model = (string)checkpoint.SelectedItem, Device = (string)device.SelectedItem, CpuThreads = settings.CpuThreads, Hotkey = shortcut.Text.Trim(), ExtraFolders = extra, Exclusions = exclusions };
             Value.Multimodal = new() { Enabled = embeddingEnabled.IsChecked == true, Paused = embeddingPaused.IsChecked == true,
                 PauseOnBattery = embeddingBattery.IsChecked == true,
-                Folders = embeddingRoots, Modalities = selectedTypes, Device = (string)embeddingDevice.SelectedItem,
+                Folders = embeddingRoots, Modalities = selectedTypes,OcrLanguages=selectedOcr, Device = (string)embeddingDevice.SelectedItem,
                 CpuThreads = (int)embeddingThreads.SelectedItem, IndexQuotaBytes = (long)embeddingQuota.SelectedItem * 1024*1024*1024 };
             DialogResult = true;
         };

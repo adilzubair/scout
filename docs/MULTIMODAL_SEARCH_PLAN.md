@@ -25,7 +25,9 @@ Sandbox permission journals recover after owner crashes, and shared runtime
 leases interlock with setup/removal. Scheduler/progress integration passes real
 all-family CPU indexing and watcher/maintenance/revocation checks. Constrained
 retrieval, lexical fusion and locator previews now pass engineering contracts,
-real CPU code/image queries and authored WPF playback checks. Calibrated quality,
+real CPU code/image queries and authored WPF playback checks.
+Bounded Windows OCR now adds scanned text while preserving vision and page locators;
+its 292 Release checks and authored CPU pipeline smoke pass. Calibrated quality,
 clean standard-account installation, further parser lifecycle hardening,
 distribution review and release
 evaluations remain required. See
@@ -292,7 +294,7 @@ results as end-to-end release evidence.
 | Durable index | SQLite queue and app scheduler: source replacement, quota/resource pauses, revocation, retry and metadata events | Packaged process-death recovery and large-library performance |
 | Source acquisition | Native identity checks and hashed owned snapshots (`f87fb8b`) | Revalidate source and scope across extraction, embedding, display and launch |
 | Extractor bridge | Receipt/hash/payload validation, private tokenizer copy, source rechecks, owned-copy cleanup, resource guards and Settings progress | Packaged crash/upgrade checks and full resource/quality evaluation |
-| Document/image readers | Six Office formats through actual no-network AppContainer extraction and CPU embedding (`c6496b8`); PDF/image/CSV foundations | OCR, additional corrupt/large/scan fixtures, coverage fidelity and parser crash cleanup |
+| Document/image readers | Six Office formats; bounded Windows OCR for PNG/TIFF/scanned PDF through actual AppContainer extraction, CPU embedding, publication and page-two retrieval | Wider Office/image fidelity, language quality, unsupported-format status coverage and packaged parser crash cleanup |
 | Audio/video readers | Bounded PyAV readers connected to indexing; all seven families pass CPU scheduler, watcher, maintenance and revocation checks (`7e66ee3`) | Packaged cancellation/crash cleanup, quality and resource gates |
 | Retrieval/UI | Engineering foundation: 289 Release checks, real CPU code/image queries, retained selection/revoked actions, and all eight required media extensions in WPF | Independent quality/admission evaluation, richer locator/format fixtures and packaged lifecycle validation |
 | Release validation | Pending | Frozen independent holdout, throughput/resource measurements, clean packaging/install and every release gate below |
@@ -402,12 +404,15 @@ Keep all large or private evaluation outputs under ignored
 
 ## Next implementation task
 
-Complete document/image coverage next: OCR availability/languages, scanned PDF
-and image fixtures, corrupt/oversized inputs and accurate partial/unsupported
-statuses. Extend locator checks using authored Office/PDF sources. Preserve the
-renderer-free implementation and the current retrieval behavior while doing so.
-The 289 Release checks, real CPU query smoke, sandbox clip recovery and WPF
-playback/selection checks are engineering evidence, not retrieval-quality proof.
+Finish the remaining document/format coverage audit: authored Office locator
+previews, explicit legacy/encrypted/unsupported status coverage, additional
+corrupt/oversized cases and packaged parser lifecycle recovery. Bounded Windows
+OCR now passes authored PNG, multipage TIFF and scanned PDF extraction, CPU
+embedding, publication and page-two retrieval; unavailable languages preserve
+vision and report partial coverage. The pinned PDFium page/bitmap cleanup was
+corrected against actual scan fixtures. English (US) OCR is smoke-tested on the
+available host; Arabic is not installed and has no recognition-quality evidence.
+These contracts and runtime/UI smokes are engineering evidence, not holdout proof.
 Keep Laya optional and metadata-only. The provisional similarity threshold is
 uncalibrated; freeze independent tasks before tuning it. Packaged forced-death
 recovery, the independent holdout, resource/hardware measurements and

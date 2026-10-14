@@ -112,6 +112,7 @@ public sealed class MultimodalSettings
     public bool PauseOnBattery { get; set; } = true;
     public string[] Folders { get; set; } = [];
     public string[] Modalities { get; set; } = [.. ContentTypes];
+    public string[] OcrLanguages { get; set; } = [];
     public string Device { get; set; } = "cpu";
     public int CpuThreads { get; set; } = Math.Max(1, Math.Min(4, Environment.ProcessorCount / 2));
     public long IndexQuotaBytes { get; set; } = 2L * 1024 * 1024 * 1024;
