@@ -105,6 +105,34 @@ internal static class MultimodalChecks
                 }
             });
         });
+        test("Shared runtime leases permit model and parser use and block removal", () =>
+        {
+            WithTemporary(root =>
+            {
+                File.WriteAllText(Path.Combine(root,"keep"),"keep");
+                using(var model=new MultimodalLease(root))
+                using(var parser=new MultimodalLease(root))
+                {
+                    try { MultimodalSetup.Remove(root); throw new Exception("Running runtime removed"); } catch(IOException) { }
+                    Check(File.Exists(Path.Combine(root,"keep")));
+                }
+                MultimodalSetup.Remove(root); Check(!Directory.Exists(root));
+            });
+        });
+        test("Runtime leases reject an exclusive setup without leaving partial locks", () =>
+        {
+            WithTemporary(root =>
+            {
+                using(var setup=new FileStream(Path.Combine(root,"setup.lock"),FileMode.OpenOrCreate,FileAccess.ReadWrite,FileShare.ReadWrite | FileShare.Delete))
+                {
+                    setup.Lock(0,1);
+                    try {using var lease=new MultimodalLease(root);throw new Exception("Setup conflict accepted");}catch(IOException){}
+                    using var bootstrap=new FileStream(Path.Combine(root,"bootstrap.lock"),FileMode.Open,FileAccess.ReadWrite,FileShare.ReadWrite | FileShare.Delete);
+                    bootstrap.Lock(0,1); // Failed second lock released the earlier shared bootstrap lease.
+                }
+                using var resumed=new MultimodalLease(root);
+            });
+        });
         test("Windows job closes worker and inherited descendants", () =>
         {
             WithTemporary(root =>
@@ -149,12 +177,19 @@ internal static class MultimodalChecks
         var options = new MultimodalSettings { Enabled = true, Device = installation.Device };
         await host.ConfigureAsync(options);
         using var deadline = new CancellationTokenSource(TimeSpan.FromMinutes(3));
+        var startupDocument=host.DocumentAsync(new {type="text",text="authored startup indexing content"},deadline.Token);
         var query = await host.QueryAsync("a blue chart", deadline.Token);
+        Check(!startupDocument.IsCompleted);
+        await startupDocument;
         var pid = host.ProcessId!.Value;
         Check(query.Vector.Length == 768 && host.State == MultimodalState.Ready);
         // Authored 64x64 blue PNG. The smoke test never reads a personal library.
         var image = "iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAIAAAAlC+aJAAAAfElEQVR4nNXOQREAMAjAsK7+PTMRPLhGQR4MZRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncV4Htj5QhwF/4nP9ugAAAABJRU5ErkJggg==";
         await host.DocumentAsync(new { type = "image", data = image }, deadline.Token);
+        var documents=Enumerable.Range(0,3).Select(_=>host.DocumentAsync(new {type="image",data=image},deadline.Token)).ToArray();
+        await host.QueryAsync("interactive query ahead of queued indexing",deadline.Token);
+        Check(!documents[1].IsCompleted && !documents[2].IsCompleted);
+        await Task.WhenAll(documents);
         using (var cancelled = new CancellationTokenSource(TimeSpan.FromMilliseconds(20)))
         {
             try { await host.DocumentAsync(new { type = "image", data = image }, cancelled.Token); }
@@ -174,7 +209,7 @@ internal static class MultimodalChecks
         Check(host.ProcessId == null && host.State == MultimodalState.Available);
         await host.QueryAsync("a blue chart", deadline.Token);
         Check(host.State == MultimodalState.Ready && host.ProcessId != pid);
-        Console.WriteLine("PASS: independent host with Laya disabled, normalized query/image, disable and restart");
+        Console.WriteLine("PASS: independent host with Laya disabled, normalized query/image, cold/warm query priority, cancellation, disable and restart");
         return 0;
     }
 }

@@ -7,7 +7,8 @@ Windows process lifetime, and Multimodal settings page. The preview installs and
 tests the full EmbeddingGemma 2 model; it does not yet index selected folders or
 add semantic matches to search results. The durable index and native source
 snapshot foundation and isolated document/image/audio/video readers are implemented;
-application indexing and retrieval are next.
+the trusted extractor bridge passes all-family durable publication. Application
+scheduling and retrieval are next.
 All content families remain in the release scope. LibreOffice is removed from
 the product path by user direction. Office evidence will use extracted text,
 cells, chart data and embedded images, without exact Office page/slide rendering.
@@ -217,6 +218,41 @@ File-to-index integration, decoder cancellation
 and crash recovery, audio/visual event quality and full-resource measurements
 remain release work.
 
+The trusted `SemanticExtractor` bridge now owns snapshot acquisition, sandbox
+launch, bounded manifest/segment validation and full-model requests. It exposes
+only a hash-verified tokenizer copy to parsers. It checks source hashes, fixed
+segment names/lengths/digests, modality families, normalized vectors, token counts,
+locators, media sample bounds, playback duration and sampled-frame timestamps.
+Unknown/duplicate fields, paths in prepared inputs and malformed coverage are
+rejected. The native source identity is checked between segments, and the original
+content hash is checked again before returning a publishable result. Cancellation
+drains the parser job before its owned copy and package-specific grant are removed.
+
+Sandbox permission changes now have a bounded, flushed recovery journal written
+before the change. Recovery accepts only the same package SID and approved
+runtime/owned-job directories, validates the entire record before applying it,
+preserves other principals' access rules, and retains invalid recovery data for
+repair. Per-job grants are released after each extraction. Actual owner-process
+exit without disposal and subsequent recovery pass, including rejection of an
+out-of-scope recovery path. Upgrade/removal recovery across changed runtime roots
+and packaged forced-exit cases remain additional release checks.
+
+Model and extractor runtime leases use shared Windows byte-range locks. The
+existing setup/removal entry points require exclusive locks, so a live runtime
+blocks them before deletion begins; a model and parser can hold leases together.
+The model host gives queued interactive queries priority over document embeddings,
+including queries arriving during cold loading. An in-flight Torch pass still
+finishes or its owned worker is stopped; cancellation never starts a second pass
+over the first one.
+
+Seventeen authored source files across all seven content families pass actual
+native acquisition, AppContainer extraction, full-model CPU embedding, typed
+receipt validation and atomic SQLite publication. Source mutation and revocation
+during embedding are rejected, cancellation removes owned snapshots, and disabling
+scope purges the resulting rows. Eight new C# checks bring the Release suite to
+266/266 with zero warnings. This is a bridge smoke, not Scout's selected-folder
+background scheduler or final search UI; those integrations remain required.
+
 Developer verification (use an isolated add-on root and data directory):
 
 ```powershell
@@ -227,6 +263,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/setup-multimodal.ps1
 .runtime/semantic-search/cpu-venv/Scripts/python.exe runtime/test_multimodal_worker_inference.py --model .runtime/semantic-search/model --device cpu
 dotnet run --project tests/Scout.Tests -c Release -- --multimodal-host C:/Path/To/PrivateTestAddon
 dotnet run --project tests/Scout.Tests -c Release -- --extract-media .runtime/semantic-search/cpu-venv/Scripts/python.exe .runtime/python/cpython-3.12.13-windows-x86_64-none .runtime/semantic-search/model
+dotnet run --project tests/Scout.Tests -c Release -- --semantic-extractor artifacts/diagnostics/multimodal/addon-no-office .runtime/python/cpython-3.12.13-windows-x86_64-none
 .runtime/semantic-search/cpu-venv/Scripts/python.exe runtime/test_extracted_embeddings.py --model .runtime/semantic-search/model --root C:/Path/Printed/By/SandboxTest --device cpu
 ```
 

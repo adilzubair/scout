@@ -19,9 +19,11 @@ internal sealed class MultimodalHost : IDisposable
     private Process? process;
     private int workerPid;
     private ProcessJob? job;
+    private MultimodalLease? runtimeLease;
     private HttpClient? client;
     private string configuration = "", sessionDirectory = "";
     private bool disposed;
+    private int pendingQueries;
     private MultimodalSettings options = new();
     private DateTime lastUsed = DateTime.UtcNow;
     private readonly System.Threading.Timer idle;
@@ -67,19 +69,34 @@ internal sealed class MultimodalHost : IDisposable
         else if (options.Paused) { State = MultimodalState.Paused; Status = "Content indexing paused"; }
         else { State = MultimodalState.Available; Status = "Add-on installed · worker unloaded"; }
     }
-    public Task<EmbeddingResult> QueryAsync(string text, CancellationToken token) => EmbedAsync(new { schemaVersion = 1, mode = "query", text }, token);
-    public Task<EmbeddingResult> DocumentAsync(object content, CancellationToken token) => EmbedAsync(new { schemaVersion = 1, mode = "document", content }, token);
-    private async Task<EmbeddingResult> EmbedAsync(object body, CancellationToken token)
+    public async Task<EmbeddingResult> QueryAsync(string text, CancellationToken token)
+    {
+        Interlocked.Increment(ref pendingQueries);
+        try { return await EmbedAsync(new { schemaVersion = 1, mode = "query", text }, token, background:false).ConfigureAwait(false); }
+        finally { Interlocked.Decrement(ref pendingQueries); }
+    }
+    public Task<EmbeddingResult> DocumentAsync(object content, CancellationToken token) => EmbedAsync(new { schemaVersion = 1, mode = "document", content }, token, background:true);
+    private async Task<EmbeddingResult> EmbedAsync(object body, CancellationToken token, bool background)
     {
         ObjectDisposedException.ThrowIf(disposed, this);
         using var request = CancellationTokenSource.CreateLinkedTokenSource(token, session.Token);
-        await gate.WaitAsync(request.Token);
-        var release = true;
+        var release = true; var ownsGate = false;
         try
         {
-            if (!options.Enabled) throw new InvalidOperationException("Multimodal add-on is disabled.");
-            await StartAsync(request.Token);
-            request.Token.ThrowIfCancellationRequested();
+            while (true)
+            {
+                await gate.WaitAsync(request.Token).ConfigureAwait(false); ownsGate = true;
+                if (!options.Enabled) throw new InvalidOperationException("Multimodal add-on is disabled.");
+                // Queued documents yield even when the query arrived after their WaitAsync.
+                if (!background || Volatile.Read(ref pendingQueries) == 0)
+                {
+                    await StartAsync(request.Token).ConfigureAwait(false);
+                    request.Token.ThrowIfCancellationRequested();
+                    if (!background || Volatile.Read(ref pendingQueries) == 0) break;
+                }
+                gate.Release(); ownsGate = false;
+                await Task.Delay(5, request.Token).ConfigureAwait(false);
+            }
             lastUsed = DateTime.UtcNow;
             // User cancellation returns promptly, but the gate remains held until Torch completes.
             var task = SendAsync(body, session.Token);
@@ -96,7 +113,7 @@ internal sealed class MultimodalHost : IDisposable
             State = MultimodalState.Failed; Status = "Add-on unavailable · ordinary search ready";
             Stop(); throw;
         }
-        finally { if (release) gate.Release(); }
+        finally { if (release && ownsGate) gate.Release(); }
     }
     private async Task FinishAsync(Task<EmbeddingResult> task)
     {
@@ -124,6 +141,7 @@ internal sealed class MultimodalHost : IDisposable
         var key = installed.Generation + "|" + options.CpuThreads;
         if (configuration == key && process is { HasExited: false } && client != null) return;
         Stop(); State = MultimodalState.Loading; Status = "Loading multimodal add-on…";
+        runtimeLease = new MultimodalLease(root);
         sessionDirectory = MultimodalSetup.OwnedPath(root, "sessions/" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(sessionDirectory);
         var readyFile = Path.Combine(sessionDirectory, "ready.json");
@@ -170,6 +188,7 @@ internal sealed class MultimodalHost : IDisposable
                 h.GetProperty("revision").GetString() != installed.Revision || h.GetProperty("device").GetString() != options.Device ||
                 h.GetProperty("dimensions").GetInt32() != 768 || !h.GetProperty("modalities").EnumerateArray().Select(value => value.GetString()).SequenceEqual(new[] { "text", "image", "audio", "video" })) throw new IOException("Incomplete multimodal worker.");
             State = options.Paused ? MultimodalState.Paused : MultimodalState.Ready;
+            lastUsed = DateTime.UtcNow;
             Status = options.Paused ? "Content indexing paused · queries ready" : "Multimodal worker ready";
         }
         catch (OperationCanceledException) when (!token.IsCancellationRequested) { Stop(); throw new IOException("Multimodal startup timed out."); }
@@ -203,6 +222,7 @@ internal sealed class MultimodalHost : IDisposable
         }
         catch (Exception error) when (error is InvalidOperationException or System.ComponentModel.Win32Exception) { }
         process?.Dispose(); process = null; workerPid = 0; configuration = "";
+        runtimeLease?.Dispose(); runtimeLease = null;
         if (sessionDirectory.Length > 0)
         {
             try

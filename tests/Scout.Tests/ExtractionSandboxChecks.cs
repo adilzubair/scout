@@ -1,6 +1,9 @@
 using System.Net;
 using System.Net.Sockets;
 using System.Text.Json;
+using System.Diagnostics;
+using System.Security.AccessControl;
+using System.Security.Principal;
 using Scout.App;
 using Scout.Core;
 
@@ -21,10 +24,46 @@ static class ExtractionSandboxChecks
             try
             {
                 using var sandbox = new ExtractionSandbox(root, []);
+                Throws<IOException>(() => sandbox.ReleaseJob(root.ToUpperInvariant()));
                 Throws<IOException>(() => sandbox.RunAsync(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "cmd.exe"), [], Path.GetDirectoryName(root)!, TimeSpan.FromSeconds(10), default).GetAwaiter().GetResult());
             }
             finally { ExtractionSandbox.RemoveProfile(root); File.Delete(Path.Combine(root, "sandbox.owner")); Directory.Delete(root); }
         });
+        test("Sandbox crash recovery restores only its package ACL and removes its journal", () =>
+        {
+            var root = Path.GetFullPath("artifacts/diagnostics/multimodal/sandbox-recovery-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(root); var read = Path.Combine(root,"runtime"); Directory.CreateDirectory(read);
+            string[] Rules() => new DirectoryInfo(read).GetAccessControl().GetAccessRules(true,true,typeof(SecurityIdentifier))
+                .Cast<FileSystemAccessRule>().Select(rule=>$"{rule.IdentityReference}|{rule.FileSystemRights}|{rule.InheritanceFlags}|{rule.PropagationFlags}|{rule.AccessControlType}|{rule.IsInherited}").Order().ToArray();
+            var before = Rules();
+            var start = new ProcessStartInfo(Environment.ProcessPath!) { UseShellExecute = false, CreateNoWindow = true };
+            foreach(var arg in new[]{"--sandbox-crash",root,read}) start.ArgumentList.Add(arg);
+            try
+            {
+                using(var child=Process.Start(start)!) Check(child.WaitForExit(10000) && child.ExitCode==0);
+                Check(File.Exists(Path.Combine(root,"sandbox-grants.json")),"crash did not retain recovery receipt");
+                var journalPath=Path.Combine(root,"sandbox-grants.json");var originalJournal=File.ReadAllText(journalPath);
+                var corrupt=System.Text.Json.Nodes.JsonNode.Parse(originalJournal)!;
+                corrupt["Grants"]![0]!["Path"]=Path.GetDirectoryName(root);
+                File.WriteAllText(journalPath,corrupt.ToJsonString());
+                Throws<IOException>(()=>{using var invalid=new ExtractionSandbox(root,[read]);});
+                Check(File.Exists(journalPath),"invalid recovery data was erased before its grants were restored");
+                File.WriteAllText(journalPath,originalJournal);
+                var sid = new SecurityIdentifier(File.ReadAllText(Path.Combine(root,"crash.sid")));
+                Check(new DirectoryInfo(read).GetAccessControl().GetAccessRules(true,false,typeof(SecurityIdentifier)).Cast<FileSystemAccessRule>().Any(rule=>rule.IdentityReference.Equals(sid)));
+                using(var resumed=new ExtractionSandbox(root,[read])) { }
+                Check(!File.Exists(Path.Combine(root,"sandbox-grants.json")));
+                Check(Rules().SequenceEqual(before),"unrelated access rules changed");
+            }
+            finally { ExtractionSandbox.RemoveProfile(root); Directory.Delete(root,true); }
+        });
+    }
+    public static int Crash(string root,string read)
+    {
+        var sandbox = new ExtractionSandbox(root,[read]);
+        File.WriteAllText(Path.Combine(root,"crash.sid"),sandbox.PackageSid);
+        Environment.Exit(0); // Deliberately bypass Dispose to exercise persistent recovery.
+        return 0;
     }
     public static async Task<int> Smoke(string python, string pythonHome)
     {

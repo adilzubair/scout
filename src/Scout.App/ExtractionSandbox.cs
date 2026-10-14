@@ -5,6 +5,7 @@ using System.Security.AccessControl;
 using System.Security.Cryptography;
 using System.Security.Principal;
 using System.Text;
+using System.Text.Json;
 using Scout.Core;
 
 namespace Scout.App;
@@ -18,11 +19,19 @@ internal sealed class ExtractionSandbox : IDisposable
     private readonly SecurityIdentifier identity;
     private readonly FileStream owner;
     private sealed record GrantState(FileSystemAccessRule[] Rules);
+    private sealed record SavedRule(int Rights, int Inheritance, int Propagation, int Type);
+    private sealed record SavedGrant(string Path, SavedRule[] Rules);
+    private sealed record GrantJournal(int SchemaVersion, string Profile, SavedGrant[] Grants);
     private readonly Dictionary<string, GrantState> grants = new(StringComparer.OrdinalIgnoreCase);
+    private readonly string[] readRoots;
+    private string JournalPath => MultimodalSetup.OwnedPath(root, "sandbox-grants.json");
     private bool disposed;
+    internal string PackageSid => identity.Value;
     public ExtractionSandbox(string ownedRoot, IEnumerable<string> readDirectories)
     {
         root = Path.GetFullPath(ownedRoot);
+        readRoots = readDirectories.Select(Path.GetFullPath).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        if (readRoots.Length > 16) throw new IOException("Too many extraction runtime roots.");
         name = ProfileName(root);
         owner = new FileStream(MultimodalSetup.OwnedPath(root, "sandbox.owner"), FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
         try
@@ -31,11 +40,12 @@ internal sealed class ExtractionSandbox : IDisposable
             if (result == unchecked((int)0x800700B7)) result = DeriveAppContainerSidFromAppContainerName(name, out sid);
             Marshal.ThrowExceptionForHR(result);
             identity = new SecurityIdentifier(sid);
-            foreach (var directory in readDirectories) Grant(directory, FileSystemRights.ReadAndExecute);
+            RecoverGrants();
+            foreach (var directory in readRoots) Grant(directory, FileSystemRights.ReadAndExecute);
         }
         catch
         {
-            try { RestoreGrants(); }
+            try { if (grants.Count > 0) RestoreGrants(); }
             finally { if (sid != IntPtr.Zero) FreeSid(sid); DeleteAppContainerProfile(name); owner.Dispose(); }
             throw;
         }
@@ -126,22 +136,75 @@ internal sealed class ExtractionSandbox : IDisposable
     {
         var acl = directory.GetAccessControl();
         if (!grants.ContainsKey(directory.FullName))
+        {
             grants[directory.FullName] = new(acl.GetAccessRules(true, false, typeof(SecurityIdentifier)).Cast<FileSystemAccessRule>().Where(entry => entry.IdentityReference.Equals(identity)).ToArray());
+            SaveGrants(); // Persist the original package-specific rules before changing permissions.
+        }
         acl.AddAccessRule(rule); directory.SetAccessControl(acl);
+    }
+    private void SaveGrants()
+    {
+        var records = grants.Select(entry => new SavedGrant(entry.Key, entry.Value.Rules.Select(rule => new SavedRule((int)rule.FileSystemRights,
+            (int)rule.InheritanceFlags, (int)rule.PropagationFlags, (int)rule.AccessControlType)).ToArray())).ToArray();
+        var bytes = JsonSerializer.SerializeToUtf8Bytes(new GrantJournal(1, name, records));
+        if (records.Length > 512 || bytes.Length > 512*1024) throw new IOException("Extraction permission journal limit.");
+        var temporary = MultimodalSetup.OwnedPath(root, "sandbox-grants.partial");
+        using (var file = new FileStream(temporary, FileMode.Create, FileAccess.Write, FileShare.None)) { file.Write(bytes); file.Flush(true); }
+        File.Move(temporary, JournalPath, true);
+    }
+    private void RecoverGrants()
+    {
+        if (!File.Exists(JournalPath)) return;
+        if (new FileInfo(JournalPath).Length > 512*1024) throw new IOException("Invalid extraction permission journal.");
+        GrantJournal journal;
+        try { journal = JsonSerializer.Deserialize<GrantJournal>(File.ReadAllBytes(JournalPath)) ?? throw new IOException("Invalid extraction permission journal."); }
+        catch (JsonException error) { throw new IOException("Invalid extraction permission journal.",error); }
+        if (journal.SchemaVersion != 1 || journal.Profile != name || journal.Grants is not { Length: <= 512 }) throw new IOException("Extraction permission journal identity mismatch.");
+        // A recovery record can only affect this exact package SID at an approved runtime
+        // root or an owned job directory. Other users' ACL entries are never restored from data.
+        var recovered = new Dictionary<string, GrantState>(StringComparer.OrdinalIgnoreCase);
+        foreach (var record in journal.Grants)
+        {
+            if (record == null || !Path.IsPathFullyQualified(record.Path) || record.Path != Path.GetFullPath(record.Path) ||
+                !(readRoots.Contains(record.Path, StringComparer.OrdinalIgnoreCase) || !record.Path.Equals(root,StringComparison.OrdinalIgnoreCase) && IndexPolicy.Within(record.Path, root)) ||
+                record.Rules is not { Length: <= 256 } || recovered.ContainsKey(record.Path)) throw new IOException("Invalid extraction permission record.");
+            _ = MultimodalSetup.OwnedPath(record.Path, "sandbox-access-check");
+            recovered[record.Path] = new(record.Rules.Select(rule =>
+            {
+                if (rule == null || rule.Type is not (0 or 1) || rule.Inheritance is < 0 or > 3 || rule.Propagation is < 0 or > 3 ||
+                    rule.Rights <= 0 || (rule.Rights & ~(int)FileSystemRights.FullControl) != 0)
+                    throw new IOException("Invalid extraction permission rule.");
+                return new FileSystemAccessRule(identity, (FileSystemRights)rule.Rights, (InheritanceFlags)rule.Inheritance,
+                    (PropagationFlags)rule.Propagation, (AccessControlType)rule.Type);
+            }).ToArray());
+        }
+        foreach (var entry in recovered) grants.Add(entry.Key, entry.Value);
+        RestoreGrants();
+    }
+    internal void ReleaseJob(string directory)
+    {
+        directory = Path.GetFullPath(directory);
+        if (directory.Equals(root,StringComparison.OrdinalIgnoreCase) || !IndexPolicy.Within(directory, root)) throw new IOException("Invalid extraction job cleanup.");
+        if (!grants.TryGetValue(directory, out var state)) return;
+        RestoreGrant(directory, state); grants.Remove(directory); SaveGrants();
+    }
+    private void RestoreGrant(string path, GrantState original)
+    {
+        var directory = new DirectoryInfo(path);
+        if (!directory.Exists) return;
+        _ = MultimodalSetup.OwnedPath(path, "sandbox-access-check");
+        var acl = directory.GetAccessControl();
+        foreach (var rule in acl.GetAccessRules(true, false, typeof(SecurityIdentifier)).Cast<FileSystemAccessRule>().Where(rule => rule.IdentityReference.Equals(identity)).ToArray())
+            acl.RemoveAccessRuleSpecific(rule);
+        foreach (var rule in original.Rules) acl.AddAccessRule(rule);
+        directory.SetAccessControl(acl);
     }
     private void RestoreGrants()
     {
         foreach (var (path, original) in grants.Reverse())
-        {
-            var directory = new DirectoryInfo(path);
-            if (!directory.Exists) continue;
-            var acl = directory.GetAccessControl();
-            foreach (var rule in acl.GetAccessRules(true, false, typeof(SecurityIdentifier)).Cast<FileSystemAccessRule>().Where(rule => rule.IdentityReference.Equals(identity)).ToArray())
-                acl.RemoveAccessRuleSpecific(rule);
-            foreach (var rule in original.Rules) acl.AddAccessRule(rule);
-            directory.SetAccessControl(acl);
-        }
+            RestoreGrant(path, original);
         grants.Clear();
+        File.Delete(JournalPath);
     }
     private static void MarkLowIntegrity(string directory)
     {

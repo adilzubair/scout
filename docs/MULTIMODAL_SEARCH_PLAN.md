@@ -16,11 +16,13 @@ source-change, revocation, atomic replacement and quota contracts. They are not
 yet connected to the application. Native source acquisition and renderer-free
 Office/PDF/image/CSV reader foundations are implemented; all six Office formats
 pass actual no-network AppContainer extraction and CPU embedding. Bounded audio/video
-readers now pass real-codec sandbox extraction and full-model CPU/CUDA embedding;
-application
-integration, clean standard-account installation, parser lifecycle
-hardening, distribution review and
-release evaluations remain required. See
+readers now pass real-codec sandbox extraction and full-model CPU/CUDA embedding.
+A trusted extractor bridge validates receipts/payloads and source identity before
+durable publication; all seven families pass its real CPU pipeline smoke.
+Sandbox permission journals recover after owner crashes, and shared runtime
+leases interlock with setup/removal. Application scheduling, clean standard-account
+installation, further parser lifecycle hardening, distribution review and release
+evaluations remain required. See
 [the runtime screen](MULTIMODAL_RUNTIME_SCREEN.md) for results and reproduction.
 See [the add-on preview](MULTIMODAL_ADDON.md) for lifecycle, installation,
 prepared-media boundaries and verification limits.
@@ -283,6 +285,7 @@ results as end-to-end release evidence.
 | Add-on lifecycle | Independent host/settings/setup (`6c6be38`); model-only readiness without LibreOffice (`df62e0b`) | Clean standard-account installation, interrupted upgrade/removal, cache reclamation and app lifecycle integration |
 | Durable index | SQLite queue, atomic source replacement, quota, revocation and restart contracts (`33aaf86`) | Connect file reconciliation and background scheduling to Scout |
 | Source acquisition | Native identity checks and hashed owned snapshots (`f87fb8b`) | Revalidate source and scope across extraction, embedding, display and launch |
+| Extractor bridge | Receipt/hash/payload validation, private tokenizer copy, source rechecks, owned-copy cleanup and all-family CPU-to-SQLite smoke | Connect the bridge to app scheduling, resource guards and progress UI; packaged crash/upgrade checks |
 | Document/image readers | Six Office formats through actual no-network AppContainer extraction and CPU embedding (`c6496b8`); PDF/image/CSV foundations | OCR, additional corrupt/large/scan fixtures, coverage fidelity and parser crash cleanup |
 | Audio/video readers | Bounded PyAV file readers; real codecs and timestamps validated in the no-network sandbox | Connect extraction/embedding to indexing; verify scheduling, cancellation/crash cleanup, quality and resource gates |
 | Retrieval/UI | Pending | Constrained vector search, lexical fusion, calibrated admission, grouped evidence and locator previews with Laya off/on |
@@ -389,10 +392,11 @@ Keep all large or private evaluation outputs under ignored
 
 ## Next implementation task
 
-Connect the verified readers to an extractor host and durable app scheduler.
-Validate every receipt, hash, locator and prepared payload before embedding;
-retain source/scope checks throughout the job. Use authored fixtures under ignored
-diagnostic folders and keep these smoke checks separate from the frozen release
-holdout. The next completion check is selected-folder indexing with atomic
-publication, pause/cancellation, immediate revocation, bounded resources and
-crash cleanup, without blocking ordinary metadata refresh or interactive queries.
+Connect the verified extractor bridge to the durable app scheduler. Feed selected
+folders through metadata reconciliation, keep decoding/inference outside its
+refresh gate, and expose progress, pause/quota/resource states and setup/removal
+coordination. Preserve immediate scope revocation and recheck source identity at
+publication. Use authored fixtures under ignored diagnostic folders and keep these
+smoke checks separate from the frozen release holdout. The next completion check
+is actual selected-folder indexing across all families, crash/resume and
+pause/cancellation without blocking ordinary search or interactive queries.
