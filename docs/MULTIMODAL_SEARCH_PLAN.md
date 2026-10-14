@@ -1,8 +1,9 @@
 # Scout multimodal semantic search implementation plan
 
 Date: 2026-10-15. Branch: `feature/multimodal-semantic-search`.
-Status: implementation resumed on 2026-10-14 after the renderer-free checkpoint
-`c6496b8`. This plan is the implementation checklist; the add-on remains a
+Status: implementation restarted on 2026-10-15 from the verified background-indexing
+checkpoint `7e66ee3`, preserving the unfinished retrieval and preview changes.
+This plan is the implementation checklist; the add-on remains a
 preview until the release gates below pass. The full-model runtime and content smoke probe
 are implemented and verified on CPU and CUDA. On 2026-10-14 the user directed
 implementation to proceed without LibreOffice. The earlier renderer spike is
@@ -290,8 +291,8 @@ results as end-to-end release evidence.
 | Source acquisition | Native identity checks and hashed owned snapshots (`f87fb8b`) | Revalidate source and scope across extraction, embedding, display and launch |
 | Extractor bridge | Receipt/hash/payload validation, private tokenizer copy, source rechecks, owned-copy cleanup, resource guards and Settings progress | Packaged crash/upgrade checks and full resource/quality evaluation |
 | Document/image readers | Six Office formats through actual no-network AppContainer extraction and CPU embedding (`c6496b8`); PDF/image/CSV foundations | OCR, additional corrupt/large/scan fixtures, coverage fidelity and parser crash cleanup |
-| Audio/video readers | Bounded PyAV file readers; real codecs and timestamps validated in the no-network sandbox | Connect extraction/embedding to indexing; verify scheduling, cancellation/crash cleanup, quality and resource gates |
-| Retrieval/UI | Pending | Constrained vector search, lexical fusion, calibrated admission, grouped evidence and locator previews with Laya off/on |
+| Audio/video readers | Bounded PyAV readers connected to indexing; all seven families pass CPU scheduler, watcher, maintenance and revocation checks (`7e66ee3`) | Packaged cancellation/crash cleanup, quality and resource gates |
+| Retrieval/UI | In progress: constraint/fusion contracts, real CPU code/image queries and matched-evidence previews pass initial checks | Finish sandboxed media playback fallback, UI/lifecycle verification, review and commit; calibrate admission only after freezing the holdout |
 | Release validation | Pending | Frozen independent holdout, throughput/resource measurements, clean packaging/install and every release gate below |
 
 Proceed in this order, committing each verified unit:
@@ -396,11 +397,14 @@ Keep all large or private evaluation outputs under ignored
 
 ## Next implementation task
 
-Implement constrained vector retrieval and evidence previews using the live
-semantic index. Apply folder/type/time/scope constraints before top-k selection,
-revalidate native source identity, preserve literal/date/action/manual-selection
-behavior, and suppress superseded responses. Keep Laya optional and metadata-only.
-Add admission/fusion/grouping contracts and final UI outcomes before quality
-evaluation. OCR/fidelity, packaged forced-death recovery, independent holdout,
+Finish and verify the current constrained-retrieval and evidence-preview slice.
+The current 288 Release checks and real CPU code/image retrieval smoke are
+engineering checks, not retrieval-quality evidence. Native playback opens the
+authored WAV/MP3/M4A/FLAC/MP4/MOV/MKV fixtures; WebM needs the in-progress bounded,
+no-network clip fallback. Verify that fallback, cancellation, scope revocation,
+temporary-file cleanup and UI selection before committing this milestone.
+Keep Laya optional and metadata-only. The provisional similarity threshold is
+uncalibrated; freeze independent tasks before tuning it. Then continue with
+OCR/fidelity, packaged forced-death recovery, independent holdout,
 resource/hardware and distribution/install gates remain open; a completed indexing
 smoke does not establish release readiness.
