@@ -7,6 +7,7 @@ if (args.Length == 3 && args[0] == "--profile") return SearchProfiler.Run(args[1
 if (args.Length == 2 && args[0] == "--job-parent") return MultimodalChecks.JobParent(args[1]);
 if (args.Length == 2 && args[0] == "--multimodal-host") return await MultimodalChecks.HostSmoke(args[1]);
 if (args.Length == 3 && args[0] == "--extraction-sandbox") return await ExtractionSandboxChecks.Smoke(args[1], args[2]);
+if (args.Length == 3 && args[0] == "--extraction-python") return await ExtractionSandboxChecks.Smoke(args[1], args[2],true);
 if (args.Length == 4 && args[0] == "--extract-readers") return await ExtractionSandboxChecks.Readers(args[1], args[2], args[3]);
 if (args.Length == 4 && args[0] == "--extract-media") return await ExtractionSandboxChecks.Media(args[1], args[2], args[3]);
 if (args.Length == 3 && args[0] == "--semantic-playback") return await SemanticPlaybackChecks.Run(args[1], args[2]);
@@ -15,6 +16,7 @@ if (args.Length == 3 && args[0] == "--semantic-scans") return await SemanticScan
 if (args.Length == 3 && args[0] == "--semantic-formats") return await SemanticFormatChecks.Run(args[1], args[2]);
 if (args.Length == 3 && args[0] == "--multimodal-freeze") return MultimodalDataset.Freeze(args[1], args[2]);
 if (args.Length == 7 && args[0] == "--multimodal-eval") return await MultimodalEvaluation.Run(args[1], args[2], args[3], args[4], args[5], args[6]);
+if (args.Length == 5 && args[0] == "--multimodal-review") return await MultimodalReview.Run(args[1], args[2], args[3], args[4]);
 if (args.Length == 3 && args[0] == "--semantic-extractor") return await SemanticExtractorChecks.Smoke(args[1], args[2]);
 if (args.Length == 3 && args[0] == "--semantic-scheduler") return await SemanticServiceChecks.Smoke(args[1], args[2]);
 if (args.Length == 3 && args[0] == "--sandbox-crash") return ExtractionSandboxChecks.Crash(args[1], args[2]);
@@ -51,6 +53,7 @@ SemanticExtractorChecks.Run(Test);
 SemanticServiceChecks.Run(Test);
 SemanticRetrievalChecks.Run(Test);
 MultimodalEvaluationChecks.Run(Test);
+MultimodalReviewChecks.Run(Test);
 Candidate FileItem(string name, int hours) => new(Candidate.Key(ItemKind.File, name), ItemKind.File, name, "C:\\Documents\\" + name) { ModifiedAt = now.AddHours(-hours), Detail = "Documents" };
 var recent = FileItem("Roadmap.pdf", 1) with { AddedAt = now.AddMinutes(-5) };
 var old = FileItem("Budget.pdf", 0) with { AddedAt = now.AddDays(-3), OpenedAt = now.AddMinutes(-1) };

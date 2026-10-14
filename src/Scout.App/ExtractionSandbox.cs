@@ -53,7 +53,20 @@ internal sealed class ExtractionSandbox : IDisposable
     public static void RemoveProfile(string ownedRoot) => Marshal.ThrowExceptionForHR(DeleteAppContainerProfile(ProfileName(Path.GetFullPath(ownedRoot))));
     private static string ProfileName(string root) => "Scout.Extract." + Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(root.ToUpperInvariant())))[..32];
 
-    public async Task<int> RunAsync(string executable, IReadOnlyList<string> arguments, string jobDirectory, TimeSpan timeout, CancellationToken token)
+    public Task<int> RunAsync(string executable, IReadOnlyList<string> arguments, string jobDirectory, TimeSpan timeout, CancellationToken token) =>
+        RunCoreAsync(executable,arguments,jobDirectory,timeout,token,null);
+
+    public Task<int> RunPythonAsync(string pythonHome,string venvExecutable,IReadOnlyList<string> arguments,string jobDirectory,TimeSpan timeout,CancellationToken token)
+    {
+        pythonHome=Path.GetFullPath(pythonHome);venvExecutable=Path.GetFullPath(venvExecutable);
+        var venv=Path.GetDirectoryName(Path.GetDirectoryName(venvExecutable))!;
+        if(!readRoots.Contains(pythonHome,StringComparer.OrdinalIgnoreCase) || !readRoots.Contains(venv,StringComparer.OrdinalIgnoreCase) ||
+            !venvExecutable.Equals(MultimodalSetup.OwnedPath(venv,"Scripts/python.exe"),StringComparison.OrdinalIgnoreCase))throw new IOException("Python interpreter is outside granted runtime roots.");
+        // CPython's launcher override activates this exact trusted venv while starting
+        // the private interpreter directly. No launcher child runs before Python.
+        return RunCoreAsync(MultimodalSetup.OwnedPath(pythonHome,"python.exe"),arguments,jobDirectory,timeout,token,venvExecutable);
+    }
+    private async Task<int> RunCoreAsync(string executable, IReadOnlyList<string> arguments, string jobDirectory, TimeSpan timeout, CancellationToken token,string? venvExecutable)
     {
         ObjectDisposedException.ThrowIf(disposed, this);
         token.ThrowIfCancellationRequested();
@@ -89,6 +102,7 @@ internal sealed class ExtractionSandbox : IDisposable
                 ["PYTHONUTF8"] = "1", ["PYTHONDONTWRITEBYTECODE"] = "1", ["PYTHONNOUSERSITE"] = "1",
                 ["HF_HUB_OFFLINE"] = "1", ["TRANSFORMERS_OFFLINE"] = "1"
             };
+            if(venvExecutable!=null)variables["__PYVENV_LAUNCHER__"]=venvExecutable;
             environment = Marshal.StringToHGlobalUni(string.Join('\0', variables.Select(pair => pair.Key + "=" + pair.Value)) + "\0\0");
             var command = new StringBuilder(string.Join(' ', new[] { executable }.Concat(arguments).Select(Quote)));
             // Suspended start closes the create/assign race: parsers cannot run before the job owns them.

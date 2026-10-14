@@ -429,6 +429,34 @@ rate limits, interruption recovery and offline-only subset verification:
 .runtime/python/cpython-3.12.13-windows-x86_64-none/python.exe scripts/multimodal-media-intake.py intake --discovery artifacts/diagnostics/multimodal/candidate-discovery.json --output artifacts/diagnostics/multimodal/candidate-pool --ids commons-147960076
 ```
 
+`--multimodal-review` prepares an intake manifest's verified sources through the
+production native snapshots, no-network AppContainer and receipt validator. It
+exports bounded image files, sampled video frames, extracted text and mono 16 kHz
+PCM WAV windows with source/asset SHA-256 and locators. It starts no embedding host
+and publishes no vectors or labels: an internal deterministic boundary double
+allows the production bridge to validate payloads before export. Output is capped
+at 512 MiB and marked `embeddingInference: not_run`, `labelsApproved: false`.
+Its parser owner is isolated from app workspaces; a real add-on lease prevents
+setup/removal while shared runtime files are read. Normal exit removes its private
+tokenizer copy, source snapshots, AppContainer profile and temporary permissions.
+
+The first real-media export exposed two full-entry-point startup timeouts through
+the Windows venv launcher. Minimal sandbox probes passed for both interpreter
+locations, so the underlying cause is not established. Extraction now starts the
+private base interpreter directly and sets CPython's trusted
+[`__PYVENV_LAUNCHER__` override](https://github.com/python/cpython/blob/3.12/Modules/getpath.py)
+to the installed venv executable. The same eight-source export then completed.
+A live probe verifies the selected venv, package path, parent/child zero-capability
+tokens, source/runtime denial, network denial and clean environment. The sandbox
+keeps its existing suspended-start/job limits; there is no unsandboxed fallback.
+Fixed body-free parser progress markers distinguish startup from reader work and
+are removed with the owned job.
+
+The eight-source review exported seven photos and one 88-second audio file without
+inference. The audio produced 147 windows, exposing a timeline-fragmentation issue
+that remains to be corrected and regression-tested before quality evaluation.
+Prepared outputs still require actual content, license, group and split review.
+
 Developer verification (use an isolated add-on root and data directory):
 
 ```powershell
@@ -449,6 +477,8 @@ dotnet run --project tests/Scout.Tests -c Release -- --semantic-scans artifacts/
 dotnet run --project tests/Scout.Tests -c Release -- --semantic-formats artifacts/diagnostics/multimodal/addon-no-office .runtime/python/cpython-3.12.13-windows-x86_64-none
 .runtime/semantic-search/.venv/Scripts/python.exe scripts/build-multimodal-evaluation-pilot.py --output artifacts/diagnostics/multimodal/evaluation-pilot-v1
 dotnet run --project tests/Scout.Tests -c Release -- --multimodal-freeze artifacts/diagnostics/multimodal/evaluation-pilot-v1/dataset.json evaluation/multimodal/protocol.json
+dotnet run --project tests/Scout.Tests -c Release -- --multimodal-review artifacts/diagnostics/multimodal/candidate-pool artifacts/diagnostics/multimodal/addon-no-office .runtime/python/cpython-3.12.13-windows-x86_64-none artifacts/diagnostics/multimodal/content-review
+dotnet run --project tests/Scout.Tests -c Release -- --extraction-python artifacts/diagnostics/multimodal/addon-no-office/generations/GENERATION/venv/Scripts/python.exe .runtime/python/cpython-3.12.13-windows-x86_64-none
 dotnet run --project tests/Scout.Tests -c Release -- --multimodal-eval artifacts/diagnostics/multimodal/evaluation-pilot-v1/dataset.json evaluation/multimodal/protocol.json artifacts/diagnostics/multimodal/addon-no-office .runtime/python/cpython-3.12.13-windows-x86_64-none artifacts/diagnostics/multimodal/evaluation-results development
 .runtime/semantic-search/cpu-venv/Scripts/python.exe runtime/test_extracted_embeddings.py --model .runtime/semantic-search/model --root C:/Path/Printed/By/SandboxTest --device cpu
 ```

@@ -55,6 +55,9 @@ def denied_network():
 
 report = dict(appcontainer=appcontainer, capabilityCount=capability_count, privateReadDenied=denied_read(), networkError=denied_network(),
               inheritedSecret=os.environ.get('SCOUT_SANDBOX_TEST_SECRET', ''), pid=os.getpid())
+if config.get('checkPackage'):
+    import tokenizers
+    report.update(prefix=sys.prefix,executable=sys.executable,packagePath=tokenizers.__file__)
 if len(sys.argv) > 2 and sys.argv[2] == '--child':
     Path('child.json').write_text(json.dumps(report), encoding='utf-8')
 else:

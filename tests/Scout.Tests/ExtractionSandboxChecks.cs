@@ -11,6 +11,16 @@ static class ExtractionSandboxChecks
 {
     public static void Run(Action<string, Action> test)
     {
+        test("Direct sandbox Python refuses an interpreter outside granted runtime roots",()=>
+        {
+            var root=Path.GetFullPath("artifacts/diagnostics/multimodal/python-roots-"+Guid.NewGuid().ToString("N"));Directory.CreateDirectory(root);
+            try
+            {
+                using var sandbox=new ExtractionSandbox(root,[]);
+                Throws<IOException>(()=>sandbox.RunPythonAsync(Path.Combine(root,"base"),Path.Combine(root,"venv/Scripts/python.exe"),[],Path.Combine(root,"job"),TimeSpan.FromSeconds(10),default));
+            }
+            finally{ExtractionSandbox.RemoveProfile(root);Directory.Delete(root,true);}
+        });
         test("Concurrent parser profiles preserve each other's runtime permissions",()=>
         {
             var root=Path.GetFullPath("artifacts/diagnostics/multimodal/sandbox-concurrent-"+Guid.NewGuid().ToString("N"));
@@ -87,7 +97,7 @@ static class ExtractionSandboxChecks
         Environment.Exit(0); // Deliberately bypass Dispose to exercise persistent recovery.
         return 0;
     }
-    public static async Task<int> Smoke(string python, string pythonHome)
+    public static async Task<int> Smoke(string python, string pythonHome,bool direct=false)
     {
         var parent = Path.GetFullPath("artifacts/diagnostics/multimodal/sandbox-probe"); Directory.CreateDirectory(parent);
         var root = Path.Combine(parent, Guid.NewGuid().ToString("N")); Directory.CreateDirectory(root);
@@ -102,13 +112,15 @@ static class ExtractionSandboxChecks
                 await baseline.ConnectAsync(IPAddress.Loopback, ((IPEndPoint)listener.LocalEndpoint).Port);
                 using var accepted = await listener.AcceptTcpClientAsync();
             }
-            var config = new { privateSource = source, port = ((IPEndPoint)listener.LocalEndpoint).Port, readOnlyRoot = Path.GetFullPath(pythonHome) };
+            var venv=Path.GetDirectoryName(Path.GetDirectoryName(Path.GetFullPath(python)))!;
+            var config = new { privateSource = source, port = ((IPEndPoint)listener.LocalEndpoint).Port, readOnlyRoot = Path.GetFullPath(pythonHome),checkPackage=direct };
             var configPath = Path.Combine(work, "request.json"); File.WriteAllText(configPath, JsonSerializer.Serialize(config));
             var script = Path.Combine(work, "probe.py"); File.Copy(Path.Combine(runtime, "test_extraction_sandbox_probe.py"), script);
             var readRoots = new[] { Path.GetFullPath(pythonHome), Path.GetDirectoryName(Path.GetDirectoryName(Path.GetFullPath(python)))!, runtime };
             using var sandbox = new ExtractionSandbox(root, readRoots);
             Environment.SetEnvironmentVariable("SCOUT_SANDBOX_TEST_SECRET", "must-not-inherit");
-            var exit = await sandbox.RunAsync(Path.GetFullPath(python), [script, configPath], work, TimeSpan.FromSeconds(120), default);
+            var exit = direct ? await sandbox.RunPythonAsync(pythonHome,python,[script,configPath],work,TimeSpan.FromSeconds(120),default) :
+                await sandbox.RunAsync(Path.GetFullPath(python), [script, configPath], work, TimeSpan.FromSeconds(120), default);
             Check(exit == 0, "sandbox probe exit " + exit + ": " + (File.Exists(Path.Combine(work, "probe-error.txt")) ? File.ReadAllText(Path.Combine(work, "probe-error.txt")) : "no error report"));
             using var document = JsonDocument.Parse(File.ReadAllText(Path.Combine(work, "result.json")));
             var result = document.RootElement;
@@ -119,6 +131,12 @@ static class ExtractionSandboxChecks
                 Check(report.GetProperty("capabilityCount").GetInt32() == 0, "parser received a capability");
                 Check(report.GetProperty("networkError").GetInt32() is 10013 or 10060, "sandbox parser reached the network");
                 Check(report.GetProperty("inheritedSecret").GetString() == "", "parent environment leaked");
+                if(direct)
+                {
+                    Check(report.GetProperty("prefix").GetString()!.Equals(venv,StringComparison.OrdinalIgnoreCase),"private venv was not activated");
+                    Check(report.GetProperty("executable").GetString()!.Equals(Path.GetFullPath(python),StringComparison.OrdinalIgnoreCase),"venv executable was not retained");
+                    Check(IndexPolicy.Within(report.GetProperty("packagePath").GetString()!,venv),"package escaped its private venv");
+                }
             }
             Check(result.GetProperty("runtimeWriteDenied").GetBoolean(), "parser could modify runtime");
             Check(!listener.Pending(), "parser reached parent-owned TCP listener");

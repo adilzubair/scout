@@ -12,6 +12,7 @@ from semantic_search.manifest import sha256
 FAMILIES = {'documents', 'presentations', 'spreadsheets', 'code', 'images', 'audio', 'video'}
 
 def extract(request_path):
+    progress('loading_readers')
     from tokenizers import Tokenizer
     from semantic_search.readers import SegmentWriter, plain, images, pdf, csv_sheet
     from semantic_search.office_readers import office
@@ -31,6 +32,7 @@ def extract(request_path):
     source = local_file(root/name, root)
     if sha256(source) != request['sourceSha256']: raise ValueError('snapshot_hash_mismatch')
     tokenizer = Tokenizer.from_file(str(Path(request['tokenizer'])))
+    progress('tokenizer_ready')
     ocr_languages=languages(request.get('ocrLanguages',[]))
     use_ocr=request['family'] in ('documents','presentations','spreadsheets','images')
     writer = SegmentWriter(root/'output', tokenizer.encode,ocr=WindowsOcr(ocr_languages) if use_ocr else None)
@@ -44,7 +46,17 @@ def extract(request_path):
     else: raise ValueError('unsupported_content_format')
     if sha256(source) != request['sourceSha256']: raise ValueError('snapshot_changed')
     if not writer.files: raise ValueError('no_extractable_content')
-    return writer.finish(source)
+    result=writer.finish(source)
+    progress('content_ready')
+    return result
+
+def progress(stage):
+    # Fixed, body-free diagnostic in the parent-owned sandbox working directory.
+    # It distinguishes native startup stalls from reader work; never approves output.
+    temporary=Path.cwd()/'parser-progress.partial'
+    with temporary.open('w',encoding='utf-8') as stream:
+        json.dump(dict(schemaVersion=1,stage=stage),stream)
+    temporary.replace(Path.cwd()/'parser-progress.json')
 
 def require_sandbox():
     """Both extraction and playback require the same zero-capability boundary."""
@@ -79,6 +91,7 @@ if __name__ == '__main__':
     options = parser.parse_args()
     try:
         require_sandbox()
+        progress('sandbox_ready')
         extract(options.request)
     except Exception as error:
         # Never persist exception bodies, paths or extracted document text.

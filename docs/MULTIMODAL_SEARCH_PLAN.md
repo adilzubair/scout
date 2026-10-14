@@ -415,8 +415,14 @@ Keep all large or private evaluation outputs under ignored
 
 ## Next implementation task
 
-Complete resumable natural-media intake and its offline integrity contracts, then
-review sources through bounded decoding without running retrieval predictions.
+Intake and content-review export foundations are complete. Fourteen offline intake
+contracts pass; the production sandbox exports verified media without inference or
+label approval. Direct private-interpreter startup passed parent/child isolation,
+venv/package checks and the eight-source export after two launcher-path timeouts.
+The first natural audio exposed 147 tiny windows in an 88-second recording. Fix
+that fragmentation with actual sandbox regression evidence before using its
+prepared windows in quality evaluation. Continue content/license/group review
+without running retrieval predictions.
 The current discovery has 92 public candidates; 71 pass initial license-label,
 container, size and original-checksum filters. These are unreviewed candidates,
 not approved licenses, source groups or content labels. The first transfer stopped

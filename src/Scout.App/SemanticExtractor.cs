@@ -90,7 +90,7 @@ internal sealed class SemanticExtractor : ISemanticExtractionSession
                 var path = Path.Combine(snapshot.Directory, "request.json");
                 await File.WriteAllBytesAsync(path, JsonSerializer.SerializeToUtf8Bytes(new { schemaVersion = 1, source = Path.GetFileName(snapshot.Path),
                     sourceSha256 = snapshot.ContentHash.ToLowerInvariant(), family = source.Family, tokenizer,ocrLanguages=scope.OcrLanguages }), request.Token).ConfigureAwait(false);
-                var exit = await sandbox!.RunAsync(installation.Python, [Path.Combine(runtime, "semantic_search", "extract.py"), "--request", path],
+                var exit = await sandbox!.RunPythonAsync(pythonHome,installation.Python, [Path.Combine(runtime, "semantic_search", "extract.py"), "--request", path],
                     snapshot.Directory, TimeSpan.FromMinutes(3), request.Token).ConfigureAwait(false);
                 if (exit != 0)
                 {
