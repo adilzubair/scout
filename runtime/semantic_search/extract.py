@@ -15,6 +15,7 @@ def extract(request_path):
     from tokenizers import Tokenizer
     from semantic_search.readers import SegmentWriter, plain, images, pdf, csv_sheet
     from semantic_search.office_readers import office
+    from semantic_search.media_readers import media
     root = Path(request_path).absolute().parent
     request_path = local_file(request_path, root)
     if request_path.stat().st_size > 16384: raise ValueError('request_budget')
@@ -35,7 +36,8 @@ def extract(request_path):
     elif suffix in ('.csv','.tsv'): csv_sheet(source,writer)
     elif request['family'] == 'images': images(source,writer)
     elif request['family'] == 'code' or suffix in ('.txt','.md','.markdown'): plain(source,writer)
-    else: raise ValueError('media_reader_not_implemented')
+    elif request['family'] in ('audio','video'): media(source,writer,request['family'])
+    else: raise ValueError('unsupported_content_format')
     if sha256(source) != request['sourceSha256']: raise ValueError('snapshot_changed')
     if not writer.files: raise ValueError('no_extractable_content')
     return writer.finish(source)

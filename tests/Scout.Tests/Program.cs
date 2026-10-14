@@ -8,6 +8,7 @@ if (args.Length == 2 && args[0] == "--job-parent") return MultimodalChecks.JobPa
 if (args.Length == 2 && args[0] == "--multimodal-host") return await MultimodalChecks.HostSmoke(args[1]);
 if (args.Length == 3 && args[0] == "--extraction-sandbox") return await ExtractionSandboxChecks.Smoke(args[1], args[2]);
 if (args.Length == 4 && args[0] == "--extract-readers") return await ExtractionSandboxChecks.Readers(args[1], args[2], args[3]);
+if (args.Length == 4 && args[0] == "--extract-media") return await ExtractionSandboxChecks.Media(args[1], args[2], args[3]);
 if (args.Length == 3 && args[0] == "--realworld") return RealWorldAudit.Run(args[1], args[2]);
 if (args.Length is 4 or 5 && args[0] == "--search-eval") return SearchEvaluation.Run(args[1], args[2], args[3], args.Length == 5 ? args[4] : null);
 if (args.Length == 2 && args[0] == "--quality-export") return QualityEvaluation.Export(args[1]);

@@ -56,17 +56,19 @@ class SegmentWriter:
         self.output.mkdir(exist_ok=True)
         self.tokenize = tokenize
         self.max_segments, self.max_bytes = max_segments, max_bytes
-        self.files, self.reasons, self.bytes = [], set(), 0
+        self.files, self.reasons, self.bytes, self.coverage = [], set(), 0, {}
     @property
     def full(self):
         return len(self.files) >= self.max_segments or self.bytes >= self.max_bytes
-    def emit(self, content, locator, evidence='', thumbnail=''):
+    def emit(self, content, locator, evidence='', thumbnail='', *, coverage=None):
         if len(self.files) >= self.max_segments:
             self.reasons.add('segment_limit'); return False
         if len(evidence) > 32000:
             raise ValueError('evidence_budget')
-        data = json.dumps(dict(content=content, modality=content['type'], locator=locator,
-                               evidence=evidence, thumbnail=thumbnail), ensure_ascii=False, allow_nan=False).encode('utf-8')
+        segment = dict(content=content, modality=content['type'], locator=locator,
+                       evidence=evidence, thumbnail=thumbnail)
+        if coverage is not None: segment['coverage'] = coverage
+        data = json.dumps(segment, ensure_ascii=False, allow_nan=False).encode('utf-8')
         if len(data) > 32*1024**2 or self.bytes+len(data) > self.max_bytes:
             self.reasons.add('prepared_output_limit'); return False
         name = f'segment-{len(self.files):04}.json'
@@ -87,6 +89,7 @@ class SegmentWriter:
     def finish(self, source):
         result = dict(schemaVersion=1, sourceSha256=sha256(source), segments=self.files,
                       partial=bool(self.reasons), reasons=sorted(self.reasons), bytes=self.bytes)
+        if self.coverage: result['coverage'] = self.coverage
         (self.output/'ready.json').write_text(json.dumps(result), encoding='utf-8')
         return result
 

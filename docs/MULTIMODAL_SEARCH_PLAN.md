@@ -15,8 +15,10 @@ verified. The separate SQLite segment index and durable queue now pass crash,
 source-change, revocation, atomic replacement and quota contracts. They are not
 yet connected to the application. Native source acquisition and renderer-free
 Office/PDF/image/CSV reader foundations are implemented; all six Office formats
-pass actual no-network AppContainer extraction and CPU embedding. Media readers,
-application integration, clean standard-account installation, parser lifecycle
+pass actual no-network AppContainer extraction and CPU embedding. Bounded audio/video
+readers now pass real-codec sandbox extraction and full-model CPU/CUDA embedding;
+application
+integration, clean standard-account installation, parser lifecycle
 hardening, distribution review and
 release evaluations remain required. See
 [the runtime screen](MULTIMODAL_RUNTIME_SCREEN.md) for results and reproduction.
@@ -282,16 +284,18 @@ results as end-to-end release evidence.
 | Durable index | SQLite queue, atomic source replacement, quota, revocation and restart contracts (`33aaf86`) | Connect file reconciliation and background scheduling to Scout |
 | Source acquisition | Native identity checks and hashed owned snapshots (`f87fb8b`) | Revalidate source and scope across extraction, embedding, display and launch |
 | Document/image readers | Six Office formats through actual no-network AppContainer extraction and CPU embedding (`c6496b8`); PDF/image/CSV foundations | OCR, additional corrupt/large/scan fixtures, coverage fidelity and parser crash cleanup |
-| Audio/video readers | Full model accepts prepared audio/video; file readers pending | Implement bounded local decoding, windows, frame sampling, audio tracks, timestamp evidence and explicit partial coverage |
+| Audio/video readers | Bounded PyAV file readers; real codecs and timestamps validated in the no-network sandbox | Connect extraction/embedding to indexing; verify scheduling, cancellation/crash cleanup, quality and resource gates |
 | Retrieval/UI | Pending | Constrained vector search, lexical fusion, calibrated admission, grouped evidence and locator previews with Laya off/on |
 | Release validation | Pending | Frozen independent holdout, throughput/resource measurements, clean packaging/install and every release gate below |
 
 Proceed in this order, committing each verified unit:
 
-1. Implement audio/video file readers using the pinned PyAV runtime. Verify real
-   codec fixtures, overlapping audio windows, timestamps, video-only/silent input,
-   frame/pixel/duration/output limits and no-network AppContainer execution. Test
-   the resulting prepared segments with the full model.
+1. Reader foundation completed after restart: audio/video file readers use the
+   pinned PyAV runtime. Real codec fixtures, overlapping audio windows, timestamps,
+   video-only/silent input, frame/pixel/duration/output limits and no-network
+   AppContainer execution pass. All 22 segments from 16 authored smoke files pass
+   full-model CPU and CUDA embedding. This is compatibility evidence, not a
+   retrieval-quality or minimum-hardware result.
 2. Build the extractor host and connect the durable queue to Scout's selected
    folders and file reconciliation. Validate snapshot receipts and source hashes,
    cancellation, immediate scope revocation, pause/quota/resource behavior,
@@ -385,9 +389,10 @@ Keep all large or private evaluation outputs under ignored
 
 ## Next implementation task
 
-Start the audio/video reader milestone from the verified prepared-input runtime
-and sandbox foundations. Use authored fixtures under ignored diagnostic folders;
-keep codec/resource smoke tests separate from the frozen release holdout. The
-next completion check is actual bounded media-file extraction in the no-network
-sandbox followed by full-model embedding, with source timestamp locators and
-honest sampling/partial coverage receipts.
+Connect the verified readers to an extractor host and durable app scheduler.
+Validate every receipt, hash, locator and prepared payload before embedding;
+retain source/scope checks throughout the job. Use authored fixtures under ignored
+diagnostic folders and keep these smoke checks separate from the frozen release
+holdout. The next completion check is selected-folder indexing with atomic
+publication, pause/cancellation, immediate revocation, bounded resources and
+crash cleanup, without blocking ordinary metadata refresh or interactive queries.

@@ -6,7 +6,8 @@ Scout now has an independent setup entry point, authenticated embedding worker,
 Windows process lifetime, and Multimodal settings page. The preview installs and
 tests the full EmbeddingGemma 2 model; it does not yet index selected folders or
 add semantic matches to search results. The durable index and native source
-snapshot foundation is implemented; isolated readers and retrieval are next.
+snapshot foundation and isolated document/image/audio/video readers are implemented;
+application indexing and retrieval are next.
 All content families remain in the release scope. LibreOffice is removed from
 the product path by user direction. Office evidence will use extracted text,
 cells, chart data and embedded images, without exact Office page/slide rendering.
@@ -87,8 +88,8 @@ Protocol version 1 supports query text and prepared document segments:
 | Video | At most 16 equal-sized prepared frames, 16 million total pixels, ordered frame indices and a window of at most 60 seconds |
 
 The entire request is limited to 32 MiB. Filesystem paths, URLs and unknown
-content fields are rejected. Office/PDF rendering, audio/video decoding and
-segmentation occur before this boundary in later readers; this is not permission
+content fields are rejected. Office/PDF extraction, audio/video decoding and
+segmentation occur before this boundary in isolated readers; this is not permission
 for the worker to read arbitrary files. Responses contain a finite normalized
 768-dimensional vector and a checked token count, never a launch target. The
 worker performs offline model loading and does not log inputs or API bodies.
@@ -177,14 +178,56 @@ previews, holdout quality, 16 GB hardware measurements and final distribution
 review remain required before release. This preview does not establish general
 retrieval quality or all-format fidelity.
 
+The renderer-free restart adds streaming media-file readers through the existing
+PyAV 19.0.1 wheel; no separate FFmpeg executable is installed. Audio is downmixed
+and resampled to mono 16 kHz in 12-second windows with 2-second overlap. Video uses
+8-second windows with 1-second overlap and samples at most one frame per second
+by default, with separate audio segments when a track is present. The reader
+preserves presentation timestamps, normalizes their common playback origin, and
+handles Matroska's millisecond timestamp precision without inventing audio gaps.
+The prepared video metadata uses a virtual 100 Hz timeline to represent sampled
+timestamps; it does not describe the original file's frame rate. Receipts also
+retain actual sampled timestamps.
+
+Decoding reads the owned snapshot through an explicit demuxer, denies secondary
+I/O and URL protocols, and runs inside the same zero-capability AppContainer.
+Bounds include 600 seconds per track timeline, 60,000 decoded frames and 200,000
+packets across the file, 90 seconds of decoding wall time, 16 MiB packets,
+16-million-pixel source video frames, 250,000-pixel prepared frames and the
+existing 256-segment/256 MiB prepared-output budget. The launcher also enforces
+its process/job memory and wall limits. Sampling, uncovered tracks, clipping,
+estimated end times and reached limits produce explicit partial-coverage reasons.
+No speech transcript or visual caption is fabricated.
+
+Thirteen new Python contracts cover real codec combinations, silence, video-only
+and audio/video input, overlapping windows, variable timestamps, coarse audio
+timestamps, sparse held frames, genuine gaps, corrupt/renamed playlists and
+duration/frame/output limits. Sixteen authored smoke files pass actual sandboxed
+extraction and C# locator/receipt checks. Validated combinations include WAV PCM,
+MP3, AAC in M4A and raw AAC, FLAC, Ogg Opus, H.264 in MP4/MOV/MKV/M4V, VP8 in
+WebM and MPEG-4 video in AVI. These do not establish support for every codec that
+can occur inside those containers. All 22 prepared segments (12 audio, 10 video)
+pass full-model offline CPU and CUDA embedding with normalized 768-dimensional
+vectors and checked token counts. The largest input in this pack uses 1,098
+tokens; smoke inference totals are 68.4 seconds on CPU and 4.0 seconds on CUDA.
+Those totals exclude extraction/startup and are not query-latency, quality or
+minimum-hardware benchmarks. The Release suite remains 258/258 with zero build
+warnings, and the six existing worker protocol contracts still pass.
+File-to-index integration, decoder cancellation
+and crash recovery, audio/visual event quality and full-resource measurements
+remain release work.
+
 Developer verification (use an isolated add-on root and data directory):
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts/setup-multimodal.ps1 -AddonRoot C:/Path/To/PrivateTestAddon -Device cpu
 .runtime/semantic-search/cpu-venv/Scripts/python.exe runtime/test_multimodal_setup.py
 .runtime/semantic-search/cpu-venv/Scripts/python.exe runtime/test_multimodal_worker.py
+.runtime/semantic-search/cpu-venv/Scripts/python.exe runtime/test_media_readers.py
 .runtime/semantic-search/cpu-venv/Scripts/python.exe runtime/test_multimodal_worker_inference.py --model .runtime/semantic-search/model --device cpu
 dotnet run --project tests/Scout.Tests -c Release -- --multimodal-host C:/Path/To/PrivateTestAddon
+dotnet run --project tests/Scout.Tests -c Release -- --extract-media .runtime/semantic-search/cpu-venv/Scripts/python.exe .runtime/python/cpython-3.12.13-windows-x86_64-none .runtime/semantic-search/model
+.runtime/semantic-search/cpu-venv/Scripts/python.exe runtime/test_extracted_embeddings.py --model .runtime/semantic-search/model --root C:/Path/Printed/By/SandboxTest --device cpu
 ```
 
 Development setup also accepts explicit `--existing-model`,

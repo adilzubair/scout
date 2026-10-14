@@ -68,18 +68,26 @@ static class ExtractionSandboxChecks
         finally { listener.Stop(); Environment.SetEnvironmentVariable("SCOUT_SANDBOX_TEST_SECRET", null); ExtractionSandbox.RemoveProfile(root); }
     }
     private static void Check(bool value, string message = "Sandbox assertion failed") { if (!value) throw new Exception(message); }
-    public static async Task<int> Readers(string python, string home, string model)
+    public static Task<int> Readers(string python, string home, string model) => ReadPack(python, home, model,
+        "office-fixtures-v2", ["notes.docx", "notes.odt", "growth.pptx", "growth.odp", "sales.xlsx", "sales.ods"]);
+    public static Task<int> Media(string python, string home, string model)
+    {
+        using var manifest = JsonDocument.Parse(File.ReadAllText(Path.GetFullPath("artifacts/diagnostics/multimodal/media-fixtures-v1/fixtures.json")));
+        return ReadPack(python, home, model, "media-fixtures-v1", manifest.RootElement.GetProperty("items").EnumerateArray().Select(item => item.GetProperty("file").GetString()!).ToArray());
+    }
+    private static async Task<int> ReadPack(string python, string home, string model, string packName, string[] files)
     {
         var root = Path.GetFullPath("artifacts/diagnostics/multimodal/sandbox-readers/" + Guid.NewGuid().ToString("N")); Directory.CreateDirectory(root);
         var runtime = Path.Combine(AppContext.BaseDirectory, "runtime");
-        var pack = Path.GetFullPath("artifacts/diagnostics/multimodal/office-fixtures-v2");
+        var pack = Path.GetFullPath("artifacts/diagnostics/multimodal/" + packName);
         try
         {
             var roots = new[] { Path.GetFullPath(home), Path.GetDirectoryName(Path.GetDirectoryName(Path.GetFullPath(python)))!, runtime, Path.GetFullPath(model) };
             using var sandbox = new ExtractionSandbox(root, roots);
-            foreach (var file in new[] { "notes.docx", "notes.odt", "growth.pptx", "growth.odp", "sales.xlsx", "sales.ods" })
+            foreach (var file in files)
             {
-                var work = Path.Combine(root, Path.GetExtension(file).TrimStart('.')); Directory.CreateDirectory(work);
+                Check(Path.GetFileName(file) == file, "invalid authored fixture name");
+                var work = Path.Combine(root, Path.GetFileNameWithoutExtension(file) + "-" + Path.GetExtension(file).TrimStart('.')); Directory.CreateDirectory(work);
                 var source = Path.Combine(work, "input" + Path.GetExtension(file)); File.Copy(Path.Combine(pack,file), source);
                 var request = Path.Combine(work, "request.json");
                 var hash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(source))).ToLowerInvariant();
@@ -90,16 +98,29 @@ static class ExtractionSandboxChecks
                 Check(ready.RootElement.GetProperty("sourceSha256").GetString()!.Equals(hash,StringComparison.OrdinalIgnoreCase));
                 var segments = ready.RootElement.GetProperty("segments").EnumerateArray().ToArray();
                 Check(segments.Length is > 0 and <= 256);
+                if (packName == "media-fixtures-v1") Check(segments.Length <= 4, "small fixture was fragmented by timestamp jitter");
                 foreach (var segment in segments)
                 {
-                    var path = Path.Combine(work,"output",segment.GetProperty("name").GetString()!);
+                    var name = segment.GetProperty("name").GetString()!;
+                    Check(System.Text.RegularExpressions.Regex.IsMatch(name, "^segment-[0-9]{4}\\.json$"));
+                    var path = Path.Combine(work,"output",name);
+                    Check(new FileInfo(path).Length == segment.GetProperty("bytes").GetInt64());
+                    Check(Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(path))).Equals(segment.GetProperty("sha256").GetString(),StringComparison.OrdinalIgnoreCase));
                     using var data = JsonDocument.Parse(File.ReadAllText(path));
                     var locator = JsonSerializer.Deserialize<ContentLocator>(data.RootElement.GetProperty("locator"), new JsonSerializerOptions { PropertyNameCaseInsensitive = true })!;
                     locator.Validate();
                     Check(data.RootElement.GetProperty("evidence").GetString()!.Length <= 32000);
+                    if (data.RootElement.GetProperty("modality").GetString() == "video")
+                    {
+                        var samples = data.RootElement.GetProperty("coverage").GetProperty("sampleTimesSeconds").EnumerateArray().Select(value => value.GetDouble()).ToArray();
+                        Check(samples.Length is > 0 and <= 16);
+                        Check(samples.All(t => t >= locator.StartSeconds && t < locator.EndSeconds));
+                        Check(ready.RootElement.GetProperty("partial").GetBoolean(), "sampling must report partial coverage");
+                    }
                 }
-                Console.WriteLine("PASS sandboxed " + Path.GetExtension(file) + " · " + segments.Length + " segments");
+                Console.WriteLine("PASS sandboxed " + file + " · " + segments.Length + " segments");
             }
+            Console.WriteLine("Prepared output root: " + root);
             return 0;
         }
         catch (Exception error) { Console.Error.WriteLine(error); return 1; }
