@@ -39,8 +39,15 @@ Settings flow. It improved a small authored semantic evaluation from 38/64 to
 56/64 but is too large for Scout's target of ordinary Windows laptops. Existing
 experimental installations can still be tested by starting Scout with
 `SCOUT_EXPERIMENTAL_SEMANTIC_HELPER=1`. See [the helper evaluation](docs/LOCAL_SEMANTIC_HELPER.md).
-Content search is separate from local AI. Document body text stays in Scout's
-private local index and is never sent to either model.
+Keyword content search is separate from local AI. Its document text stays in
+Scout's private index and is not sent to Laya or the Qwen helper.
+
+This branch also includes a **Settings → Multimodal** development preview for
+the optional full EmbeddingGemma 2 add-on. It installs and tests text, image,
+audio and video support independently of Laya. Folder indexing and semantic
+search results are still being implemented. Selected content will be supplied
+to the local embedding worker when that pipeline is connected; Laya and Qwen
+continue to receive no document bodies. See [add-on status and checks](docs/MULTIMODAL_ADDON.md).
 
 Command-line setup is also available:
 
@@ -109,7 +116,7 @@ Creation dates can change when copying a file and do not prove authorship. Acces
 - Chrome and Edge history are separately opt-in. Regular profiles supply up to 10,000 distinct HTTP(S) URLs and 10,000 completed downloads from the last 90 days. Databases are read-only; a locked database can use a bounded disposable snapshot with consistency checks. Incognito data, cookies and open tabs are not read.
 - Calendar phrases use the Windows timezone, including daylight-saving boundaries. `last week` is the preceding Monday–Sunday; `past seven days` is rolling. Singular superlatives use the requested evidence even when filenames also match.
 - Content search is off by default. When enabled, it searches only selected folders that Scout already searches and supports bounded text/source files plus Office and OpenDocument files. Files larger than 16 MiB are skipped, and at most 64,000 characters are extracted from each supported file. PDF contents and OCR are not indexed.
-- Extracted body text is stored in a private local full-text index. Turning content search off clears that index. The model never receives document body text. Laya receives query text, shortlisted titles/kinds, relevant evidence and limited local context: foreground/recent app names, clipboard **kind**, time and weekday. Clipboard contents are not read for ranking.
+- Extracted keyword-search text is stored in a private local full-text index. Turning keyword content search off clears that index. Laya/Qwen receive no document body text. Laya receives query text, shortlisted titles/kinds, relevant evidence and limited local context: foreground/recent app names, clipboard **kind**, time and weekday. Clipboard contents are not read for ranking. The separate multimodal preview uses a local embedding worker and currently tests authored inputs; selected folders are not yet content-indexed.
 - Data is stored in `%LOCALAPPDATA%\Scout\scout.db`, with content text kept in its separate local index. Pins, workspaces and successful launches are retained locally. Disabling a browser removes its history source; explicitly saved or previously launched items remain in the personal library. Clear launch history removes learned aliases and launch boosts while retaining pins and workspaces.
 
 Every launch requires Enter or an explicit Open action. A model can select only known candidate IDs; it cannot produce shell commands. Each group member is validated before launching, with partial failures reported. Successful shell dispatch does not guarantee the receiving app finished loading.

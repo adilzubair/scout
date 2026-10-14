@@ -11,6 +11,7 @@ public partial class App : Application
     private System.Windows.Forms.NotifyIcon? tray;
     private IndexService? index;
     private ModelHost? model;
+    private MultimodalHost? multimodal;
     internal static string DataDirectory => Environment.GetEnvironmentVariable("SCOUT_DATA_DIR") ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Scout");
     protected override async void OnStartup(StartupEventArgs e)
     {
@@ -62,7 +63,9 @@ public partial class App : Application
             }
             index = new IndexService(store); model = new ModelHost();
             if (!smoke && !diagnose && !bluetooth) _ = model.WarmAsync(store.Settings);
-            var main = new MainWindow(store, index, model); MainWindow = main;
+            multimodal = new MultimodalHost();
+            await multimodal.ConfigureAsync(store.Settings.Multimodal);
+            var main = new MainWindow(store, index, model, multimodal); MainWindow = main;
             tray = new System.Windows.Forms.NotifyIcon
             {
                 Text = "Scout — Ctrl+Alt+Space", Icon = System.Drawing.Icon.ExtractAssociatedIcon(Environment.ProcessPath!) ?? System.Drawing.SystemIcons.Application,
@@ -127,6 +130,6 @@ public partial class App : Application
     }
     protected override void OnExit(ExitEventArgs e)
     {
-        tray?.Dispose(); index?.Dispose(); model?.Dispose(); instance?.Dispose(); base.OnExit(e);
+        tray?.Dispose(); index?.Dispose(); model?.Dispose(); multimodal?.Dispose(); instance?.Dispose(); base.OnExit(e);
     }
 }

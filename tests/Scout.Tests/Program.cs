@@ -4,6 +4,8 @@ using Microsoft.Data.Sqlite;
 using Scout.Core;
 
 if (args.Length == 3 && args[0] == "--profile") return SearchProfiler.Run(args[1], args[2]);
+if (args.Length == 2 && args[0] == "--job-parent") return MultimodalChecks.JobParent(args[1]);
+if (args.Length == 2 && args[0] == "--multimodal-host") return await MultimodalChecks.HostSmoke(args[1]);
 if (args.Length == 3 && args[0] == "--realworld") return RealWorldAudit.Run(args[1], args[2]);
 if (args.Length is 4 or 5 && args[0] == "--search-eval") return SearchEvaluation.Run(args[1], args[2], args[3], args.Length == 5 ? args[4] : null);
 if (args.Length == 2 && args[0] == "--quality-export") return QualityEvaluation.Export(args[1]);
@@ -29,6 +31,7 @@ SearchUpgradeChecks.Run(Test);
 ContentSearchChecks.Run(Test);
 IndexRaceChecks.Run(Test);
 SettingsUiChecks.Run(Test);
+MultimodalChecks.Run(Test);
 Candidate FileItem(string name, int hours) => new(Candidate.Key(ItemKind.File, name), ItemKind.File, name, "C:\\Documents\\" + name) { ModifiedAt = now.AddHours(-hours), Detail = "Documents" };
 var recent = FileItem("Roadmap.pdf", 1) with { AddedAt = now.AddMinutes(-5) };
 var old = FileItem("Budget.pdf", 0) with { AddedAt = now.AddDays(-3), OpenedAt = now.AddMinutes(-1) };

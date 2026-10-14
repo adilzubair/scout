@@ -19,30 +19,51 @@ from semantic_search.msi import MsiDatabase, file_layout, safe_component
 MANIFEST = ROOT / 'runtime/office_renderer.json'
 
 
+def download_package(spec, package):
+    partial = package.with_suffix('.partial')
+    offset = partial.stat().st_size if partial.exists() else 0
+    if offset == spec['bytes'] and sha256(partial) == spec['sha256']:
+        partial.replace(package)
+        return
+    if offset >= spec['bytes']:
+        offset = 0
+    request = urllib.request.Request(spec['url'], headers={'Range': f'bytes={offset}-'} if offset else {})
+    with urllib.request.urlopen(request, timeout=60) as response:
+        if not response.url.startswith('https://'):
+            raise ValueError('Renderer download must use HTTPS')
+        if response.status == 206:
+            expected = f'bytes {offset}-{spec["bytes"]-1}/{spec["bytes"]}'
+            if response.headers.get('Content-Range') != expected:
+                raise ValueError('Invalid renderer download range')
+        elif response.status == 200:
+            offset = 0  # Publisher/mirror may ignore Range; restart this artifact safely.
+        else:
+            raise ValueError('Unexpected renderer download status')
+        with partial.open('ab' if offset else 'wb') as stream:
+            received = offset
+            while chunk := response.read(1024 * 1024):
+                received += len(chunk)
+                if received > spec['bytes']:
+                    raise ValueError('Renderer download exceeded pinned length')
+                stream.write(chunk)
+    if partial.stat().st_size != spec['bytes'] or sha256(partial) != spec['sha256']:
+        raise ValueError('Office package length/checksum mismatch')
+    partial.replace(package)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--download-only', action='store_true')
+    parser.add_argument('--output', type=Path, help='Explicit private renderer download/extraction directory')
     args = parser.parse_args()
     spec = json.loads(MANIFEST.read_text(encoding='utf-8'))
-    base = ROOT / '.runtime/semantic-search/office'
+    base = args.output or ROOT / '.runtime/semantic-search/office'
     base.mkdir(parents=True, exist_ok=True)
+    base = base.resolve(strict=True)
     package = base / spec['package']
     if not package.exists():
-        partial = package.with_suffix('.partial')
         started = time.perf_counter()
-        with urllib.request.urlopen(spec['url'], timeout=60) as response:
-            if not response.url.startswith('https://'):
-                raise ValueError('Renderer download must use HTTPS')
-            with partial.open('wb') as stream:
-                received = 0
-                while chunk := response.read(1024 * 1024):
-                    received += len(chunk)
-                    if received > spec['bytes']:
-                        raise ValueError('Renderer download exceeded pinned length')
-                    stream.write(chunk)
-        if partial.stat().st_size != spec['bytes'] or sha256(partial) != spec['sha256']:
-            raise ValueError('Office package length/checksum mismatch')
-        partial.replace(package)
+        download_package(spec, package)
         print(f'Office package downloaded and verified in {time.perf_counter()-started:.1f}s', flush=True)
     if package.stat().st_size != spec['bytes'] or sha256(package) != spec['sha256']:
         raise ValueError('Office package length/checksum mismatch')

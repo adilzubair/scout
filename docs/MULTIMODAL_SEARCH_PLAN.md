@@ -5,10 +5,13 @@ Status: implementation started. The full-model runtime and content smoke probe
 are implemented and verified on CPU and CUDA. The Office compatibility spike
 now passes DOCX/ODT, PPTX/ODP and XLSX/ODS conversion from a privately extracted
 official Windows package, including native presentation chart rendering.
-The next slice is the independent add-on setup, host and settings. Product
-installation, renderer hardening, distribution review and release evaluations
-remain required. See
+The independent add-on setup, host and settings preview is implemented and
+verified; the next slice is the durable segment index and work queue. Clean
+standard-account installation, renderer hardening, distribution review and
+release evaluations remain required. See
 [the runtime screen](MULTIMODAL_RUNTIME_SCREEN.md) for results and reproduction.
+See [the add-on preview](MULTIMODAL_ADDON.md) for lifecycle, installation,
+prepared-media boundaries and verification limits.
 
 Build an optional local content-search add-on using the full EmbeddingGemma 2
 model. The first release must search document, spreadsheet, code, image, audio,

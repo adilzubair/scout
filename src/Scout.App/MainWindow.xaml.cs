@@ -17,6 +17,7 @@ public partial class MainWindow : Window
     private readonly ScoutStore store;
     private readonly IndexService index;
     private readonly ModelHost model;
+    private readonly MultimodalHost multimodal;
     private Scope scope;
     private CancellationTokenSource search = new();
     private long revision;
@@ -48,9 +49,9 @@ public partial class MainWindow : Window
     private string lastRenderedQuery = "";
     private HashSet<string> lastRenderedIds = [];
 
-    internal MainWindow(ScoutStore store, IndexService index, ModelHost model)
+    internal MainWindow(ScoutStore store, IndexService index, ModelHost model, MultimodalHost multimodal)
     {
-        this.store = store; this.index = index; this.model = model;
+        this.store = store; this.index = index; this.model = model; this.multimodal = multimodal;
         InitializeComponent();
         WindowVisuals.Configure(this);
         SourceInitialized += (_, _) =>
@@ -465,14 +466,17 @@ public partial class MainWindow : Window
     internal async void ShowSettings()
     {
         Toggle(true);
-        var dialog = new SettingsWindow(store.Settings, ApplyHotkey, () => store.ClearLaunchHistory()) { Owner = this };
+        var dialog = new SettingsWindow(store.Settings, ApplyHotkey, () => store.ClearLaunchHistory(), multimodal,
+            () => { var saved = store.Settings; saved.Multimodal.Enabled = false; store.SaveSettings(saved); }) { Owner = this };
         if (dialog.ShowDialog() == true)
         {
             search.Cancel(); revision++; uiRefresh.Stop(); await model.ResetAsync();
             try
             {
                 await index.ConfigureAsync(dialog.Value);
-                store.SaveSettings(dialog.Value); enriched = []; ClearGroup();
+                store.SaveSettings(dialog.Value);
+                await multimodal.ConfigureAsync(dialog.Value.Multimodal);
+                enriched = []; ClearGroup();
                 indexChanged = false; observedIndexVersion = index.Version; ScheduleSearch(false);
             }
             catch (Exception error) when (error is IOException or UnauthorizedAccessException or Microsoft.Data.Sqlite.SqliteException)

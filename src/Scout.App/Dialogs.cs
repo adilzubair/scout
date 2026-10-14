@@ -66,7 +66,7 @@ internal sealed class GroupWindow : Window
 internal sealed class SettingsWindow : Window
 {
     public ScoutSettings Value { get; private set; }
-    public SettingsWindow(ScoutSettings settings, Func<string, bool> applyHotkey, Action clearHistory)
+    public SettingsWindow(ScoutSettings settings, Func<string, bool> applyHotkey, Action clearHistory, MultimodalHost? multimodalHost = null, Action? addonRemoved = null)
     {
         Value = settings;
         Title = "Scout settings"; Width = 800; Height = 654; MinWidth = 680; MinHeight = 460; WindowStartupLocation = WindowStartupLocation.CenterOwner;
@@ -195,6 +195,110 @@ internal sealed class SettingsWindow : Window
             finally { setup.IsEnabled = true; }
         };
 
+        var multimodalOptions = settings.Multimodal ?? new MultimodalSettings();
+        var multimodal = Page("Multimodal", "\uE8A5", "Prepare local content search across documents, images, audio, and video.");
+        Note(multimodal, "Development preview: this build prepares and tests the add-on. Content indexing and search results are still being implemented.");
+        var embeddingEnabled = Check(multimodal, "Enable the multimodal add-on", multimodalOptions.Enabled);
+        var embeddingPaused = Check(multimodal, "Pause background content indexing", multimodalOptions.Paused);
+        Note(multimodal, "Independent of Laya. Selected content will be processed on this PC; it is not sent to Laya or a cloud model.");
+        var embeddingFolders = Field(multimodal, "Multimodal content folders", string.Join(Environment.NewLine, multimodalOptions.Folders), true);
+        Browse(multimodal, embeddingFolders, "Browse for a multimodal content folder");
+        Heading(multimodal, "Content types");
+        var embeddingTypes = MultimodalSettings.ContentTypes.ToDictionary(type => type, type => Check(multimodal,
+            char.ToUpperInvariant(type[0]) + type[1..], multimodalOptions.Modalities.Contains(type)));
+        Heading(multimodal, "Processing device");
+        var embeddingDevice = new ComboBox { ItemsSource = new[] { "cpu", "cuda" }, SelectedItem = multimodalOptions.Device, Padding = new Thickness(10) };
+        AutomationProperties.SetName(embeddingDevice, "Multimodal processing device"); multimodal.Children.Add(embeddingDevice);
+        Note(multimodal, "Use cpu, or cuda for a supported NVIDIA GPU. Changing the device requires installing that version of the add-on.");
+        Heading(multimodal, "CPU threads");
+        var embeddingThreads = new ComboBox { ItemsSource = new[] { 1, 2, 4, 8, Math.Clamp(multimodalOptions.CpuThreads, 1, 32) }.Distinct().Order().ToArray(), SelectedItem = Math.Clamp(multimodalOptions.CpuThreads, 1, 32), Padding = new Thickness(10) };
+        AutomationProperties.SetName(embeddingThreads, "Multimodal CPU threads"); multimodal.Children.Add(embeddingThreads);
+        Heading(multimodal, "Content index limit");
+        var quota = Math.Clamp(multimodalOptions.IndexQuotaBytes / (1024L*1024*1024), 1, 32);
+        var embeddingQuota = new ComboBox { ItemsSource = new[] { 2L, 4L, 8L, 16L, quota }.Distinct().Order().ToArray(), SelectedItem = quota, Padding = new Thickness(10) };
+        AutomationProperties.SetName(embeddingQuota, "Multimodal index limit in GB"); multimodal.Children.Add(embeddingQuota);
+        Note(multimodal, "Limit in GB, separate from downloaded runtime and model storage. Indexing will pause when it reaches this limit.");
+        var embeddingStatus = new TextBlock { Text = MultimodalSetup.Find() == null ? "Add-on not installed" : "Add-on installed", TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 12, 0, 12), Foreground = WindowVisuals.Brush("Muted") };
+        AutomationProperties.SetLiveSetting(embeddingStatus, AutomationLiveSetting.Polite);
+        var embeddingInstall = new Button { Content = "Install or verify add-on", HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 8, 0, 6) };
+        var embeddingCancel = new Button { Content = "Cancel setup", IsEnabled = false, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 0, 0, 6) };
+        var embeddingTest = new Button { Content = "Test add-on", HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 0, 0, 6) };
+        var embeddingRemove = new Button { Content = "Remove add-on", HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 0, 0, 6) };
+        multimodal.Children.Add(embeddingInstall); multimodal.Children.Add(embeddingCancel); multimodal.Children.Add(embeddingTest); multimodal.Children.Add(embeddingRemove); multimodal.Children.Add(embeddingStatus);
+        Note(multimodal, "Install downloads several GB and needs additional temporary disk space. Installation and removal take effect immediately. Removing the add-on preserves your ordinary file library and Laya.");
+        // Keep setup actions near the top so an uninstalled add-on is easy to prepare.
+        var downloadNote = multimodal.Children[multimodal.Children.Count - 1];
+        multimodal.Children.Remove(downloadNote);
+        var setupActions = new WrapPanel();
+        foreach (var button in new[] { embeddingInstall, embeddingCancel, embeddingTest, embeddingRemove })
+        {
+            multimodal.Children.Remove(button); button.Margin = new Thickness(0, 0, 8, 8); setupActions.Children.Add(button);
+        }
+        multimodal.Children.Remove(embeddingStatus);
+        multimodal.Children.Insert(3, setupActions); multimodal.Children.Insert(4, embeddingStatus); multimodal.Children.Insert(5, downloadNote);
+        CancellationTokenSource? embeddingOperation = null;
+        void Busy(bool value)
+        {
+            embeddingInstall.IsEnabled = embeddingTest.IsEnabled = embeddingRemove.IsEnabled = embeddingDevice.IsEnabled = !value;
+            embeddingCancel.IsEnabled = value;
+            save.IsEnabled = !value;
+        }
+        embeddingCancel.Click += (_, _) => embeddingOperation?.Cancel();
+        Closed += (_, _) => embeddingOperation?.Cancel();
+        embeddingInstall.Click += async (_, _) =>
+        {
+            Busy(true);
+            embeddingOperation = CancellationTokenSource.CreateLinkedTokenSource(setupLifetime.Token);
+            try
+            {
+                if (multimodalHost != null) await multimodalHost.BeginSetupAsync();
+                await MultimodalSetup.InstallAsync((string)embeddingDevice.SelectedItem, new Progress<string>(text => embeddingStatus.Text = text), embeddingOperation.Token);
+                embeddingStatus.Text = "Add-on verified. Choose folders and save settings to enable it.";
+            }
+            catch (OperationCanceledException) { embeddingStatus.Text = "Setup cancelled. Retry to reuse completed downloads."; }
+            catch (Exception error) when (error is IOException or UnauthorizedAccessException or System.ComponentModel.Win32Exception) { embeddingStatus.Text = error.Message; }
+            finally
+            {
+                embeddingOperation.Dispose(); embeddingOperation = null; Busy(false);
+                if (multimodalHost is { IsDisposed: false }) await multimodalHost.ConfigureAsync(multimodalOptions);
+            }
+        };
+        embeddingTest.Click += async (_, _) =>
+        {
+            Busy(true); embeddingStatus.Text = "Loading the add-on for a local test…";
+            embeddingOperation = CancellationTokenSource.CreateLinkedTokenSource(setupLifetime.Token);
+            using var testHost = new MultimodalHost();
+            try
+            {
+                if (multimodalHost != null) await multimodalHost.ConfigureAsync(new());
+                await testHost.ConfigureAsync(new() { Enabled = true, Device = (string)embeddingDevice.SelectedItem, CpuThreads = (int)embeddingThreads.SelectedItem });
+                await testHost.QueryAsync("local model readiness", embeddingOperation.Token);
+                embeddingStatus.Text = "Local test passed. Text, image, audio and video encoders are available.";
+            }
+            catch (OperationCanceledException) { embeddingStatus.Text = "Local test cancelled."; }
+            catch (Exception error) when (error is IOException or HttpRequestException or InvalidOperationException or System.ComponentModel.Win32Exception or System.Text.Json.JsonException) { embeddingStatus.Text = "Add-on test failed. Verify setup for the selected device and try again."; }
+            finally
+            {
+                embeddingOperation.Dispose(); embeddingOperation = null; Busy(false);
+                if (multimodalHost is { IsDisposed: false }) await multimodalHost.ConfigureAsync(multimodalOptions);
+            }
+        };
+        embeddingRemove.Click += async (_, _) =>
+        {
+            Busy(true);
+            try
+            {
+                if (multimodalHost != null) await multimodalHost.ConfigureAsync(new());
+                await Task.Run(() => MultimodalSetup.Remove());
+                embeddingEnabled.IsChecked = false;
+                addonRemoved?.Invoke();
+                embeddingStatus.Text = "Add-on removed. Your ordinary file library and Laya are kept.";
+            }
+            catch (Microsoft.Data.Sqlite.SqliteException) { embeddingStatus.Text = "Add-on removed, but the disabled setting could not be saved. Try saving settings again."; }
+            catch (Exception error) when (error is IOException or UnauthorizedAccessException) { embeddingStatus.Text = "Removal did not finish. Close other add-on workers and try again."; }
+            finally { Busy(false); }
+        };
+
         var privacy = Page("Privacy", "\uE72E", "Your search history belongs on your PC.");
         Heading(privacy, "Browser history");
         var chrome = Check(privacy, "Include Chrome visits and downloads", settings.ChromeHistory);
@@ -220,8 +324,16 @@ internal sealed class SettingsWindow : Window
                 if (Lines(field.Text).Any(p => !Path.IsPathFullyQualified(p) || !Directory.Exists(p))) { Error("Use existing, full folder paths, such as C:\\Users\\you\\Projects.", 1, field); return; }
             if (contentSearch.IsChecked == true && indexedContentFolders.Any(p => !Path.IsPathFullyQualified(p) || !Directory.Exists(p))) { Error("Use existing, full folder paths, such as C:\\Users\\you\\Projects.", 1, contentFolders); return; }
             if (ai.IsChecked == true && !File.Exists(python.Text.Trim())) { Error("Choose the Python executable created by local AI setup.", 2, python); return; }
+            var embeddingRoots = Lines(embeddingFolders.Text);
+            if (embeddingEnabled.IsChecked == true && (embeddingRoots.Length == 0 || embeddingRoots.Any(p => !Path.IsPathFullyQualified(p) || !Directory.Exists(p)))) { Error("Choose at least one existing folder for multimodal content search.", 3, embeddingFolders); return; }
+            var selectedTypes = embeddingTypes.Where(entry => entry.Value.IsChecked == true).Select(entry => entry.Key).ToArray();
+            if (embeddingEnabled.IsChecked == true && selectedTypes.Length == 0) { Error("Choose at least one content type.", 3, embeddingTypes.First().Value); return; }
+            if (embeddingEnabled.IsChecked == true && MultimodalSetup.Find()?.Device != (string)embeddingDevice.SelectedItem) { Error("Install the add-on for the selected processing device first.", 3, embeddingInstall); return; }
             if (!applyHotkey(shortcut.Text.Trim())) { Error("That shortcut is invalid or already in use. Try Ctrl+Alt+S.", 0, shortcut); return; }
             Value = new ScoutSettings { ChromeHistory = chrome.IsChecked == true, EdgeHistory = edge.IsChecked == true, WindowsSearch = windows.IsChecked == true, RecentItems = recent.IsChecked == true, WebFallback = web.IsChecked == true, AutomationFolders = automationFolders, ContentSearchEnabled = contentSearch.IsChecked == true, ContentFolders = indexedContentFolders, AiEnabled = ai.IsChecked == true, SemanticHelper = semanticHelper?.IsChecked == true, PythonPath = python.Text.Trim(), Model = (string)checkpoint.SelectedItem, Device = (string)device.SelectedItem, CpuThreads = settings.CpuThreads, Hotkey = shortcut.Text.Trim(), ExtraFolders = extra, Exclusions = exclusions };
+            Value.Multimodal = new() { Enabled = embeddingEnabled.IsChecked == true, Paused = embeddingPaused.IsChecked == true,
+                Folders = embeddingRoots, Modalities = selectedTypes, Device = (string)embeddingDevice.SelectedItem,
+                CpuThreads = (int)embeddingThreads.SelectedItem, IndexQuotaBytes = (long)embeddingQuota.SelectedItem * 1024*1024*1024 };
             DialogResult = true;
         };
         SelectPage(pages[0].Page);

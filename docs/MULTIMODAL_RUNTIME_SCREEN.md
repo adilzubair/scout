@@ -6,7 +6,9 @@ The full local model runs on Windows CPU and CUDA and produces valid embeddings
 for all 14 authored smoke fixtures. This implementation supplies the model
 manifest, separate dependency locks, verified downloads, an offline inference
 adapter, fixture generation and benchmark tools. Scout's user-facing semantic
-add-on, durable content index and retrieval policy are subsequent milestones.
+add-on now has an independent installation/host/settings preview described in
+[the add-on status](MULTIMODAL_ADDON.md). The durable content index and retrieval
+policy remain subsequent milestones.
 
 The Office spike now verifies DOCX, ODT, PPTX, ODP, XLSX and ODS conversion from
 an extracted official Windows package. The layout probe embeds rendered pages,
@@ -216,8 +218,8 @@ PyTorch sources. Use the same verified model and fixture directory.
 
 ## Next implementation work
 
-Implement the independent add-on setup/host and consent/settings, then the
-durable segment index and query integration. Include renderer process/network
+Implement the durable segment index, work queue and query integration after the
+installation/host/settings preview. Include renderer process/network
 limits and standard-account setup/update/removal checks. Verify codec/source
 distribution details and measure the full pipeline on a 16 GB CPU laptop before
 release. CPU visual indexing must stay in the background;

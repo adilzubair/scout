@@ -103,7 +103,7 @@ public partial class MainWindow
         try
         {
             settings.Show();
-            foreach (var name in new[] { "General", "Folders", "Local AI", "Privacy" })
+            foreach (var name in new[] { "General", "Folders", "Local AI", "Multimodal", "Privacy" })
             {
                 var navigation = UiDiagnostics.Descendants<Button>(settings).Single(button => AutomationProperties.GetName(button) == name);
                 navigation.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));

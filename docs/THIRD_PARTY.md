@@ -53,5 +53,14 @@ licenses, corresponding source and notice delivery before shipping the add-on.
 The dependency locks and renderer manifest establish development compatibility;
 they do not complete the distribution review for native/codec dependencies.
 
+The add-on setup separately downloads uv 0.11.27 (MIT/Apache-2.0), pinned by
+length and SHA-256 in `runtime/multimodal_setup.json`, and uses its managed
+Python 3.12.13 distribution. uv and Python remain in the private add-on directory
+and are excluded from the base package. Setup disables global executable aliases
+and Windows registry registration. Keep the exact interpreter/dependency notices
+and source requirements in the final optional-distribution review.
+[uv source and licenses](https://github.com/astral-sh/uv/tree/0.11.27),
+[managed Python distributions](https://docs.astral.sh/uv/concepts/python-versions/).
+
 See [the multimodal runtime screen](MULTIMODAL_RUNTIME_SCREEN.md) for versions,
 measurements and remaining distribution work.

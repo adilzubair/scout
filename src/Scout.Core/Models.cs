@@ -92,6 +92,8 @@ public sealed class ScoutSettings
     public bool ContentSearchEnabled { get; set; }
     public string[] ContentFolders { get; set; } = [];
     public bool SemanticHelper { get; set; }
+    private MultimodalSettings multimodal = new();
+    public MultimodalSettings Multimodal { get => multimodal; set => multimodal = value ?? new(); }
     public string PythonPath { get; set; } = "";
     public string Model { get; set; } = "english";
     public string Device { get; set; } = "cpu";
@@ -99,6 +101,18 @@ public sealed class ScoutSettings
     public string Hotkey { get; set; } = "Ctrl+Alt+Space";
     public string[] ExtraFolders { get; set; } = [];
     public string[] Exclusions { get; set; } = [];
+}
+
+public sealed class MultimodalSettings
+{
+    public static readonly string[] ContentTypes = ["documents", "presentations", "spreadsheets", "code", "images", "audio", "video"];
+    public bool Enabled { get; set; }
+    public bool Paused { get; set; }
+    public string[] Folders { get; set; } = [];
+    public string[] Modalities { get; set; } = [.. ContentTypes];
+    public string Device { get; set; } = "cpu";
+    public int CpuThreads { get; set; } = Math.Max(1, Math.Min(4, Environment.ProcessorCount / 2));
+    public long IndexQuotaBytes { get; set; } = 2L * 1024 * 1024 * 1024;
 }
 
 public sealed record RankResult(IReadOnlyDictionary<string, double> Scores, IReadOnlySet<string> GroupMembers, string Status)
