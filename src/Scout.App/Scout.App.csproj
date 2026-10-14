@@ -9,6 +9,16 @@
   </PropertyGroup>
   <ItemGroup><ProjectReference Include="../Scout.Core/Scout.Core.csproj" /></ItemGroup>
   <ItemGroup><PackageReference Include="System.Management" Version="10.0.12" /></ItemGroup>
-  <ItemGroup><Content Include="../../runtime/**" Exclude="../../runtime/**/__pycache__/**;../../runtime/office_renderer.json;../../runtime/test_office_renderer.py;../../runtime/semantic_search/office.py;../../runtime/semantic_search/msi.py"><Link>runtime/%(RecursiveDir)%(Filename)%(Extension)</Link><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></Content></ItemGroup>
+  <ItemGroup>
+    <Content Include="../../runtime/batching.py;../../runtime/download_models.py;../../runtime/download_semantic.py;../../runtime/embeddinggemma2_model.json;../../runtime/models.json;../../runtime/multimodal_setup.json;../../runtime/ranking.py;../../runtime/requirements.lock.txt;../../runtime/requirements.txt;../../runtime/semantic_helper.py;../../runtime/semantic_model.json;../../runtime/server.py">
+      <Link>runtime/%(Filename)%(Extension)</Link><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="../../runtime/semantic_search/__init__.py;../../runtime/semantic_search/distribution.json;../../runtime/semantic_search/embedding.py;../../runtime/semantic_search/extract.py;../../runtime/semantic_search/manifest.py;../../runtime/semantic_search/media_readers.py;../../runtime/semantic_search/notices.py;../../runtime/semantic_search/ocr.py;../../runtime/semantic_search/office_readers.py;../../runtime/semantic_search/packages.py;../../runtime/semantic_search/paths.py;../../runtime/semantic_search/playback.py;../../runtime/semantic_search/processes.py;../../runtime/semantic_search/protocol.py;../../runtime/semantic_search/readers.py;../../runtime/semantic_search/requirements.cpu.lock.txt;../../runtime/semantic_search/requirements.cuda.lock.txt;../../runtime/semantic_search/setup.py;../../runtime/semantic_search/worker.py">
+      <Link>runtime/semantic_search/%(Filename)%(Extension)</Link><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="../../runtime/notices/pywinrt-3.2.1-MIT.txt;../../runtime/notices/tokenizers-0.23.3-Apache-2.0.txt">
+      <Link>runtime/notices/%(Filename)%(Extension)</Link><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
   <ItemGroup><Content Include="../../scripts/setup-multimodal.ps1;../../scripts/fetch-embeddinggemma2.py"><Link>scripts/%(Filename)%(Extension)</Link><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></Content></ItemGroup>
 </Project>

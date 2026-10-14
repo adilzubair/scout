@@ -37,6 +37,12 @@ void Test(string name, Action test)
 }
 void Assert(bool condition, string message = "Assertion failed") { if (!condition) throw new Exception(message); }
 void Throws<T>(Action action) where T : Exception { try { action(); } catch (T) { return; } throw new Exception("Expected " + typeof(T).Name); }
+if (args is ["--semantic-service-checks"])
+{
+    SemanticServiceChecks.Run(Test);
+    Console.WriteLine($"{total-failures.Count}/{total} scheduler checks passed.");
+    return failures.Count==0?0:1;
+}
 var now = new DateTimeOffset(2026, 9, 23, 12, 0, 0, TimeSpan.Zero);
 var empty = new Dictionary<string, LibraryItem>();
 ParityChecks.Run(Test);

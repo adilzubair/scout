@@ -87,10 +87,11 @@ static class SemanticServiceChecks
         test("Index quota pauses publication until settings increase the quota",()=>With(async f=>
         {
             var value=f.Enabled();value.Multimodal.IndexQuotaBytes=1;
-            await f.Metadata.ConfigureAsync(value);await Wait(()=>f.Service.Activity.Message.Contains("limit reached"));
+            await f.Metadata.ConfigureAsync(value);
+            await f.WaitForQuota(()=>f.Service.Activity.Message.Contains("limit reached"),"quota pause");
             Check(f.Service.Index!.Progress.Ready==0 && f.Service.Index.Progress.Pending==2);
             value.Multimodal.IndexQuotaBytes=2L*1024*1024*1024;await f.Metadata.ConfigureAsync(value);
-            await Wait(()=>f.Service.Activity.Progress?.Ready==2);
+            await f.WaitForQuota(()=>f.Service.Activity.Progress?.Ready==2,"quota increase");
         }));
         test("Hidden-file watcher changes revoke semantic rows without a full metadata scan",()=>With(async f=>
         {
@@ -246,6 +247,11 @@ static class SemanticServiceChecks
                 (text,token)=>{Interlocked.Increment(ref Queries);return Query(text,token);});
         }
         public ScoutSettings Enabled()=>new(){RecentItems=false,WindowsSearch=false,Multimodal=new(){Enabled=true,Folders=[Selected]}};
+        public async Task WaitForQuota(Func<bool> condition,string stage)
+        {
+            try{await Wait(condition);}
+            catch(TimeoutException error){throw new TimeoutException($"{stage}: {System.Text.Json.JsonSerializer.Serialize(Service.Activity)}; calls={Calls}; files={System.Text.Json.JsonSerializer.Serialize(Service.Index?.Files())}",error);}
+        }
         public void Dispose(){Metadata.Dispose();Host.Dispose();SemanticExtractor.DeleteJob(Path.GetDirectoryName(Root)!,Root);}
     }
 }

@@ -4,4 +4,7 @@
     <ProjectReference Include="../../src/Scout.Core/Scout.Core.csproj" />
     <ProjectReference Include="../../src/Scout.App/Scout.App.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <Content Include="../../runtime/test_extraction_sandbox_probe.py"><Link>runtime/test_extraction_sandbox_probe.py</Link><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory><CopyToPublishDirectory>Never</CopyToPublishDirectory></Content>
+  </ItemGroup>
 </Project>

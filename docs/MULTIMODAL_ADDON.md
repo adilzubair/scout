@@ -568,6 +568,38 @@ Model imports are checksum-verified. LibreOffice scripts/manifests remain in the
 repository only as historical development probes and are excluded from the base ZIP.
 Diagnostic files and screenshots stay under ignored `artifacts/diagnostics/`.
 
+The base publish uses an explicit 33-file production runtime list. Test helpers,
+authoring/evaluation scripts and historical Office renderer code stay outside the
+ZIP; the extraction isolation probe is copied only to test output. The build runs
+24 package contracts, checks the self-contained desktop runtime, compares shipped
+runtime/setup files with their sources and rejects private indexes, model weights,
+environments, linked entries and unexpected runtime files. ZIP creation uses `/`
+paths and validates every entry's name, length and SHA-256 before replacing the
+archive. A separate `Scout-win-x64.inventory.json` records the checked base files;
+it explicitly grants no optional dependency distribution approval.
+
+On 2026-10-15 the fresh 532-file payload and ZIP passed these integrity checks.
+The published executable passed the built-in WPF flow with isolated data, including
+search/selection, text evidence, coverage revocation, settings and screenshots.
+This run used the package working directory and did not load the repository's
+optional authored Office fixture directory. A separate offline run of the published
+runtime's readiness function passed all five input forms against the existing CPU
+development generation. Clean standard-account setup, update/removal, packaged
+all-format extraction/playback and hardware/quality gates remain open.
+
+The initial Release run had one quota scheduler timeout (306/307). With diagnostic
+state reporting added, the targeted 16 scheduler checks and the full 307-check
+rerun passed. No production quota change was made and the original timeout has no
+confirmed cause; retain it as an intermittent lifecycle issue for investigation.
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/test-package.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build.ps1 -Publish
+dotnet run --project tests/Scout.Tests -c Release --no-build -- --semantic-service-checks
+# Set SCOUT_DATA_DIR to a new isolated directory before running this UI flow.
+artifacts/Scout/Scout.exe --ui-smoke-test
+```
+
 Setup retains bounded, hash-verified package/interpreter notices and supplemental
 upstream license texts in `generations/<generation>/notices/`. Re-verification
 adds an immutable bundle and atomically updates `current.json`; it does not alter

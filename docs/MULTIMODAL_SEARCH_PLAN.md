@@ -1,7 +1,7 @@
 # Scout multimodal semantic search implementation plan
 
 Date: 2026-10-15. Branch: `feature/multimodal-semantic-search`.
-Status: implementation resumed on 2026-10-15 from checkpoint `6e666ca`.
+Status: implementation active; restart verification on 2026-10-15 follows checkpoint `fc3f8ea`.
 Retrieval, previews, OCR and format coverage are committed. The frozen evaluation
 foundation passes 307 Release checks; independent quality and release gates remain open.
 This plan is the implementation checklist; the add-on remains a
@@ -415,6 +415,21 @@ Keep all large or private evaluation outputs under ignored
 `artifacts/diagnostics/multimodal/` and model/runtime downloads outside Git.
 
 ## Next implementation task
+
+Restart milestone completed: the base has an explicit 33-file runtime allowlist,
+24 package contracts, a fresh self-contained ZIP and streamed verification of all
+532 published file hashes. The published executable passes isolated WPF checks;
+its source runtime passes offline CPU readiness for text, image, audio, video and
+joint audiovisual input using the existing development generation. This does not
+establish clean-account installation or independent retrieval quality.
+
+Next, continue packaged add-on install/update/interruption/removal and recovery
+checks, followed by the independent content-grounded evaluation corpus. The first
+full run timed out waiting for quota pause/resume (306/307); targeted scheduler
+checks (16/16) and the complete rerun (307/307) passed. Preserve this unresolved
+intermittent result and the improved timeout diagnostics for lifecycle work.
+Keep the physical 16 GB machine and native distribution obligations as explicit
+release gates; neither has been discharged by development-machine smoke tests.
 
 Distribution audit now retains 71 installed package notice inventories, interpreter
 terms and pinned supplemental OCR/tokenizer/model license texts. Eight notice and

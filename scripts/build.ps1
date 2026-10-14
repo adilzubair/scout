@@ -8,6 +8,7 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Build failed.' }
     & dotnet run --project tests/Scout.Tests/Scout.Tests.csproj --configuration Release --no-build --no-restore
     if ($LASTEXITCODE -ne 0) { throw 'Tests failed.' }
+    & (Join-Path $PSScriptRoot 'test-package.ps1')
     if ($Publish) {
         $artifactsDir = [System.IO.Path]::GetFullPath((Join-Path $scoutRoot 'artifacts'))
         $publishDir = [System.IO.Path]::GetFullPath((Join-Path $artifactsDir 'Scout'))
@@ -26,7 +27,9 @@ try {
         $scriptsDir = Join-Path $publishDir 'scripts'
         New-Item -ItemType Directory -Path $scriptsDir -Force | Out-Null
         Copy-Item -LiteralPath scripts/setup-laya.ps1 -Destination (Join-Path $scriptsDir 'setup-laya.ps1')
-        Compress-Archive -Path "$publishDir/*" -DestinationPath artifacts/Scout-win-x64.zip -Force
+        & (Join-Path $PSScriptRoot 'verify-package.ps1') -PublishedDirectory $publishDir
+        & (Join-Path $PSScriptRoot 'package-archive.ps1') -Directory $publishDir -Destination artifacts/Scout-win-x64.zip
+        & (Join-Path $PSScriptRoot 'verify-package.ps1') -PublishedDirectory $publishDir -Archive artifacts/Scout-win-x64.zip -Inventory artifacts/Scout-win-x64.inventory.json
         $checksum = (Get-FileHash artifacts/Scout-win-x64.zip -Algorithm SHA256).Hash.ToLowerInvariant()
         "$checksum  Scout-win-x64.zip" | Set-Content -LiteralPath artifacts/Scout-win-x64.zip.sha256
         Write-Output "Packaged artifacts/Scout-win-x64.zip ($checksum)"
