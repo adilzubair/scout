@@ -1,0 +1,14 @@
+# Full model: explicit media dependencies avoid unrelated ASR extras on Windows.
+sentence-transformers==6.1.0
+transformers==5.19.0
+torch==2.8.0
+torchvision==0.23.0
+torchaudio==2.8.0
+numpy==2.3.4
+Pillow==12.3.0
+av==19.0.1
+librosa==1.0.0
+soundfile==0.14.0
+psutil==7.2.2
+pypdf==6.20.1
+pypdfium2==5.14.0

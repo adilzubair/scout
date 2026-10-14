@@ -23,3 +23,23 @@ remain local and are not included in the Scout ZIP.
 - Microsoft.Data.Sqlite: https://github.com/dotnet/efcore
 - SQLitePCLRaw: https://github.com/ericsink/SQLitePCL.raw
 - SQLite: https://www.sqlite.org/copyright.html
+
+## Multimodal development runtime
+
+The experimental multimodal probe downloads the full Google EmbeddingGemma 2
+checkpoint separately (Apache-2.0), pinned by revision and artifact checksums in
+`runtime/embeddinggemma2_model.json`. Its isolated Python dependencies and
+development fixture tools retain their upstream licenses and package metadata.
+No model weights, native dependency environment or generated fixture media are
+included in Git or the base application package.
+
+PDF page rendering uses the pypdfium2 package and its bundled PDFium dependency.
+Media experiments use PyAV with bundled FFmpeg libraries; the probe records their
+actual build configuration and reported licenses. The portable LibreOffice
+research package is a separately downloaded, checksum-verified artifact whose
+automatic extraction has not passed the setup spike. Review the corresponding
+source, codec and notice requirements before selecting any of these native
+artifacts for product distribution.
+
+See [the multimodal runtime screen](MULTIMODAL_RUNTIME_SCREEN.md) for versions,
+measurements and remaining distribution work.

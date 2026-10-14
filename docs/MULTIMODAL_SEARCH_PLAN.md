@@ -1,7 +1,10 @@
 # Scout multimodal semantic search implementation plan
 
 Date: 2026-10-14. Branch: `feature/multimodal-semantic-search`.
-Status: planned; implementation milestones below are pending.
+Status: implementation started. The full-model runtime and content smoke probe
+are implemented and verified on CPU and CUDA. Milestone 1 remains open for
+Office layout rendering and automatic per-user renderer distribution. See
+[the runtime screen](MULTIMODAL_RUNTIME_SCREEN.md) for results and reproduction.
 
 Build an optional local content-search add-on using the full EmbeddingGemma 2
 model. The first release must search document, spreadsheet, code, image, audio,
@@ -83,7 +86,8 @@ a separate lock file. Do not upgrade Laya's environment in place.
 
 Proposed extraction stack to validate in milestone 1:
 
-- PDF text through pypdf, with reusable Windows PDF rendering for page images.
+- PDF text through pypdf, with page rendering initially implemented through
+  pypdfium2 in the isolated worker; evaluate reuse of Windows rendering later.
   pypdf extracts text but does not supply OCR or page rendering.
   [pypdf documentation](https://pypdf.readthedocs.io/en/stable/).
 - Dedicated Open XML/OpenDocument readers for paragraphs, slides, formulas,
