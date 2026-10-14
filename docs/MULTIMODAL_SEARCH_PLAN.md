@@ -3,7 +3,7 @@
 Date: 2026-10-15. Branch: `feature/multimodal-semantic-search`.
 Status: implementation resumed on 2026-10-15 from checkpoint `6e666ca`.
 Retrieval, previews, OCR and format coverage are committed. The frozen evaluation
-foundation passes 300 Release checks; independent quality and release gates remain open.
+foundation passes 304 Release checks; independent quality and release gates remain open.
 This plan is the implementation checklist; the add-on remains a
 preview until the release gates below pass. The full-model runtime and content smoke probe
 are implemented and verified on CPU and CUDA. On 2026-10-14 the user directed
@@ -419,10 +419,13 @@ Intake and content-review export foundations are complete. Fourteen offline inta
 contracts pass; the production sandbox exports verified media without inference or
 label approval. Direct private-interpreter startup passed parent/child isolation,
 venv/package checks and the eight-source export after two launcher-path timeouts.
-The first natural audio exposed 147 tiny windows in an 88-second recording. Fix
-that fragmentation with actual sandbox regression evidence before using its
-prepared windows in quality evaluation. Continue content/license/group review
-without running retrieval predictions.
+The first natural audio exposed 147 tiny windows in an 88-second recording.
+Reported timing alignment up to 20 ms now yields nine overlapping windows with
+exactly preserved reconstructed PCM16 samples. Seventeen media contracts and the
+same real sandboxed source pass; larger gaps and accumulated drift remain visible.
+Seven photos have visual observations linked to source/asset hashes; auditory,
+license and related-group review are still pending. Continue these reviews and
+the remaining natural-media intake without running retrieval predictions.
 The current discovery has 92 public candidates; 71 pass initial license-label,
 container, size and original-checksum filters. These are unreviewed candidates,
 not approved licenses, source groups or content labels. The first transfer stopped

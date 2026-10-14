@@ -453,9 +453,19 @@ Fixed body-free parser progress markers distinguish startup from reader work and
 are removed with the owned job.
 
 The eight-source review exported seven photos and one 88-second audio file without
-inference. The audio produced 147 windows, exposing a timeline-fragmentation issue
-that remains to be corrected and regression-tested before quality evaluation.
-Prepared outputs still require actual content, license, group and split review.
+inference. The audio initially produced 147 windows due to alternating approximately
+10 ms PTS deviations. The reader now aligns deviations up to 20 ms against its
+sample counter and reports `audio_timestamp_adjusted` as partial coverage. It
+inserts/drops no samples and preserves larger gaps; each incoming timestamp is
+checked against the counter so drift cannot accumulate without triggering a gap.
+The same sandboxed source now produces nine overlapping windows. Reconstructing
+the exported PCM16 stream, after removing configured overlap, preserves all
+1,414,003 samples byte for byte against the prior export. Seventeen media contracts
+cover bounded adjustment, larger gaps, accumulated drift and variable decoded
+frame sizes alongside the existing codec, duration and output-limit checks.
+Seven prepared photos were visually inspected before inference; auditory content,
+license, related-group and split review remain incomplete. These are engineering
+and source-review results, not a quality holdout.
 
 Developer verification (use an isolated add-on root and data directory):
 

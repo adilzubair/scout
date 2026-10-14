@@ -134,7 +134,13 @@ class AudioWindows:
         if self.start is None and start < self.last_end: raise ValueError('audio_timestamp_regression')
         if self.start is not None:
             expected = self.start+len(self.samples)
-            if abs(start-expected) <= tolerance_samples: start = expected
+            delta=abs(start-expected)
+            # Sample counters avoid tiny fragments from bounded decoder/resampler
+            # PTS jitter. This never inserts/drops samples or accumulates unbounded
+            # drift: every incoming PTS must remain within 20 ms of that counter.
+            if delta <= max(tolerance_samples,round(.020*RATE)):
+                if delta>tolerance_samples:self.writer.reasons.add('audio_timestamp_adjusted')
+                start = expected
             elif start != expected:
                 if start < self.last_end: raise ValueError('audio_timestamp_regression')
                 self.writer.reasons.add('audio_timeline_gap')
