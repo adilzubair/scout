@@ -2,10 +2,8 @@
 
 import argparse
 import json
-import os
 from pathlib import Path
 import shutil
-import subprocess
 import sys
 import time
 
@@ -13,32 +11,15 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'runtime'))
 from semantic_search.embedding import local_file
 from semantic_search.manifest import sha256
+from semantic_search.office import FORMATS, OfficeRenderer
 
 
 def find_renderer(explicit=None):
     if explicit:
         return explicit.resolve(strict=True)
-    candidates = [shutil.which('soffice.exe')]
-    for base in ('ProgramFiles', 'ProgramFiles(x86)'):
-        if os.environ.get(base):
-            candidates.append(str(Path(os.environ[base]) / 'LibreOffice/program/soffice.exe'))
-    return next((Path(p) for p in candidates if p and Path(p).is_file()), None)
-
-
-def stop_tree(process):
-    import psutil
-    try:
-        descendants = psutil.Process(process.pid).children(recursive=True)
-        for child in reversed(descendants):
-            try:
-                child.kill()
-            except psutil.NoSuchProcess:
-                pass
-    except psutil.NoSuchProcess:
-        pass
-    if process.poll() is None:
-        process.kill()
-    process.communicate()
+    spec = json.loads((ROOT / 'runtime/office_renderer.json').read_text(encoding='utf-8'))
+    candidate = ROOT / '.runtime/semantic-search/office' / ('libreoffice-' + spec['version']) / spec['executable']
+    return candidate.resolve() if candidate.is_file() else None
 
 
 def main():
@@ -46,6 +27,8 @@ def main():
     parser.add_argument('--fixtures', type=Path, required=True)
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--soffice', type=Path)
+    parser.add_argument('--model', type=Path, help='Also embed actual rendered pages offline')
+    parser.add_argument('--device', choices=['cpu', 'cuda'], default='cpu')
     args = parser.parse_args()
     if args.output.exists():
         raise FileExistsError('Refusing to overwrite a renderer report')
@@ -56,45 +39,65 @@ def main():
                   renderer='LibreOffice', status='unavailable', cases=[])
     if renderer:
         from pypdf import PdfReader
-        import pypdfium2 as pdfium
         work = args.output.resolve().parent / (args.output.stem + '-office')
         work.mkdir(parents=True, exist_ok=False)
-        profile = work / 'profile'
-        profile.mkdir()
-        report.update(status='tested', executableSha256=sha256(renderer))
+        started = time.perf_counter()
+        office = OfficeRenderer(renderer.parent.parent)
+        report.update(status='tested', executableSha256=sha256(renderer),
+                      rendererVersion=office.spec['version'], integrityCheckMs=(time.perf_counter()-started)*1000)
+        embedder = None
+        if args.model:
+            from semantic_search.embedding import FullEmbedder
+            embedder = FullEmbedder(args.model, device=args.device, threads=4)
+        expected_count = sum(Path(i['file']).suffix.lower() in FORMATS for i in fixture['items'])
         for item in fixture['items']:
             path = local_file(root / item['file'], root)
-            if path.suffix.lower() not in ('.docx', '.pptx', '.xlsx'):
+            if path.suffix.lower() not in FORMATS:
                 continue
             if sha256(path) != fixture['files'][item['file']]['sha256']:
                 raise ValueError('Office fixture checksum mismatch')
             start = time.perf_counter()
-            process = subprocess.Popen([str(renderer), '-env:UserInstallation=' + profile.as_uri(),
-                '--headless', '--norestore', '--nodefault', '--nofirststartwizard',
-                '--convert-to', 'pdf', '--outdir', str(work), str(path)],
-                stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
             row = dict(id=item['id'])
             try:
-                stdout, stderr = process.communicate(timeout=60)
-                converted = work / (path.stem + '.pdf')
-                if process.returncode != 0 or not converted.is_file():
-                    raise ValueError('Conversion failed: ' + (stdout + stderr).decode(errors='replace')[-1000:])
-                with pdfium.PdfDocument(converted) as document:
-                    page = document[0]
-                    bitmap = page.render(scale=1)
-                    try:
-                        bitmap.to_pil().save(work / (path.stem + '.png'))
-                    finally:
-                        bitmap.close()
-                        page.close()
-                row.update(status='ok', pages=len(PdfReader(converted).pages),
-                           conversionMs=(time.perf_counter()-start)*1000, pdfSha256=sha256(converted))
+                with office.render(path, root, work) as result:
+                    converted = work / (item['id'] + '.pdf')
+                    shutil.copyfile(result['pdf'], converted)
+                    text = ' '.join(' '.join(p.extract_text().split()) for p in PdfReader(converted).pages)
+                    if any(expected not in text for expected in item.get('expectedText', [])):
+                        raise ValueError('Expected authored content missing from rendered PDF')
+                    if result['partial'] or result['totalPages'] != item.get('expectedPages', result['totalPages']):
+                        raise ValueError('Unexpected authored page coverage')
+                    conversion_ms = (time.perf_counter()-start)*1000
+                    embeddings = []
+                    for page in result['pages']:
+                        image_path = work / (item['id'] + f'-page-{page["page"]}.png')
+                        shutil.copyfile(page['image'], image_path)
+                        if page['page'] == 1 and item.get('assertChartPixels'):
+                            from PIL import Image
+                            import numpy as np
+                            with Image.open(image_path) as image:
+                                pixels = np.asarray(image.convert('RGB'), dtype=np.int16)
+                            # Fixture-specific: a title or OLE placeholder cannot satisfy a chart.
+                            region = pixels[pixels.shape[0]//3:, :, :]
+                            chromatic = region.max(axis=-1) - region.min(axis=-1) > 80
+                            if float(chromatic.mean()) < 0.02:
+                                raise ValueError('Authored chart is missing from rendered page')
+                            row['chartPixelFraction'] = float(chromatic.mean())
+                        if embedder:
+                            from PIL import Image
+                            import numpy as np
+                            with Image.open(image_path) as image:
+                                embedding_start = time.perf_counter()
+                                vector, tokens = embedder.embed({'image': image.convert('RGB')})
+                            embeddings.append(dict(page=page['page'], dimensions=len(vector),
+                                tokens=tokens, norm=float(np.linalg.norm(vector)), embeddingMs=(time.perf_counter()-embedding_start)*1000))
+                    row.update(status='ok', pages=result['totalPages'], partial=result['partial'],
+                               conversionMs=conversion_ms, pdfSha256=sha256(converted), embeddings=embeddings,
+                               contentAssertions=len(item.get('expectedText', [])))
             except Exception as error:
-                stop_tree(process)
                 row.update(status='failed', error=str(error))
             report['cases'].append(row)
-        if any(row['status'] != 'ok' for row in report['cases']) or len(report['cases']) != 3:
+        if any(row['status'] != 'ok' for row in report['cases']) or not expected_count or len(report['cases']) != expected_count:
             report['status'] = 'failed'
     args.output.parent.mkdir(parents=True, exist_ok=True)
     with args.output.open('x', encoding='utf-8') as stream:

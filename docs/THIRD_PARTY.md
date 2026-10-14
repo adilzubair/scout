@@ -35,11 +35,23 @@ included in Git or the base application package.
 
 PDF page rendering uses the pypdfium2 package and its bundled PDFium dependency.
 Media experiments use PyAV with bundled FFmpeg libraries; the probe records their
-actual build configuration and reported licenses. The portable LibreOffice
-research package is a separately downloaded, checksum-verified artifact whose
-automatic extraction has not passed the setup spike. Review the corresponding
-source, codec and notice requirements before selecting any of these native
-artifacts for product distribution.
+actual build configuration and reported licenses.
+
+The Office compatibility spike separately downloads the official LibreOffice
+26.8.1 Windows x64 MSI, pinned by package length and SHA-256 in
+`runtime/office_renderer.json`. Read-only extraction retains the package's
+`LICENSE.html`, `NOTICE`, and component-specific notices. LibreOffice identifies
+MPL-2.0 as its primary license and includes components under other licenses;
+the corresponding source release location is recorded in the manifest.
+The failed PortableApps 26.2.4 experiment is historical and is not used by the
+successful rendering path. Neither renderer package nor extracted runtime is
+included in Git or Scout's base application package. Review the exact component
+licenses, corresponding source and notice delivery before shipping the add-on.
+[LibreOffice licensing](https://www.libreoffice.org/licenses/),
+[26.8.1 source releases](https://download.documentfoundation.org/libreoffice/src/26.8.1/).
+
+The dependency locks and renderer manifest establish development compatibility;
+they do not complete the distribution review for native/codec dependencies.
 
 See [the multimodal runtime screen](MULTIMODAL_RUNTIME_SCREEN.md) for versions,
 measurements and remaining distribution work.

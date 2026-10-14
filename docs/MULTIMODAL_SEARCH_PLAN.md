@@ -2,8 +2,12 @@
 
 Date: 2026-10-14. Branch: `feature/multimodal-semantic-search`.
 Status: implementation started. The full-model runtime and content smoke probe
-are implemented and verified on CPU and CUDA. Milestone 1 remains open for
-Office layout rendering and automatic per-user renderer distribution. See
+are implemented and verified on CPU and CUDA. The Office compatibility spike
+now passes DOCX/ODT, PPTX/ODP and XLSX/ODS conversion from a privately extracted
+official Windows package, including native presentation chart rendering.
+The next slice is the independent add-on setup, host and settings. Product
+installation, renderer hardening, distribution review and release evaluations
+remain required. See
 [the runtime screen](MULTIMODAL_RUNTIME_SCREEN.md) for results and reproduction.
 
 Build an optional local content-search add-on using the full EmbeddingGemma 2
@@ -100,6 +104,13 @@ Proposed extraction stack to validate in milestone 1:
   cannot be assumed to fit Scout's installation flow. Resolve an appropriate
   distribution or alternative renderer in the initial spike.
   [LibreOffice system requirements](https://www.libreoffice.org/system-requirements/).
+  The spike now extracts the pinned 26.8.1 MSI through read-only data APIs and
+  embedded cabinets, without executing installer actions. It validates all
+  extracted application files before conversion. This resolves development
+  runtime viability; it is not a completed standard-account installation test.
+  Formula-bearing spreadsheets and embedded ODF objects currently receive an
+  unsupported status. Cached-value render inputs and additional chart/layout
+  fixtures remain part of the document-reader milestone.
 - Windows image decoding and local OCR where available; define missing OCR
   language handling. Vision embeddings remain usable without OCR.
 - A pinned FFmpeg/ffprobe build for bounded audio/video decoding. Record the

@@ -8,10 +8,11 @@ manifest, separate dependency locks, verified downloads, an offline inference
 adapter, fixture generation and benchmark tools. Scout's user-facing semantic
 add-on, durable content index and retrieval policy are subsequent milestones.
 
-Milestone 1 remains open for complete Office layout rendering and automatic
-per-user renderer distribution. The probe can read DOCX paragraphs, XLSX cell
-values and an embedded PPTX picture; those readers do not establish faithful
-document, chart or spreadsheet layout coverage.
+The Office spike now verifies DOCX, ODT, PPTX, ODP, XLSX and ODS conversion from
+an extracted official Windows package. The layout probe embeds rendered pages,
+including a native PPTX chart, rather than relying on an embedded picture.
+This resolves the renderer compatibility dependency for add-on host work.
+Broader layout fidelity and production installation/hardening remain required.
 
 ## Implemented runtime
 
@@ -111,13 +112,72 @@ and reached its 120-second timeout. Its process was stopped and no child helper
 remained. That invocation is unsuitable for Scout's automatic setup.
 [Publisher package details](https://portableapps.com/apps/office/libreoffice_portable).
 
-`scripts/fetch-office-probe.ps1` therefore downloads and verifies only; it does
-not execute the portable installer. `scripts/probe-office-renderer.py` can test
-an explicitly supplied renderer on the authored DOCX, PPTX and XLSX fixtures.
-It reports unavailability with exit code 2 when no renderer exists. The next
-renderer experiment should validate an upstream package extraction method or
-an alternative isolated renderer without a system installation. Full Office
-layout support remains a release requirement.
+The successful replacement is the official LibreOffice 26.8.1 Windows x64 MSI,
+pinned in `runtime/office_renderer.json`. The package is 374,870,016 bytes
+(357.5 MiB) with SHA-256
+`c6298b10cfa1748bcbedad94c62ce771e240e5021bfd6d7a967cd571b04b5312`.
+The metadata comes from the publisher's
+[metalink](https://download.documentfoundation.org/libreoffice/stable/26.8.1/win/x86_64/LibreOffice_26.8.1_Win_x86-64.msi.metalink).
+
+`scripts/fetch-office-renderer.py` opens the verified MSI in read-only mode,
+exports its embedded cabinets, and uses Windows `expand.exe` to extract data.
+It reconstructs the application directory through the MSI Directory, Component
+and File tables, validates file lengths and creates a complete SHA-256 inventory.
+It never invokes Windows Installer installation actions, registers components,
+or runs the PortableApps installer. The tested extraction took 129.7 seconds
+for 19,271 application files. The resulting directory is approximately 1.42 GiB,
+additional to Python/model storage; the retained MSI and cabinet/payload staging
+require additional temporary disk space. This is a development workspace setup,
+not yet Scout's resumable installer or a clean standard-account deployment test.
+[Microsoft read-only MSI API](https://learn.microsoft.com/en-us/windows/win32/api/msiquery/nf-msiquery-msiopendatabasew).
+
+`runtime/semantic_search/office.py` verifies that inventory once at worker
+startup, takes a bounded source snapshot under a fixed filename, and converts
+with a private profile using `soffice.com`. Profiles disable macro execution and
+the Python macro runtime. ZIP/XML preflight rejects excessive expansion,
+entities, external image/data links, DDE fields and unsupported embedded objects.
+Embedded XLSX chart data is checked recursively. Ordinary hyperlinks remain
+allowed. Formula-bearing spreadsheets are explicitly deferred until a
+cached-value-only render input is implemented; this helper must not recalculate
+workbook formulas. These cases remain discoverable through ordinary search.
+[LibreOffice command-line parameters](https://help.libreoffice.org/latest/en-US/text/shared/guide/start_parameters.html).
+
+Conversion has a deadline and cancellation; failures terminate the owned process
+tree. Successful rendering supplies bounded page rasters with PDF page locators
+and explicit partial coverage. Context exit removes the owned snapshot/profile
+directory, and a changed source is not published. Spreadsheet PDF pages are
+layout locators; sheet/cell evidence will come from dedicated structured readers.
+This helper is not an OS security sandbox. Network denial, Windows job limits,
+crash/orphan cleanup and host resource accounting remain production work before
+using it on an opted-in personal library.
+
+The authored layout pack adds two-page DOCX/ODT notes, XLSX/ODS numeric tables,
+a two-slide PPTX with a native chart, and an ODP with a chart image. All six files
+pass expected page counts and 16 combined text assertions. Both chart pages
+pass fixture-specific color/pixel checks and were inspected visually. All ten
+rendered pages produce normalized 768-dimensional full-model embeddings on both
+CPU and CUDA.
+CPU conversion plus rasterization took 7.59–10.07 seconds per file; page
+embedding took 3.20–3.67 seconds. All-file renderer verification took 10.02
+seconds before conversion. CUDA page embedding took 111–150 ms after the first
+875 ms invocation. Each conversion uses a fresh profile. These small
+fixtures do not establish font parity or fidelity over arbitrary Office files.
+
+The visual check initially caught an OLE placeholder in place of the native
+chart, even though PDF text and embedding checks passed. LibreOffice's broad
+`DisableActiveContent` setting caused it. The corrected path retains macro
+blocking and package preflight while permitting validated chart data; the added
+chart assertion prevents that failure from passing the screen again. ODF
+embedded chart objects, formula caches and complex layouts need further fixtures.
+
+Fourteen Office contracts cover path escapes, MSI layout/collisions, package
+integrity, nested external data, formulas, expansion, deadlines, cancellation,
+source changes, partial pages and temporary cleanup. The seven earlier
+multimodal contracts still pass, and Scout's Release build again passes zero
+warnings and all 223 C# checks. Reports and page previews stay in ignored
+`artifacts/diagnostics/multimodal/office-layout-cpu-v2*` and
+`office-layout-cuda-v2*`; the original portable
+experiment remains as historical evidence.
 
 The PyAV wheel exposes FFmpeg build configuration and reports LGPL version 3
 or later for its libraries. Its configuration also names optional codec
@@ -142,7 +202,10 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/setup-semantic-probe
 .runtime/semantic-search/.venv/Scripts/python.exe scripts/probe-multimodal.py --fixtures artifacts/diagnostics/multimodal/new-fixtures/fixtures.json --device cuda --output artifacts/diagnostics/multimodal/new-cuda.json
 .runtime/semantic-search/.venv/Scripts/python.exe runtime/test_multimodal.py
 .runtime/semantic-search/.venv/Scripts/python.exe runtime/test_multimodal_inference.py --model .runtime/semantic-search/model --device cuda
-.runtime/semantic-search/.venv/Scripts/python.exe scripts/probe-office-renderer.py --fixtures artifacts/diagnostics/multimodal/new-fixtures/fixtures.json --soffice C:/Path/To/soffice.exe --output artifacts/diagnostics/multimodal/new-office.json
+.runtime/semantic-search/.venv/Scripts/python.exe scripts/fetch-office-renderer.py
+.runtime/semantic-search/.venv/Scripts/python.exe scripts/build-office-fixtures.py --output artifacts/diagnostics/multimodal/new-office-fixtures
+.runtime/semantic-search/.venv/Scripts/python.exe scripts/probe-office-renderer.py --fixtures artifacts/diagnostics/multimodal/new-office-fixtures/fixtures.json --output artifacts/diagnostics/multimodal/new-office.json --model .runtime/semantic-search/model --device cuda
+.runtime/semantic-search/.venv/Scripts/python.exe runtime/test_office_renderer.py
 ```
 
 For a separate CPU environment, create another Python 3.12 venv, sync
@@ -153,10 +216,11 @@ PyTorch sources. Use the same verified model and fixture directory.
 
 ## Next implementation work
 
-Resolve Office conversion and its per-user deployment, verify codec/source
-distribution details, and measure the full pipeline on a 16 GB CPU laptop.
-Then implement the independent add-on host, consent/settings, durable segment
-index and query integration. CPU visual indexing must stay in the background;
+Implement the independent add-on setup/host and consent/settings, then the
+durable segment index and query integration. Include renderer process/network
+limits and standard-account setup/update/removal checks. Verify codec/source
+distribution details and measure the full pipeline on a 16 GB CPU laptop before
+release. CPU visual indexing must stay in the background;
 query embeddings are fast enough in this screen to justify testing an
 interactive retrieval path, while the memory and first-load costs need further
 optimization. Keep all modality support in the release scope.
