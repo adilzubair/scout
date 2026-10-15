@@ -148,6 +148,60 @@ Actual offline replay reproduced all source bytes, captions, selection and attri
 evidence, with only batch timestamps changing. These checks establish reproducible
 candidate preparation, rather than retrieval quality or license clearance.
 
+## Unopened natural-video review
+
+A bounded retry of the retained Commons discovery obtained seven new originals
+(126,327,527 bytes) before another provider rate limit stopped transfer. The
+verified seven-source subset was published offline; the failed transfer is kept
+and the remaining three selections were not retried. A fresh offline intake
+reproduces all seven sources and normalized provenance. No candidate predictions
+were opened.
+
+The packaged production AppContainer review prepares all seven into 82 segments,
+including 27 joint audio/video segments and 22 separate audio segments. All 505
+prepared-asset hashes, original byte counts/SHA1/SHA256, WAV windows, frame offsets
+and owned cleanup pass verification. Eleven hash-linked contact sheets show all
+223 distinct sampled frames. One source exports no audio; three retain explicit
+`joint_av_audio_incomplete` flags and the steam-train source retains
+`audio_peak_clipped`. All retain `video_frames_sampled`. This verifies bounded
+preparation, not complete temporal or auditory content coverage.
+
+Visual inspection supports nine draft queries from seven originals and seven
+provisional creator groups. Multiple queries about the same train clip are related
+tasks. A title mentioning waves accompanies prominent boat/person/bag content;
+"Train Journey" shows nighttime road traffic in the sampled frames. Draft queries
+use visible content rather than inferring claims from those titles. Sampling does
+not prove absence, and these observations contain no approved auditory labels,
+negative tasks, exact event boundaries or splits.
+
+`scripts/capture-commons-attribution.py` records current
+[file metadata](https://www.mediawiki.org/wiki/API:Imageinfo) and
+[page revisions](https://www.mediawiki.org/wiki/API:Revisions) for an existing
+verified intake. It retains raw publisher fields/wikitext as JSON, original/page
+identity, creator links and snapshot hashes without executing HTML or following
+creator URLs. Requests use at most ten pages, with spacing between batches and
+the existing bounded retry policy. Completed snapshots survive a later request
+failure. Source checksums are rechecked before and after capture. Altered inputs,
+published summaries, duplicate identities and approval flags cannot silently pass
+offline verification. Ten new offline contracts and fourteen intake contracts
+pass.
+
+The seven current artist/license-label/original-checksum comparisons match. These
+are metadata matches, not license clearance: creator aliases, original-source
+rights, derivatives and cross-corpus grouping still need review. All labels remain
+unapproved and unsplit. Capture and then verify without network or rewrites:
+
+```powershell
+& .runtime/semantic-search/cpu-venv/Scripts/python.exe scripts/capture-commons-attribution.py --intake artifacts/diagnostics/multimodal/natural-video-pool-v1/intake.json --output artifacts/diagnostics/multimodal/natural-video-attribution-v1
+& .runtime/semantic-search/cpu-venv/Scripts/python.exe scripts/capture-commons-attribution.py --intake artifacts/diagnostics/multimodal/natural-video-pool-v1/intake.json --output artifacts/diagnostics/multimodal/natural-video-attribution-v1 --existing-only
+```
+
+Sources, contacts, snapshots and draft queries remain under ignored diagnostics.
+No source media is added to the application or physical-PC bundle. The 400-task
+seven-family quality/abstention holdout, audio listening/annotation approval and
+the existing physical hardware, UI/concurrency, lifecycle and distribution gates
+remain open. No model, threshold or protocol pins changed.
+
 ## Unopened document and Office candidates
 
 `scripts/intake-zenodo-content.py` intakes an explicit file selection from pinned

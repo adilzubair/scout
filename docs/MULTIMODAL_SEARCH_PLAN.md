@@ -856,3 +856,25 @@ The refreshed hardware ZIP contains the exact tested `bcfec8d` product/driver,
 Its SHA-256 is `772f55dae67449c88204b4f82f5403e0a7132226f22b6b0f99864e610d2c752b`.
 The user will run it on the physical PC later. Quality/abstention, broader resource
 and lifecycle evidence, and distribution clearance remain release requirements.
+
+The natural-video quality intake adds seven unchanged originals (126,327,527
+bytes) from the prior Commons discovery. Transfer stopped at another provider
+limit; the verified subset and a fresh offline replay preserve source/provenance
+bytes, and the remaining three transfers were not retried. Production no-model
+review yields 82 segments, including 27 joint AV and 22 separate audio segments.
+All 505 prepared assets and source hashes/window bounds/cleanup verify. Eleven
+contact sheets expose 223 sampled frames, now inspected. Nine visual draft queries
+cover seven originals/provisional creator groups; multiple train queries are
+related tasks. Titles alone were insufficient for boat and nighttime-traffic
+content. No auditory labels, absence claims, exact event boundaries or splits
+have been approved.
+
+A current Commons attribution capture retains full publisher metadata/page
+revisions and creator links, uses bounded/resumable requests and verifies offline
+without rewriting evidence. Ten new contracts and fourteen intake contracts pass;
+seven current original-checksum/artist/license-label comparisons match. These
+matches do not clear original-source rights or aliases/event/derivative grouping.
+No model predictions were opened on this pool. Next complete auditory content and
+cross-corpus rights/group review, supported negatives and the independent 400-task
+holdout; keep the physical 16 GB, WPF/Laya/concurrency, lifecycle and distribution
+gates open. Production code and the tested `bcfec8d` hardware ZIP are unchanged.
