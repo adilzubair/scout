@@ -155,19 +155,20 @@ static class MultimodalHardwareChecks
         Write(Path.Combine(root,phase+"-resources.json"),result);
         Check(child.Process.ExitCode==0,"Hardware phase failed: "+phase+"; retain all logs.");return result;
     }
-    public static async Task<int> Child(string phase,string addon,string fixtures,string root)
+    public static async Task<int> Child(string phase,string addon,string fixtures,string root,string device="cpu")
     {
         try
         {
+            Check(device is "cpu" or "cuda" && (phase=="validate" || device=="cpu"),"Unsupported hardware device/phase.");
             if(phase=="install")
             {
                 using var deadline=new CancellationTokenSource(TimeSpan.FromMinutes(30));
                 await MultimodalSetup.InstallAsync("cpu",new Progress(),deadline.Token,addon);return 0;
             }
-            var installed=MultimodalSetup.Find(addon)??throw new IOException("Missing verified CPU add-on.");Check(installed.Device=="cpu","Hardware workload requires CPU mode.");
+            var installed=MultimodalSetup.Find(addon)??throw new IOException("Missing verified add-on.");Check(installed.Device==device,"Hardware workload device does not match the installation.");
             if(phase=="scale")return await MultimodalScaleBenchmark.Run(addon,Path.Combine(root,"scale"),[100000],2L*1024*1024*1024);
             Check(phase=="validate","Unknown hardware phase.");
-            using var host=new MultimodalHost(addon);await host.ConfigureAsync(new(){Enabled=true,Device="cpu",CpuThreads=4});using var active=host.KeepIndexingActive();
+            using var host=new MultimodalHost(addon);await host.ConfigureAsync(new(){Enabled=true,Device=device,CpuThreads=4});using var active=host.KeepIndexingActive();
             using var deadlineAll=new CancellationTokenSource(TimeSpan.FromMinutes(20));var token=deadlineAll.Token;
             var cold=Stopwatch.StartNew();Check((await host.QueryAsync("hardware readiness",token)).Vector.Length==768,"Cold query failed.");cold.Stop();
             var scope=new SemanticScope(true,[fixtures],[],MultimodalSettings.ContentTypes,installed.Revision,"hardware-reader").Normalize();
@@ -186,7 +187,7 @@ static class MultimodalHardwareChecks
             var evidence=new SemanticEvidence("hardware",scene.CandidateId,scene.Revision,scene.Path,scene.Family,new("time"){StartSeconds=.5,EndSeconds=2.5},"Authored clip",[]);
             await using(var clip=await SemanticPlayback.PrepareAsync(addon,installed,evidence,()=>scope,token))Check(File.Exists(clip.Path),"Missing bounded video preview.");
             Write(Path.Combine(root,"validation.json"),new{schemaVersion=1,coldProcessFirstQueryMs=cold.Elapsed.TotalMilliseconds,under20Seconds=cold.Elapsed.TotalSeconds<=20,
-                coldDefinition="new model process; OS filesystem cache was not flushed",cpuThreads=4,laya="off",families,files=results,videoPreviewPassed=true,
+                coldDefinition="new model process; OS filesystem cache was not flushed",device,cpuThreads=4,laya="off",families,files=results,videoPreviewPassed=true,
                 qualityApproval=false,releaseReady=false});return 0;
         }
         catch(Exception error){Console.Error.WriteLine(error);return 1;}

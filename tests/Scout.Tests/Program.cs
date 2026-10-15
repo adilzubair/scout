@@ -24,6 +24,9 @@ if (args.Length == 5 && args[0] == "--multimodal-maintenance") return await Mult
 if (args.Length == 4 && args[0] == "--maintenance-child") return await MultimodalMaintenanceLifecycleChecks.Child(args[1],args[2],args[3]);
 if (args.Length == 5 && args[0] == "--multimodal-upgrade") return await MultimodalUpgradeChecks.Run(args[1],args[2],args[3],args[4]);
 if (args.Length == 4 && args[0] == "--upgrade-child") return await MultimodalUpgradeChecks.Child(args[1],args[2],args[3]);
+if (args.Length == 5 && args[0] == "--multimodal-device-upgrade") return await MultimodalDeviceUpgradeChecks.Run(args[1],args[2],args[3],args[4]);
+if (args.Length == 4 && args[0] == "--device-upgrade-child") return await MultimodalDeviceUpgradeChecks.Child(args[1],args[2],args[3]);
+if (args.Length == 5 && args[0] == "--device-content-child") return await MultimodalDeviceUpgradeChecks.Content(args[1],args[2],args[3],args[4]);
 if (args.Length == 3 && args[0] == "--fresh-setup-remove") return await FreshSetupChecks.Run(args[1],args[2],remove:true);
 if (args.Length == 3 && args[0] == "--fresh-setup-retry") return await FreshSetupChecks.Run(args[1],args[2],true);
 if (args.Length == 4 && args[0] == "--fresh-setup-child" && args[3] is "fresh" or "retry" or "fresh-remove") return await FreshSetupChecks.Child(args[1],args[2],args[3]=="retry",args[3]=="fresh-remove");

@@ -76,12 +76,23 @@ Developer validation commands (outputs and generated media stay ignored):
 python scripts/build-multimodal-resource-fixtures.py --baseline <baseline-bundle/fixtures> --tokenizer <verified-model/tokenizer.json> --output <new-resource-fixture-folder>
 dotnet run --project tests/Scout.Tests -c Release --no-build -- --hardware-bundle artifacts/Scout <new-bundle-folder> <resource-fixture-folder>
 dotnet run --project tests/Scout.Tests -c Release --no-build -- --multimodal-startup artifacts/Scout <verified-addon> <output-folder>
+dotnet run --project tests/Scout.Tests -c Release --no-build -- --multimodal-device-upgrade artifacts/Scout <passed-retained-fresh-case> <resource-bundle/fixtures> <output-parent>
 ```
 
 The resource builder verifies the baseline hashes and pinned tokenizer, exact
 reader token budget and decoded frame/sample counts. Bundle creation verifies
 the additional files against that manifest. The portable workflow runs three
 cold hosts before extraction and scale; it preserves failed target flags as data.
+
+The device-upgrade harness requires a compatible NVIDIA GPU, an owned retained
+fresh CPU installation and the pinned 21-file resource bundle. It downloads the
+pinned CUDA dependencies, injects a native-audit failure into a private package
+copy, checks CPU fallback, then retries offline and runs all seven content families
+and video preview on both devices. It tests CUDA reactivation and restores the
+original CPU marker, comparing every original CPU environment/model file and the
+ordinary database/source. Its 12 GiB free-space check is a test reserve, not a
+measured product minimum. This exercises CPU/CUDA dependency builds; it does not
+establish same-device version upgrades, independent quality or release approval.
 
 Scout now has an independent setup entry point, authenticated embedding worker,
 Windows process lifetime, and Multimodal settings page. The preview installs and

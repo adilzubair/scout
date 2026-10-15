@@ -937,3 +937,30 @@ complete actual changed-dependency/device upgrade, remaining account/volume and
 parser lifecycle checks, independent content-grounded quality/abstention and
 WPF/Laya/concurrency validation. Distribution clearance remains open; this package
 is a validation preview, and release readiness is still false.
+
+Actual CPU/CUDA dependency switching now passes using the exact published
+`317b288` product and a dedicated validation driver. The retained fresh CPU
+installation upgrades Torch/torchaudio from `2.8.0+cpu` to `2.8.0+cu128` and
+torchvision from `0.23.0+cpu` to `0.23.0+cu128`. The remaining package versions
+stay pinned. All encoders verify on the RTX 5060 Laptop GPU before an intentionally
+incorrect native-audit hash rejects publication in the private probe. The CPU
+marker survives, and actual CPU query/parsing still works. Restoring the original
+audit allows offline CUDA retry, query/parsing and model reuse. Both devices then
+pass the same 21 pinned files, seven families and video preview. Offline CPU
+rollback, CUDA reactivation and final restoration of the exact original CPU
+marker pass. Every original CPU environment/model file, ordinary database,
+selected source and fixture original remains unchanged. The private audit policy
+is restored byte-for-byte; no fault is shipped.
+
+CUDA content validation records a 19,499.5471 ms cold query and 5,542,924,288-byte
+whole-job peak commit. The CPU content replay after rollback records 30,862.9321
+ms and 6,239,522,816 bytes. Both memory peaks stay below 6 GiB; this CPU cold query
+misses the 20-second target. Preserve it alongside the earlier passing CPU trials
+and profile startup under coexistence/load before claiming that resource gate.
+These are current 32 GB host observations, not minimum hardware or quality proof.
+The initial driver attempt was deliberately stopped for a report-field casing
+error before repeating with the corrected driver; its interruption evidence is
+retained. The native suite passes 351 checks. Production code, runtime pins and
+the tested `20358424` hardware ZIP are unchanged. Same-device dependency-version
+upgrades, remaining lifecycle/account/volume tests, independent quality, broader
+UI/resource evidence and distribution clearance remain open.
