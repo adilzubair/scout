@@ -964,3 +964,14 @@ retained. The native suite passes 351 checks. Production code, runtime pins and
 the tested `20358424` hardware ZIP are unchanged. Same-device dependency-version
 upgrades, remaining lifecycle/account/volume tests, independent quality, broader
 UI/resource evidence and distribution clearance remain open.
+
+Independent post-run verification rehashes all 24,462 original CPU environment/
+model files and all thirteen pinned model files in each device generation. Both
+71-package inventories differ in exactly the three expected CPU/CUDA versions;
+the original CPU marker, database/source and tested hardware ZIP also verify.
+Three subsequent separately timed CPU startups with both generations installed
+take 16,655.5011, 15,595.1877 and 15,208.4690 ms. They meet the target for these
+trials and place most elapsed time between worker launch and readiness. They do
+not reproduce or diagnose the earlier 30,862.9321 ms miss; keep that failure open
+and investigate the model-startup interval under representative load. No input
+budget, threshold, dependency pin or production code changed for this follow-up.
