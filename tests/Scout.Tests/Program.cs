@@ -102,6 +102,7 @@ SemanticRetrievalChecks.Run(Test);
 MultimodalEvaluationChecks.Run(Test);
 MultimodalReviewChecks.Run(Test);
 MultimodalScaleChecks.Run(Test);
+MultimodalHardwareChecks.Contracts(Test);
 Candidate FileItem(string name, int hours) => new(Candidate.Key(ItemKind.File, name), ItemKind.File, name, "C:\\Documents\\" + name) { ModifiedAt = now.AddHours(-hours), Detail = "Documents" };
 var recent = FileItem("Roadmap.pdf", 1) with { AddedAt = now.AddMinutes(-5) };
 var old = FileItem("Budget.pdf", 0) with { AddedAt = now.AddDays(-3), OpenedAt = now.AddMinutes(-1) };

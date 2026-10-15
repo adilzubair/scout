@@ -796,3 +796,13 @@ layouts and large-sheet coverage remain limitations. The unexplained earlier
 media failure, cold/p95 misses, remaining lifecycle checks and distribution
 clearance remain open. The user will run the refreshed validation bundle on the
 physical 16 GB PC later; no hardware approval is implied by this milestone.
+
+Bundle finalization exposed two regenerated local media containers that differed
+from the recorded resource baseline. The failed build is retained and the prior
+delivered ZIP remains preserved. Expanded bundles now take all 21 originals from
+the verified resource pack, checking sizes/hashes before copying and hashes again
+afterwards. The real bundle succeeds with unchanged pinned inputs while both
+different developer files remain untouched. Four new baseline/corruption/missing-
+file/window-budget contracts pass; the native suite now passes 345 checks. This
+harness correction does not resolve the separate earlier media extraction failure
+or change any resource/quality target.

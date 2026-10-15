@@ -45,6 +45,13 @@ eight 250K-pixel video frames with eight seconds of aligned PCM. The separate
 `resource-windows.json` records their hashes and verified sizes. These are
 authored engineering inputs, not independent quality labels.
 
+When building this expanded bundle, all 21 inputs come from the recorded resource
+pack, including its original baseline files. The builder verifies every listed
+size and SHA-256 before copying, verifies the copied bytes again, and retains the
+manifest. Regenerating local developer media fixtures cannot substitute different
+container bytes into this workload. Missing/changed inputs or different window
+budgets fail bundle creation.
+
 Windows job accounting records peak committed memory for each phase's entire
 process tree, including nested model/parser processes and the test app. This is
 a conservative whole-workload measurement, not sampled working set. Targets for

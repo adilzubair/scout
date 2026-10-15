@@ -13,6 +13,66 @@ static class MultimodalHardwareChecks
     private static void Check(bool value,string message){if(!value)throw new IOException(message);}
     private static string Hash(string path){using var file=File.OpenRead(path);return Convert.ToHexString(SHA256.HashData(file)).ToLowerInvariant();}
     private static void Write(string path,object value)=>File.WriteAllText(path,JsonSerializer.Serialize(value,Json));
+    private static readonly string[] ResourceNames=["notes.docx","notes.odt","growth.pptx","growth.odp","sales.xlsx","sales.ods",
+        "tone.wav","tone.mp3","tone.m4a","tone.flac","scene.mp4","scene.mov","scene.mkv","scene.webm","invoice.pdf","source.py","picture.png",
+        "window-text.txt","window-image.png","window-audio.wav","window-video.mkv"];
+    private static void CopyResourcePack(string resourceFixtures,string fixtures,string destination)
+    {
+        resourceFixtures=Path.GetFullPath(resourceFixtures);
+        var manifest=MultimodalSetup.OwnedPath(Path.GetDirectoryName(resourceFixtures)!,Path.GetFileName(resourceFixtures)+".manifest.json");
+        Check(new FileInfo(manifest).Length<=262144,"Resource fixture manifest exceeds its budget.");
+        using var resource=JsonDocument.Parse(File.ReadAllText(manifest));var data=resource.RootElement;
+        Check(data.GetProperty("schemaVersion").GetInt32()==1 && data.GetProperty("textReaderTokens").GetInt32()==2048 &&
+            data.GetProperty("imagePixels").GetInt32()==1000000 && data.GetProperty("audioSamples").GetInt32()==192000 &&
+            data.GetProperty("videoFrames").GetInt32()==8 && data.GetProperty("videoFramePixels").GetInt32()==250000 &&
+            data.GetProperty("jointAudioSamples").GetInt32()==128000,"Resource fixture windows differ from the production budgets.");
+        // The pack contains its immutable baseline too. Regenerated developer
+        // fixtures may differ in container metadata and must not replace it.
+        foreach(var name in ResourceNames)
+        {
+            var source=MultimodalSetup.OwnedPath(resourceFixtures,name);var expected=data.GetProperty("files").GetProperty(name);
+            Check(new FileInfo(source).Length==expected.GetProperty("bytes").GetInt64() && Hash(source)==expected.GetProperty("sha256").GetString(),"Resource fixture checksum mismatch.");
+        }
+        foreach(var name in ResourceNames)
+        {
+            var source=MultimodalSetup.OwnedPath(resourceFixtures,name);var target=Path.Combine(fixtures,name);
+            File.Copy(source,target);
+            Check(Hash(target)==data.GetProperty("files").GetProperty(name).GetProperty("sha256").GetString(),"Copied resource fixture checksum mismatch.");
+        }
+        File.Copy(manifest,Path.Combine(destination,"resource-windows.json"));
+    }
+    public static void Contracts(Action<string,Action> test)
+    {
+        foreach(var scenario in new[]{"unchanged","changed","missing","window"})
+        test("Hardware resource pack uses its pinned baseline: "+scenario,()=>
+        {
+            var root=Path.GetFullPath("artifacts/diagnostics/hardware-pack-contracts/"+Guid.NewGuid().ToString("N"));
+            var pack=Path.Combine(root,"pack");var output=Path.Combine(root,"output");var fixtures=Path.Combine(output,"fixtures");
+            Directory.CreateDirectory(pack);Directory.CreateDirectory(fixtures);
+            try
+            {
+                foreach(var name in ResourceNames)File.WriteAllText(Path.Combine(pack,name),"authored contract "+name);
+                var files=ResourceNames.ToDictionary(name=>name,name=>new{bytes=new FileInfo(Path.Combine(pack,name)).Length,sha256=Hash(Path.Combine(pack,name))});
+                Write(pack+".manifest.json",new{schemaVersion=1,textReaderTokens=scenario=="window"?2047:2048,imagePixels=1000000,
+                    audioSamples=192000,videoFrames=8,videoFramePixels=250000,jointAudioSamples=128000,files});
+                if(scenario=="changed")File.AppendAllText(Path.Combine(pack,"scene.mkv"),"changed");
+                if(scenario=="missing")File.Delete(Path.Combine(pack,"scene.webm"));
+                if(scenario!="unchanged")
+                {
+                    try{CopyResourcePack(pack,fixtures,output);throw new InvalidOperationException("Invalid pack accepted.");}catch(IOException){}
+                    Check(!Directory.EnumerateFileSystemEntries(fixtures).Any() && !File.Exists(Path.Combine(output,"resource-windows.json")),"Invalid pack copied a prefix.");
+                }
+                else
+                {
+                    File.WriteAllText(Path.Combine(pack,"unlisted.txt"),"must not copy");
+                    CopyResourcePack(pack,fixtures,output);
+                    Check(Directory.GetFiles(fixtures).Length==21 && ResourceNames.All(name=>Hash(Path.Combine(fixtures,name))==files[name].sha256),"Pinned baseline bytes changed.");
+                    Check(Hash(pack+".manifest.json")==Hash(Path.Combine(output,"resource-windows.json")),"Manifest bytes changed.");
+                }
+            }
+            finally{SemanticExtractor.DeleteJob(Path.GetDirectoryName(root)!,root);}
+        });
+    }
     public static int Bundle(string package,string destination,string? resourceFixtures=null)
     {
         destination=Path.GetFullPath(destination);
@@ -20,36 +80,21 @@ static class MultimodalHardwareChecks
         _=MultimodalSetup.OwnedPath(destination,"package");Directory.CreateDirectory(destination);
         MultimodalLifecycleChecks.CreateProbe(Path.GetFullPath(package),Path.Combine(destination,"package"));
         var fixtures=Path.Combine(destination,"fixtures");Directory.CreateDirectory(fixtures);
-        foreach(var name in new[]{"notes.docx","notes.odt","growth.pptx","growth.odp","sales.xlsx","sales.ods"})
-            File.Copy(Path.GetFullPath("artifacts/diagnostics/multimodal/office-fixtures-v2/"+name),Path.Combine(fixtures,name));
-        foreach(var name in new[]{"tone.wav","tone.mp3","tone.m4a","tone.flac","scene.mp4","scene.mov","scene.mkv","scene.webm"})
-            File.Copy(Path.GetFullPath("artifacts/diagnostics/multimodal/media-fixtures-v1/"+name),Path.Combine(fixtures,name));
-        File.Copy(Path.GetFullPath("artifacts/diagnostics/multimodal/fixtures-v1/pdf-invoice.pdf"),Path.Combine(fixtures,"invoice.pdf"));
-        File.WriteAllText(Path.Combine(fixtures,"source.py"),"def hardware_total():\n    return 42000\n");
-        using(var image=new System.Drawing.Bitmap(64,64))
+        if(resourceFixtures==null)
         {
-            using(var canvas=System.Drawing.Graphics.FromImage(image))canvas.Clear(System.Drawing.Color.Blue);
-            image.Save(Path.Combine(fixtures,"picture.png"),System.Drawing.Imaging.ImageFormat.Png);
-        }
-        if(resourceFixtures!=null)
-        {
-            resourceFixtures=Path.GetFullPath(resourceFixtures);
-            var manifest=MultimodalSetup.OwnedPath(Path.GetDirectoryName(resourceFixtures)!,Path.GetFileName(resourceFixtures)+".manifest.json");
-            Check(new FileInfo(manifest).Length<=262144,"Resource fixture manifest exceeds its budget.");
-            using var resource=JsonDocument.Parse(File.ReadAllText(manifest));var data=resource.RootElement;
-            Check(data.GetProperty("schemaVersion").GetInt32()==1 && data.GetProperty("textReaderTokens").GetInt32()==2048 &&
-                data.GetProperty("imagePixels").GetInt32()==1000000 && data.GetProperty("audioSamples").GetInt32()==192000 &&
-                data.GetProperty("videoFrames").GetInt32()==8 && data.GetProperty("videoFramePixels").GetInt32()==250000 &&
-                data.GetProperty("jointAudioSamples").GetInt32()==128000,"Resource fixture windows differ from the production budgets.");
-            foreach(var file in Directory.GetFiles(fixtures))Check(Hash(file)==data.GetProperty("files").GetProperty(Path.GetFileName(file)).GetProperty("sha256").GetString(),"Resource pack has a different authored baseline.");
-            foreach(var name in new[]{"window-text.txt","window-image.png","window-audio.wav","window-video.mkv"})
+            foreach(var name in new[]{"notes.docx","notes.odt","growth.pptx","growth.odp","sales.xlsx","sales.ods"})
+                File.Copy(Path.GetFullPath("artifacts/diagnostics/multimodal/office-fixtures-v2/"+name),Path.Combine(fixtures,name));
+            foreach(var name in new[]{"tone.wav","tone.mp3","tone.m4a","tone.flac","scene.mp4","scene.mov","scene.mkv","scene.webm"})
+                File.Copy(Path.GetFullPath("artifacts/diagnostics/multimodal/media-fixtures-v1/"+name),Path.Combine(fixtures,name));
+            File.Copy(Path.GetFullPath("artifacts/diagnostics/multimodal/fixtures-v1/pdf-invoice.pdf"),Path.Combine(fixtures,"invoice.pdf"));
+            File.WriteAllText(Path.Combine(fixtures,"source.py"),"def hardware_total():\n    return 42000\n");
+            using(var image=new System.Drawing.Bitmap(64,64))
             {
-                var source=MultimodalSetup.OwnedPath(resourceFixtures,name);var expected=data.GetProperty("files").GetProperty(name);
-                Check(new FileInfo(source).Length==expected.GetProperty("bytes").GetInt64() && Hash(source)==expected.GetProperty("sha256").GetString(),"Resource fixture checksum mismatch.");
-                File.Copy(source,Path.Combine(fixtures,name));
+                using(var canvas=System.Drawing.Graphics.FromImage(image))canvas.Clear(System.Drawing.Color.Blue);
+                image.Save(Path.Combine(fixtures,"picture.png"),System.Drawing.Imaging.ImageFormat.Png);
             }
-            File.Copy(manifest,Path.Combine(destination,"resource-windows.json"));
         }
+        else CopyResourcePack(resourceFixtures,fixtures,destination);
         File.Copy(Path.GetFullPath("scripts/run-multimodal-hardware.ps1"),Path.Combine(destination,"run.ps1"));
         File.Copy(Path.GetFullPath("scripts/collect-multimodal-hardware.ps1"),Path.Combine(destination,"collect-results.ps1"));
         File.Copy(Path.GetFullPath("docs/MULTIMODAL_HARDWARE_VALIDATION.md"),Path.Combine(destination,"README.md"));
