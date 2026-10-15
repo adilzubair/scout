@@ -135,6 +135,9 @@ internal sealed class SourceSnapshot(string directory, string path, SemanticSour
         // Fixed ownership is recorded at construction; never delete a caller-selected source directory.
         var parent = System.IO.Path.GetDirectoryName(Directory)!;
         var owned = MultimodalSetup.OwnedPath(parent, System.IO.Path.GetFileName(Directory));
-        if (System.IO.Directory.Exists(owned)) System.IO.Directory.Delete(owned, true);
+        // A transient Windows sharing lock must not mask a parser failure or
+        // invalidate successful extraction. The owned source-* name remains a
+        // recovery target; the extractor retries it before the next job/start.
+        if (System.IO.Directory.Exists(owned)) SemanticExtractor.TryDeleteJob(parent, owned);
     }
 }

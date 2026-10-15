@@ -148,6 +148,77 @@ Actual offline replay reproduced all source bytes, captions, selection and attri
 evidence, with only batch timestamps changing. These checks establish reproducible
 candidate preparation, rather than retrieval quality or license clearance.
 
+## Unopened document and Office candidates
+
+`scripts/intake-zenodo-content.py` intakes an explicit file selection from pinned
+public Zenodo metadata snapshots. Each selection names the record ID, exact
+metadata SHA256 and original filenames. The tool requires public access, a declared
+CC BY 4.0 license, creator attribution and publisher file checksums. It constructs
+only the selected record's HTTPS file URL, rejects redirects, verifies exact byte
+length/MD5 and records a local SHA256. It never opens a document or runs formulas.
+The original metadata/selection bytes are retained alongside the originals.
+
+Files are limited to 32 MiB, batches to 100 files/512 MiB, and transfers to a checked
+600-second deadline with 30-second socket timeouts. A first 120-second transfer
+attempt failed and remains recorded; the successful bounded retry reused the
+already verified file. Offline replay verifies all bytes and provenance without
+network requests. Existing candidate manifests, provenance and frozen datasets
+cannot be overwritten. Ten offline source-intake contracts pass.
+
+```powershell
+& .runtime/semantic-search/cpu-venv/Scripts/python.exe scripts/intake-zenodo-content.py --selection artifacts/diagnostics/multimodal/zenodo-content-discovery/selection-v1.json --metadata artifacts/diagnostics/multimodal/zenodo-content-discovery --output artifacts/diagnostics/multimodal/zenodo-office-candidates-v1
+```
+
+The first batch contains eleven originals (75,911,809 bytes): three presentations
+(PPTX/ODP), three documents (PDF/DOCX) and five spreadsheets (XLSX/CSV). They come
+from four concept-record groups. Alternate formats and deposit versions remain
+related; eleven files are not eleven independent source groups. The deposits cover
+ecological restoration, historical correspondence, logistics-training telemetry
+and plant gene-expression research. Record declarations and embedded third-party
+credits still require rights review before approving holdout use.
+
+The generalized production review exporter accepts these content pools, verifies
+opaque source paths/checksums and runs the same no-network readers across all
+seven configured families. It records known unsupported/timeout outcomes and
+continues to remaining sources; any unavailable source yields a nonzero exit and
+an explicit report. Source changes, invalid receipts and unexpected integrity
+failures still abort. No embedding or retrieval predictions are used for review.
+
+Real-source review exposed three defects, now corrected:
+
+- Spreadsheet chunks could lose their sheet/header context and begin mid-value.
+  Chunks now repeat bounded context, preserve ordinary cell boundaries, repeat an
+  oversized cell's address on continuation and identify the covered cell range.
+  Exact emitted strings are retokenized because trimming can change BPE boundaries.
+  Abbreviated context is visible as `sheet_context_limit`; source/segment quotas
+  remain explicit. Multirow/merged-header selection remains a fidelity-review case.
+- A transient Windows sharing lock during snapshot deletion could mask a parser
+  timeout. Sharing/lock violations retain the owned copy for retry before the next
+  job/start. Link/path/integrity and other unexpected errors remain fatal. A real
+  held-file contract verifies error preservation, retry and original-file safety.
+- The pinned PDF binding's BSD check called `platform.system()`. On CPython 3.12
+  Windows that enters WMI detection, causing both natural PDFs to time out in
+  AppContainer. The loader supplies the already-known Windows OS name only during
+  that import and restores the original function even on failure. The exact PDFs
+  then complete inside the unchanged zero-capability boundary and three-minute
+  deadline. Vendor wheels and model artifacts are unchanged.
+
+Keep the failed baseline and intermediate boundary/cleanup failures. The final
+eleven-source run prepares 1,288 verified segments and removes its owned work
+directory. All 1,014 text segments (including 571 sheet segments) satisfy the
+2,048-token raw reader limit with the pinned actual tokenizer. Both PDFs have no
+partial flag. Office layout, unsupported embedded-image, OCR and dense-sheet
+limits remain visible in the other sources; this is not complete fidelity proof.
+Original file hashes remain unchanged. All 340 regression checks, 24 package
+contracts and 21 reader contracts pass at this milestone.
+
+Twenty-eight draft questions were authored from independently inspected original
+Office XML/cached values, with source-part hashes and candidate slide/paragraph/
+cell locators. They remain unapproved and unsplit pending full-corpus ambiguity,
+rights and related-source review. None has been used for model inference, and no
+negative task was inferred from an omission. The future 400-task holdout and its
+seven-family requirements remain unchanged.
+
 ## Open release evidence
 
 Natural images, video, joint audiovisual events, multilingual and complex Office

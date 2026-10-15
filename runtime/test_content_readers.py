@@ -1,15 +1,19 @@
 """Content-grounded contracts for the bounded renderer-free document readers."""
 import io
+import importlib
 import json
+import platform
 from pathlib import Path
 import tempfile
+import sys
 import unittest
+from unittest.mock import patch
 import zipfile
 from types import SimpleNamespace
 
 from PIL import Image
 from semantic_search.packages import package, relationships
-from semantic_search.readers import SegmentWriter, plain, images, pdf, csv_sheet, text_chunks
+from semantic_search.readers import SegmentWriter, plain, images, pdf, csv_sheet, text_chunks, pdfium_module
 from semantic_search.office_readers import office, cell_position
 from semantic_search.protocol import decode_request
 
@@ -64,6 +68,89 @@ class Readers(unittest.TestCase):
         chunks = list(text_chunks(source,tokens,limit=257))
         self.assertEqual(''.join(value for value,_,_ in chunks),source)
         self.assertTrue(all(len(tokens(value).ids) <=257 for value,_,_ in chunks))
+    def test_windows_pdf_loader_avoids_wmi_and_restores_platform_after_success_or_failure(self):
+        sentinel=object()
+        for failed in (False,True):
+            def load(name):
+                self.assertEqual(name,'pypdfium2');self.assertEqual(platform.system(),'Windows')
+                if failed:raise RuntimeError('import failed')
+                return sentinel
+            with patch.object(sys,'platform','win32'),patch.object(platform,'system',side_effect=AssertionError('WMI query forbidden')) as original,patch.object(importlib,'import_module',side_effect=load):
+                if failed:
+                    with self.assertRaisesRegex(RuntimeError,'import failed'):pdfium_module()
+                else:self.assertIs(pdfium_module(),sentinel)
+                self.assertIs(platform.system,original);original.assert_not_called()
+    def test_non_windows_pdf_loader_keeps_normal_platform_detection(self):
+        sentinel=object()
+        with patch.object(sys,'platform','linux'),patch.object(platform,'system',return_value='Linux') as original:
+            def load(name):
+                self.assertIs(platform.system,original);self.assertEqual(platform.system(),'Linux');return sentinel
+            with patch.object(importlib,'import_module',side_effect=load):self.assertIs(pdfium_module(),sentinel)
+    def test_sheet_chunks_repeat_headers_without_splitting_ordinary_numeric_cells(self):
+        with tempfile.TemporaryDirectory(dir=TEST_ROOT) as folder:
+            context='Sheet: Measurements\nHeaders: A1: Gene | B1: adjusted_p_value\n'
+            cells=[f'A{row}: {row}.38306799999999996E-4' for row in range(2,202)]
+            writer=SegmentWriter(Path(folder)/'out',tokens)
+            self.assertTrue(writer.table(context,cells,dict(kind='sheet',sheet='Measurements')))
+            chunks=content(writer);self.assertGreater(len(chunks),1)
+            bodies=[]
+            for chunk in chunks:
+                value=chunk['content']['text'];self.assertTrue(value.startswith(context));self.assertLessEqual(len(tokens(value).ids),2048)
+                body=value[len(context):];bodies.append(body)
+                rows=[int(line.split(':',1)[0][1:]) for line in body.splitlines()]
+                self.assertEqual(chunk['locator']['startCell'],'A'+str(min(rows)))
+                self.assertEqual(chunk['locator']['endCell'],'A'+str(max(rows)))
+                self.assertNotIn('(continued)',body)
+            self.assertEqual(''.join(bodies),'\n'.join(cells))
+    def test_giant_cell_continuations_keep_the_real_address_and_every_character(self):
+        with tempfile.TemporaryDirectory(dir=TEST_ROOT) as folder:
+            context='Sheet: Notes\nHeaders: long free text\n'
+            cells=['A2: '+('مرحبا'*1000)+'\nB999: this is literal cell text\n'+('tail '*1000),'C3: next cell']
+            writer=SegmentWriter(Path(folder)/'out',tokens)
+            self.assertTrue(writer.table(context,cells,dict(kind='sheet',sheet='Notes')))
+            bodies=[];continued=False
+            for chunk in content(writer):
+                value=chunk['content']['text'];self.assertLessEqual(len(value),2048);self.assertTrue(value.startswith(context))
+                body=value[len(context):]
+                if body.startswith('A2 (continued):\n'):
+                    continued=True;body=body[len('A2 (continued):\n'):]
+                self.assertNotIn('999',chunk['locator']['startCell']+chunk['locator']['endCell'])
+                bodies.append(body)
+            self.assertTrue(continued)
+            self.assertEqual(''.join(bodies),'\n'.join(cells))
+    def test_sheet_context_and_segment_limits_are_visible_and_invalid_addresses_rejected(self):
+        with tempfile.TemporaryDirectory(dir=TEST_ROOT) as folder:
+            writer=SegmentWriter(Path(folder)/'out',tokens,max_segments=1)
+            self.assertFalse(writer.table('Sheet: Tall\nHeaders: '+'h'*4000,['A2: '+'x'*5000],dict(kind='sheet',sheet='Tall')))
+            self.assertEqual(len(writer.files),1)
+            self.assertIn('sheet_context_limit',writer.reasons);self.assertIn('segment_limit',writer.reasons)
+            for value in ('A0: invalid','XFE1: invalid','A1048577: invalid','unlabelled value'):
+                with self.subTest(value=value),self.assertRaisesRegex(ValueError,'sheet_cell_address'):
+                    writer.table('Sheet: Tall\n',[value],dict(kind='sheet',sheet='Tall'))
+    def test_csv_large_cells_keep_headers_and_addressed_continuations(self):
+        with tempfile.TemporaryDirectory(dir=TEST_ROOT) as folder:
+            source=Path(folder)/'wide.csv';source.write_text('Gene,Description\nAT1,'+'description '*600+'\nAT2,second\n',encoding='utf-8')
+            writer=SegmentWriter(Path(folder)/'out',tokens);csv_sheet(source,writer)
+            chunks=content(writer);self.assertGreater(len(chunks),1)
+            self.assertTrue(all(chunk['evidence'].startswith('Sheet: CSV\nHeaders: Gene | Description\n') for chunk in chunks))
+            self.assertTrue(any('B2 (continued):' in chunk['evidence'] for chunk in chunks))
+            self.assertTrue(any('B3: second' in chunk['evidence'] for chunk in chunks))
+    def test_trimmed_table_boundaries_are_retokenized_before_emission(self):
+        def boundary_tokens(text):
+            extra=16 if text.endswith('\n') else 0
+            return SimpleNamespace(ids=list(range(len(text)+extra)),offsets=[(i,i+1) for i in range(len(text))]+[(len(text),len(text))]*extra)
+        with tempfile.TemporaryDirectory(dir=TEST_ROOT) as folder:
+            context='Sheet: Boundary\nHeaders: Value\n'
+            cells=['A2: '+'x'*(2048-len(context)-5),'B3: last']
+            writer=SegmentWriter(Path(folder)/'out',boundary_tokens)
+            self.assertTrue(writer.table(context,cells,dict(kind='sheet',sheet='Boundary')))
+            bodies=[]
+            for chunk in content(writer):
+                value=chunk['content']['text'];self.assertLessEqual(len(boundary_tokens(value).ids),2048)
+                body=value[len(context):]
+                if body.startswith('A2 (continued):\n'):body=body[len('A2 (continued):\n'):]
+                bodies.append(body)
+            self.assertEqual(''.join(bodies),'\n'.join(cells))
     def test_source_lines_and_partial_segment_budget_are_explicit(self):
         with tempfile.TemporaryDirectory(dir=TEST_ROOT) as folder:
             source = Path(folder)/'source.py'; source.write_text(''.join(f'line {i}\n' for i in range(1,101)),encoding='utf-8')

@@ -67,11 +67,15 @@ internal sealed class SemanticExtractor : ISemanticExtractionSession
         }
         var venv = Path.GetDirectoryName(Path.GetDirectoryName(installation.Python))!;
         sandbox = new ExtractionSandbox(root, [pythonHome, venv, runtime, assets]);
-        // Constructor recovery restores the previous job grants before any old copies are removed.
+    }
+    private void RetrySnapshotCleanup()
+    {
+        // The serial gate and sandbox owner lease exclude live snapshots; prior
+        // grants have been restored before this bounded namespace is retried.
         foreach (var directory in Directory.EnumerateDirectories(root, "source-*"))
         {
             var name = Path.GetFileName(directory);
-            if (name.Length == 39 && name[7..].All(char.IsAsciiHexDigit)) DeleteJob(root, directory);
+            if (name.Length == 39 && name[7..].All(char.IsAsciiHexDigit)) TryDeleteJob(root, directory);
         }
     }
     public async Task<SemanticExtraction> ExtractAsync(SemanticSource source, CancellationToken token)
@@ -82,6 +86,7 @@ internal sealed class SemanticExtractor : ISemanticExtractionSession
         {
             ObjectDisposedException.ThrowIf(disposed, this);
             await InitializeAsync(request.Token).ConfigureAwait(false);
+            RetrySnapshotCleanup();
             var scope = currentScope();
             if (SemanticSourceReader.Read(source.Path, scope) != source) throw new IOException("Source changed before parsing.");
             using var snapshot = await SemanticSourceReader.SnapshotAsync(source, scope, root, request.Token).ConfigureAwait(false);
@@ -146,6 +151,12 @@ internal sealed class SemanticExtractor : ISemanticExtractionSession
     {
         using var file = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 65536, FileOptions.Asynchronous);
         return file.Length == bytes && Convert.ToHexString(await SHA256.HashDataAsync(file, token).ConfigureAwait(false)).Equals(hash, StringComparison.OrdinalIgnoreCase);
+    }
+    internal static bool TryDeleteJob(string ownerRoot, string directory)
+    {
+        try {DeleteJob(ownerRoot,directory);return true;}
+        catch(DirectoryNotFoundException){return true;}
+        catch(IOException error) when((error.HResult&0xffff) is 32 or 33){return false;}
     }
     internal static void DeleteJob(string ownerRoot, string directory)
     {

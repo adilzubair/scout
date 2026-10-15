@@ -50,6 +50,20 @@ static class SemanticSourceChecks
             Throws<IOException>(() => SemanticSourceReader.SnapshotAsync(original, f.Scope, f.Work, default).GetAwaiter().GetResult());
             Check(!Directory.Exists(f.Work) || Directory.GetDirectories(f.Work).Length == 0);
         }));
+        test("Locked snapshot cleanup preserves parser failure and retries only its owned copy",()=>With(f=>
+        {
+            var snapshot=SemanticSourceReader.SnapshotAsync(f.Read()!,f.Scope,f.Work,default).GetAwaiter().GetResult();
+            var keep=Path.Combine(f.Work,"keep.txt");File.WriteAllText(keep,"keep");
+            using(var held=new FileStream(snapshot.Path,FileMode.Open,FileAccess.Read,FileShare.Read))
+            {
+                Throws<TimeoutException>(()=>{using(snapshot)throw new TimeoutException("parser budget");});
+                Check(Directory.Exists(snapshot.Directory),"Locked copy was not retained for recovery.");
+                Check(!SemanticExtractor.TryDeleteJob(f.Work,snapshot.Directory));
+            }
+            snapshot.Dispose();Check(!Directory.Exists(snapshot.Directory));
+            Check(SemanticExtractor.TryDeleteJob(f.Work,snapshot.Directory));
+            Check(File.ReadAllText(f.Path)=="hello" && File.ReadAllText(keep)=="keep");
+        }));
         test("Canceled semantic snapshots create no derived content", () => With(f =>
         {
             using var cancel = new CancellationTokenSource(); cancel.Cancel();

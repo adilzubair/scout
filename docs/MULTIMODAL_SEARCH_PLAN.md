@@ -1,9 +1,9 @@
 # Scout multimodal semantic search implementation plan
 
 Date: 2026-10-15. Branch: `feature/multimodal-semantic-search`.
-Status: implementation active; resumed on 2026-10-15 from checkpoint `909bb60`.
+Status: implementation active; independent quality and release validation in progress.
 Retrieval, previews, OCR and format coverage are committed. The frozen evaluation
-foundation passes 337 Release checks; independent quality and release gates remain open.
+foundation passes 340 Release checks; independent quality and release gates remain open.
 This plan is the implementation checklist; the add-on remains a
 preview until the release gates below pass. The full-model runtime and content smoke probe
 are implemented and verified on CPU and CUDA. On 2026-10-14 the user directed
@@ -681,3 +681,39 @@ offline, alongside thirteen Python contracts and 337 regression checks. Continue
 the all-family corpus, resolve source/group review, author supported negatives,
 then freeze at least 400 tasks before changing admission or opening holdout
 predictions. The 0.35 floor and all release gates remain unchanged.
+
+The document/Office candidate intake now pins original public record metadata,
+file checksums, attribution and concept/version relationships. Eleven originals
+from four related-source groups (PPTX/ODP, PDF/DOCX and XLSX/CSV) reproduce offline.
+Ten source-intake contracts pass. The all-family no-model review exporter now
+records unavailable sources without approving them or dropping later files.
+The real corpus exposed lost sheet context at token boundaries, a Windows
+snapshot-cleanup sharing race and a PDF import stall through CPython's WMI-based
+OS-name detection. Bounded context/cell-aware chunks, exact emitted-token checks,
+owned deferred cleanup and a scoped Windows PDF import workaround correct these
+cases without changing sandbox capabilities, parser deadlines or model artifacts.
+The final actual review prepares all eleven sources into 1,288 verified segments;
+all 1,014 text segments stay within 2,048 raw tokens. Failed and intermediate runs
+remain preserved. Both PDFs complete without a partial flag; Office/OCR/large-sheet
+limits remain explicit. Twenty-eight source-part-grounded draft questions remain
+unapproved, with no model predictions or splits. Source rights, whole-corpus
+ambiguity/group review, merged/multirow header fidelity, supported negatives and
+the frozen 400-task holdout remain next. All 340 regression, 24 package and 21
+reader checks pass. The full-model CPU/CUDA, packaged resource, physical 16 GB,
+remaining lifecycle and distribution gates retain their existing scope.
+
+The exact packaged reader-fix rehearsal completed all 21 authored fixtures across
+seven families, bounded video preview and the 100,000-segment workload. Whole-job
+peak commit was 6,248,288,256 bytes for extraction and 5,424,603,136 bytes for scale,
+both below 6 GiB. Performance targets did not pass: three new-process cold queries
+took 24,214.2027, 22,668.7916 and 20,039.3698 ms (target 20,000 ms), and uncached
+semantic search p95 was 1,099.034 ms, maximum 1,289.1309 ms (p95 target 1,000 ms).
+Only 2,805,518,336 bytes of physical RAM were available at the first cold result;
+memory pressure may contribute, but does not waive a failed target. Preserve this
+run alongside earlier passing and failing measurements. The harness's workload
+exit code is not performance approval. No physical 16 GB result has been received;
+the user has that PC and will run the validation bundle later.
+The separate offline CUDA worker smoke check also passes text, image, audio,
+video and joint audiovisual inference with finite normalized 768-dimensional
+vectors and outgoing Python sockets blocked. This uses authored engineering
+inputs; no predictions have been opened on the new natural-content candidates.

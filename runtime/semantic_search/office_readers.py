@@ -137,7 +137,7 @@ def xlsx(archive, writer):
             if not lines: return True
             context = 'Sheet: '+name+'\nHeaders: '+' | '.join(heading)+'\nMerged ranges: '+', '.join(merges[:256])+'\n'
             left,top,right,bottom=bounds
-            return writer.text(context+'\n'.join(lines), dict(kind='sheet', sheet=name, startCell=column(left)+str(top), endCell=column(right)+str(bottom)))
+            return writer.table(context, lines, dict(kind='sheet', sheet=name, startCell=column(left)+str(top), endCell=column(right)+str(bottom)))
         count = 0
         for row in content.findall('./s:sheetData/s:row', NS):
             row_lines = []
@@ -290,7 +290,7 @@ def odf(archive, writer, suffix):
                     lines = [f'{column(c)}{current}: {v}' + (f' [merged {wide} columns × {high} rows]' if wide > 1 or high > 1 else '') for c,v,wide,high in values]
                     if not heading: heading = lines.copy()
                     locator = dict(kind='sheet', sheet=name, startCell=column(values[0][0])+str(current), endCell=column(values[-1][0])+str(current))
-                    if not writer.text('Sheet: '+name+'\nHeaders: '+' | '.join(heading)+'\n'+'\n'.join(lines), locator): return
+                    if not writer.table('Sheet: '+name+'\nHeaders: '+' | '.join(heading)+'\n', lines, locator): return
                     nonempty += len(values)
                 row_number += repeat
             locator = dict(kind='sheet', sheet=name, startCell='A1', endCell='A1')

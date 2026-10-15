@@ -1,10 +1,14 @@
 """Bounded prepared segments. Invoked only on an owned snapshot by the sandbox host."""
 import base64
+import bisect
 import io
+import importlib
 import json
 import math
 from pathlib import Path
+import platform
 import re
+import sys
 import xml.etree.ElementTree as ET
 import zipfile
 from contextlib import closing
@@ -92,6 +96,57 @@ class SegmentWriter:
                 location.update(startLine=base_line+text.count('\n', 0, start), endLine=base_line+text.count('\n', 0, end-1))
             if not self.emit(dict(type='text', text=value), location, value): return False
         return True
+    def table(self, context, cells, locator):
+        """Repeat bounded sheet context and keep cell boundaries/addresses in chunks."""
+        if not cells: return True
+        first = next(text_chunks(context, self.tokenize, limit=512, max_chars=3000), None)
+        prefix = first[0] if first else ''
+        if first and first[2] < len(context): self.reasons.add('sheet_context_limit')
+        if prefix and not prefix.endswith('\n'): prefix += '\n'
+        starts, addresses, positions, length = [], [], [], 0
+        for cell in cells:
+            match = re.match(r'^([A-Z]{1,3})([1-9][0-9]{0,6}): ', cell)
+            if not match: raise ValueError('sheet_cell_address')
+            col = 0
+            for char in match[1]: col = col*26+ord(char)-64
+            row = int(match[2])
+            if col > 16384 or row > 1048576: raise ValueError('sheet_cell_address')
+            starts.append(length); addresses.append(match[1]+match[2]); positions.append((col,row))
+            length += len(cell)+1
+        text, offset = '\n'.join(cells), 0
+        while offset < len(text):
+            current = bisect.bisect_right(starts, offset)-1
+            heading = prefix + (addresses[current]+' (continued):\n' if offset > starts[current] else '')
+            end = min(len(text), offset+12000-len(heading))
+            encoding = self.tokenize(heading+text[offset:end])
+            if len(encoding.ids) > 2048:
+                end = offset+encoding.offsets[2048][0]-len(heading)
+            if end <= offset: raise ValueError('tokenizer_offsets')
+            # A normal cell stays whole; only a cell larger than the complete
+            # window is continued, with its address repeated above its value.
+            boundary = bisect.bisect_right(starts, end)-1
+            if end < len(text) and starts[boundary] > offset: end = starts[boundary]
+            value = heading+text[offset:end]
+            # Ending at a cell boundary can change BPE merges. Recheck the
+            # exact emitted string, moving a whole cell to the next chunk.
+            encoded = self.tokenize(value)
+            while len(encoded.ids) > 2048:
+                previous = bisect.bisect_left(starts, end)-1
+                if starts[previous] > offset:
+                    end = starts[previous]
+                else:
+                    end = min(end-1,offset+encoded.offsets[2048][0]-len(heading))
+                if end <= offset: raise ValueError('tokenizer_offsets')
+                value = heading+text[offset:end]
+                encoded = self.tokenize(value)
+            if len(value) > 12000: raise ValueError('sheet_text_budget')
+            last = bisect.bisect_right(starts, end-1)-1
+            included = positions[current:last+1]
+            location = dict(locator, startCell=column(min(col for col,row in included))+str(min(row for col,row in included)),
+                            endCell=column(max(col for col,row in included))+str(max(row for col,row in included)))
+            if not self.emit(dict(type='text',text=value),location,value): return False
+            offset = end
+        return True
     def image(self, image, locator, evidence=''):
         data, thumbnail = image_bytes(image)
         if not self.emit(dict(type='image', data=data), locator, evidence, thumbnail):return False
@@ -142,9 +197,22 @@ def images(source, writer):
                 return
         # Vision coverage is independent of installed Windows OCR languages.
 
+def pdfium_module():
+    # The pinned raw binding checks platform.system() solely for a BSD loader
+    # workaround. CPython 3.12 resolves that through WMI on Windows, which can
+    # stall in AppContainer. sys.platform already establishes this exact answer.
+    if sys.platform != 'win32': return importlib.import_module('pypdfium2')
+    original = platform.system
+    try:
+        platform.system = lambda: 'Windows'
+        return importlib.import_module('pypdfium2')
+    finally:
+        platform.system = original
+
+
 def pdf(source, writer, *, kind='page', max_pages=128):
     from pypdf import PdfReader
-    import pypdfium2 as pdfium
+    pdfium = pdfium_module()
     reader = PdfReader(source, strict=True)
     if reader.is_encrypted: raise ValueError('encrypted_pdf')
     with pdfium.PdfDocument(source) as document:
@@ -189,8 +257,8 @@ def csv_sheet(source, writer):
                 lines.extend(f'{column(col+1)}{1 if index == 0 else first+index}: {value}' for col, value in enumerate(row) if value)
             end = first+len(group)
             location = dict(kind='sheet', sheet='CSV', startCell=f'A{1 if first == 1 else first+1}', endCell=f'{column(max(map(len, values)))}{end}')
-            if not writer.text('\n'.join(lines), location): return
+            if not writer.table('\n'.join(lines[:2])+'\n', lines[2:], location): return
             first = end
             if first >= 1048576: writer.reasons.add('sheet_row_limit'); return
         if first == 1:
-            writer.text('Sheet: CSV\n'+'\n'.join(f'{column(i+1)}1: {v}' for i,v in enumerate(header)), dict(kind='sheet', sheet='CSV', startCell='A1', endCell=f'{column(len(header))}1'))
+            writer.table('Sheet: CSV\nHeaders: '+' | '.join(header)+'\n', [f'{column(i+1)}1: {v}' for i,v in enumerate(header) if v], dict(kind='sheet', sheet='CSV', startCell='A1', endCell=f'{column(len(header))}1'))

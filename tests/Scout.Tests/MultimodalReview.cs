@@ -13,11 +13,19 @@ static class MultimodalReview
     private static readonly JsonSerializerOptions Json = new() { PropertyNamingPolicy=JsonNamingPolicy.CamelCase,WriteIndented=true };
     internal sealed record Asset(string File,string Kind,long Bytes,string Sha256,double? OffsetSeconds=null);
     private sealed record Source(string Id,string Family,string File,long Bytes,string Sha256);
-    internal static bool SourceIdentity(string? id)=>id!=null && Regex.IsMatch(id,@"^(?:commons|coco)-[0-9]{1,20}\z");
+    internal sealed record SourceFailure(string Status,string Detail);
+    internal static SourceFailure? Failure(Exception error)=>error switch
+    {
+        UnsupportedContentException unsupported=>new("unsupported",unsupported.Reason),
+        TaskCanceledException or TimeoutException=>new("failed","extraction_timeout"),
+        _=>null
+    };
+    internal static bool SourceIdentity(string? id)=>id!=null && Regex.IsMatch(id,@"^(?:(?:commons|coco)-[0-9]{1,20}|zenodo-[0-9]{1,20}-[a-f0-9]{12})\z");
+    internal static bool CandidatePurpose(string? purpose)=>purpose is "unreviewed candidate-media-pool" or "unreviewed candidate-content-pool";
 
     internal static string SourceFile(string pool,string relative)
     {
-        if(!Regex.IsMatch(relative,@"^sources/f-[0-9a-f]{12}\.[a-z0-9]{2,5}$"))throw new InvalidDataException("Invalid candidate source path.");
+        if(!Regex.IsMatch(relative,@"^sources/f-[0-9a-f]{12}\.[a-z0-9]{1,5}\z"))throw new InvalidDataException("Invalid candidate source path.");
         return MultimodalSetup.OwnedPath(pool,relative);
     }
     internal static byte[] Wave(byte[] pcm)
@@ -48,7 +56,7 @@ static class MultimodalReview
         var manifestHash=Convert.ToHexString(SHA256.HashData(manifestBytes)).ToLowerInvariant();
         using var intake=JsonDocument.Parse(manifestBytes,new JsonDocumentOptions{MaxDepth=32});
         var data=intake.RootElement;
-        if(data.GetProperty("schemaVersion").GetInt32()!=1 || data.GetProperty("purpose").GetString()!="unreviewed candidate-media-pool")throw new InvalidDataException("Not a candidate media pool.");
+        if(data.GetProperty("schemaVersion").GetInt32()!=1 || !CandidatePurpose(data.GetProperty("purpose").GetString()))throw new InvalidDataException("Not a candidate content pool.");
         var sources=data.GetProperty("items").EnumerateArray().Select(item=>
         {
             var local=item.GetProperty("local");
@@ -56,7 +64,7 @@ static class MultimodalReview
         }).ToArray();
         if(sources.Length is < 1 or > 100 || sources.Sum(s=>s.Bytes)>512L*1024*1024 ||
             sources.Select(s=>s.Id).Distinct().Count()!=sources.Length || sources.Select(s=>s.File).Distinct(StringComparer.OrdinalIgnoreCase).Count()!=sources.Length ||
-            sources.Any(s=>s.Bytes is < 1 or > 32*1024*1024 || !SourceIdentity(s.Id) || !Regex.IsMatch(s.Sha256,"^[0-9a-f]{64}$") || s.Family is not ("images" or "audio" or "video")))
+            sources.Any(s=>s.Bytes is < 1 or > 32*1024*1024 || !SourceIdentity(s.Id) || !Regex.IsMatch(s.Sha256,"^[0-9a-f]{64}$") || !MultimodalSettings.ContentTypes.Contains(s.Family)))
             throw new InvalidDataException("Invalid candidate source budget or identity.");
         foreach(var source in sources)
         {
@@ -66,8 +74,8 @@ static class MultimodalReview
         Directory.CreateDirectory(outputParent);
         var root=MultimodalSetup.OwnedPath(Path.GetFullPath(outputParent),"review-"+Guid.NewGuid().ToString("N"));Directory.CreateDirectory(root);
         var work=MultimodalSetup.OwnedPath(root,"work");Directory.CreateDirectory(work);
-        var scope=new SemanticScope(true,[Path.Combine(pool,"sources")],[],["images","audio","video"],installation.Revision,"content-review");
-        var report=new List<object>();long remaining=512L*1024*1024;
+        var scope=new SemanticScope(true,[Path.Combine(pool,"sources")],[],MultimodalSettings.ContentTypes,installation.Revision,"content-review");
+        var report=new List<object>();long remaining=512L*1024*1024;var unavailable=0;
         try
         {
             // Separate parser owner prevents interference with a live app's extraction workspace.
@@ -113,11 +121,18 @@ static class MultimodalReview
                     {
                         current=item.Id;batches.Clear();var source=SemanticSourceReader.Read(SourceFile(pool,item.File),scope)??throw new IOException("Candidate source is no longer eligible.");
                         Console.WriteLine($"Parsing {item.Id} ({item.Family}) through the no-network sandbox.");
-                        var extraction=await extractor.ExtractAsync(source,default);
+                        SemanticExtraction extraction;
+                        try {extraction=await extractor.ExtractAsync(source,default);}
+                        catch(Exception error) when(Failure(error) is {} failure)
+                        {
+                            if(!await SemanticExtractor.VerifiedAsync(SourceFile(pool,item.File),item.Bytes,item.Sha256,default))throw new IOException("Candidate source changed during a failed extraction.");
+                            report.Add(new {item.Id,item.Family,sourceSha256=item.Sha256,status=failure.Status,partial=true,detail=failure.Detail,segments=Array.Empty<object>()});
+                            unavailable++;Console.WriteLine($"UNAVAILABLE {item.Id}: {failure.Detail}; continuing review without approving this source.");continue;
+                        }
                         if(!extraction.ContentHash.Equals(item.Sha256,StringComparison.OrdinalIgnoreCase) || extraction.Segments.Count!=batches.Count)throw new IOException("Candidate snapshot/export mismatch.");
                         var segments=extraction.Segments.Select((segment,index)=>new {segment.Modality,segment.Locator,segment.Evidence,
                             assets=batches[index].Select(asset=>asset.Kind=="video-frame"?asset with {OffsetSeconds=asset.OffsetSeconds+segment.Locator.StartSeconds}:asset).ToArray()}).ToArray();
-                        report.Add(new {item.Id,item.Family,sourceSha256=item.Sha256,extraction.Partial,extraction.Detail,segments});
+                        report.Add(new {item.Id,item.Family,sourceSha256=item.Sha256,status="ready",extraction.Partial,extraction.Detail,segments});
                         Console.WriteLine($"Prepared {item.Id}: {segments.Length} validated segments; content review still pending.");
                     }
                 }
@@ -125,12 +140,12 @@ static class MultimodalReview
             finally{ExtractionSandbox.RemoveProfile(extractor.WorkRoot);}
             if(!await SemanticExtractor.VerifiedAsync(manifest,manifestBytes.Length,manifestHash,default))throw new IOException("Intake changed during review export.");
             var result=new {schemaVersion=1,purpose="unreviewed content-review export",embeddingInference="not_run",labelsApproved=false,
-                intakeSha256=manifestHash,createdUtc=DateTimeOffset.UtcNow,items=report};
+                intakeSha256=manifestHash,createdUtc=DateTimeOffset.UtcNow,unavailableSources=unavailable,allSourcesPrepared=unavailable==0,items=report};
             var temporary=Path.Combine(root,"review.partial");
             using(var file=new FileStream(temporary,FileMode.CreateNew,FileAccess.Write,FileShare.None))
             {await JsonSerializer.SerializeAsync(file,result,Json);file.Flush(true);}
             File.Move(temporary,Path.Combine(root,"review.json"));
-            Console.WriteLine("Review export: "+root);return 0;
+            Console.WriteLine("Review export: "+root);return unavailable==0?0:1;
         }
         finally{SemanticExtractor.DeleteJob(root,work);}
     }
