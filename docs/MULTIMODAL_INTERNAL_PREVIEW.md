@@ -11,22 +11,19 @@ model locally, works with Laya off and requires no LibreOffice.
 
 ## Delivery
 
-Use `artifacts/Scout-hardware-validation.zip` (85,296,130 bytes). It contains the
+Use `artifacts/Scout-multimodal-preview.zip`. It contains the
 tested application, bundled .NET runtime, validation driver and authored fixtures.
 Python, dependencies and model weights download when the add-on is installed;
 they are not inside this ZIP. No .NET SDK, Office or LibreOffice is required.
 
-SHA-256:
-`6c9807577c0a1c248c35582a0d2dcc5211dfb393418b9555fafd97cfd6b84a74`
-
-The adjacent `artifacts/Scout-hardware-validation.zip.sha256` identifies the same
-ZIP. Final handoff verification checks all 563 ZIP members against the inventory
-and retained staging files, all 33 runtime source files and recorded application/
-core/driver DLL hashes. The existing validated ZIP is unchanged.
+The adjacent `artifacts/Scout-multimodal-preview.zip.sha256` identifies this ZIP.
+The earlier hardware-validation ZIP is retained as historical evidence; use the
+new preview for interactive testing because it fixes the settings folder picker.
 
 | Identity | Commit |
 | --- | --- |
-| Packaged product and hardware instructions | `eacfe164dd75d0c3e51b052ba9d6a788573a9be2` |
+| Packaged product, including folder-picker crash fix | `f5f0b9b` |
+| Prior full-model CPU/CUDA resource package | `eacfe164dd75d0c3e51b052ba9d6a788573a9be2` |
 | Shipping setup bytecode preparation | `4996824bff5ee8fdfcdfcfb7ec1e604a3c60f650` |
 | Recorded CPU/CUDA validation evidence | `5efdc8c` |
 | Development-only natural-code intake tooling; not packaged | `79faae2` |
@@ -71,14 +68,23 @@ will run this later; physical minimum-hardware support is not yet established.
 
 ## Verification and known limitations
 
-Existing evidence includes 351 native regression checks, 17 Python setup/model-
-reuse checks and 24 packaging contracts. The exact package passes all 21 authored
+The folder-picker fix passes a clean Release build, all 351 native regression
+checks and 24 packaging contracts. An isolated WPF regression opens the actual
+Windows folder dialog three times: select, repeat select and cancel. It verifies
+the selected path, duplicate prevention, unchanged values on cancellation and
+usable settings/manual entry after simulated COM, Win32 and dialog-state failures.
+This also passes against the replacement self-contained application.
+
+Prior evidence includes 17 Python setup/model-reuse checks. The `eacfe16` package
+passes all 21 authored
 files across seven families, video preview, CPU/CUDA setup/fallback/offline retry/
 rollback and revision-3 generation preparation. On the 32 GB development PC,
 three CPU process-cold queries take 13.19/10.77/10.87 seconds; warm semantic p95 at
 100,000 synthetic segments is 331.59 ms. Whole-job peak commit is 5.82 GiB for
 content/preview and 5.06 GiB for scale, with Laya off and OS file cache unflushed.
-These are engineering checks, not representative retrieval-quality results.
+These are engineering checks, not representative retrieval-quality results. The
+folder-picker fix does not change readers, model/runtime pins, index or retrieval
+policy; the expensive full-model resource workload was not repeated for this UI fix.
 
 - Semantic false positives remain a known issue: the small authored pilot admitted
   every negative query at the unchanged 0.35 similarity floor. Natural-audio

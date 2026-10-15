@@ -10,6 +10,12 @@ run, distribution review and remaining production checks are deferred; autonomou
 work stops after this handoff. Historical evidence and open gates below remain
 available and do not imply production approval.
 
+Interactive folder browsing is corrected in `f5f0b9b`: the previous custom COM
+picker used an unregistered class and could terminate Scout. Settings now uses
+WPF's native folder-dialog wrapper and retains manual path entry if the browser
+cannot open. Use the replacement `Scout-multimodal-preview.zip` from the handoff;
+the older hardware-validation ZIP does not include this fix.
+
 Storage maintenance now keeps the selected generation and one recent completed
 rollback generation for the same device, plus two completed generations for the
 other device. Successful setup prunes older and unfinished generation directories.

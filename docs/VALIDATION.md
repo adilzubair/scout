@@ -78,3 +78,26 @@ Reproduce with `scripts/build.ps1 -Publish`, `runtime/test_runtime.py`, `runtime
 ## Limits
 
 No live Jev account comparison or macOS execution was performed. Windows Recent Items, creation timestamps, indexed folders and preview codecs differ from their macOS counterparts. The adapter compares up to 32 retrieved candidates; it cannot find files outside the configured/indexed sources or infer facts that are absent from names and metadata. Laya may abstain on unfamiliar descriptions. Semantic probabilities remain uncalibrated beyond these small evaluations.
+
+## Multimodal folder-picker preview correction — 2026-10-15
+
+The reported settings Browse crash is traced to `FolderPicker.Pick` activating an
+unregistered COM class (`0x80040154`) in retained Windows application events. The
+hand-written interop is replaced with WPF `OpenFolderDialog`; expected browser
+failures preserve settings and show manual-path guidance. Code commit: `f5f0b9b`.
+
+Release build: zero warnings/errors. Native regressions: 351/351. Packaging
+contracts: 24. The isolated `--folder-picker-smoke-test` passes against both the
+SDK build and the replacement self-contained app. It selects the actual native
+folder dialog, repeats the same selection, cancels, and verifies settings stays
+usable after injected COM/Win32/dialog-state errors. It requires `SCOUT_DATA_DIR`
+and does not change the user's ordinary settings or install model runtimes.
+
+Replacement internal delivery: `artifacts/Scout-multimodal-preview.zip`,
+85,307,118 bytes, SHA-256
+`f22b559550eab55761592c737eccea576dd4a5b4dc15680cc915483cb44501e6`.
+All 565 ZIP members match inventory/staging, and all 33 runtime files match source
+and the previous bundle. The previous ZIP is unchanged. Expensive model/resource
+workloads were not repeated for this UI-only correction; prior results and open
+quality/hardware/distribution gates retain their original scope. See the
+[internal-preview handoff](MULTIMODAL_INTERNAL_PREVIEW.md) for usage.

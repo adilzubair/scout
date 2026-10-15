@@ -3,13 +3,21 @@
 Date: 2026-10-15. Branch: `feature/multimodal-semantic-search`.
 Status: internal-preview handoff complete; production release work deferred.
 
+The subsequent interactive folder-selection crash is fixed in `f5f0b9b`.
+Windows events identify unregistered COM activation in the hand-written picker.
+WPF's built-in folder dialog replaces that interop, and a picker failure now
+leaves settings open with manual-path guidance. The targeted real-dialog WPF
+regression verifies select/repeat/cancel and failure recovery; all 351 native
+checks and 24 package contracts pass. The replacement self-contained preview is
+`artifacts/Scout-multimodal-preview.zip`; the prior hardware ZIP remains retained.
+
 The user approved changing the finish line to ready for internal testing, with
 at most 60 minutes of remaining work from the 2026-10-15 scope change. The revised
 objective is to hand over the existing optional, LibreOffice-free, seven-family
 preview with its validated ZIP, usage instructions, commits and known issues.
 Only demonstrated installation/indexing/search/evidence blockers justify fixes
-in this finalization. No such product blocker was found in the handoff checks.
-The existing package's full inventory, runtime sources and checksum verify;
+in this finalization. The later reported folder-picker blocker is corrected
+above. Package inventory, runtime sources and checksum verification are retained;
 see [the internal-preview handoff](MULTIMODAL_INTERNAL_PREVIEW.md).
 
 The internal-preview objective is complete. Stop autonomous goal work after
