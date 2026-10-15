@@ -3,6 +3,21 @@
 Date: 2026-10-15. Branch: `feature/multimodal-semantic-search`.
 Status: internal-preview handoff complete; production release work deferred.
 
+The immediate-reopen folder-persistence bug is reproduced and fixed in `2f5173a`.
+Saving no longer waits for a full index reconfiguration: Settings writes validated
+preferences before closing and retains edits if writing fails. Real WPF tests cover
+immediate reopen with indexing held pending, overlapping saves, a second-process
+restart, index failure, validation, Cancel and storage failure. The wider UI/
+preview suite and the actual seven-family scheduler/query smoke pass; all 351
+native regressions and 24 package contracts pass. See
+[app end-to-end testing](APP_END_TO_END_TESTING.md). The new delivery is
+`artifacts/Scout-multimodal-preview-e2e-fixed.zip`; earlier previews remain kept.
+The full UI run exposed a native PDF/graphics process-detach crash even after its
+assertions completed. `f53e3d6` isolates PDF rendering in a bounded owned worker.
+Navigation, cancellation, malformed inputs and temporary-file cleanup pass, and
+the runner now checks actual process exit codes. The failed intermediate
+settings-only package is retained as evidence and is superseded by this delivery.
+
 The subsequent interactive folder-selection crash is fixed in `f5f0b9b`.
 Windows events identify unregistered COM activation in the hand-written picker.
 WPF's built-in folder dialog replaces that interop, and a picker failure now

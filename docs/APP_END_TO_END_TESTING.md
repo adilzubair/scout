@@ -2,6 +2,13 @@
 
 Date: 2026-10-15. Branch: `feature/multimodal-semantic-search`.
 
+Final self-contained product: `f53e3d6`, delivered as
+`artifacts/Scout-multimodal-preview-e2e-fixed.zip`. The exact packaged executable
+passes all four runner phases with exit code zero; its `Scout.dll` SHA-256 is
+`f815a53ef4d1dc254e2a0a314d50921730f0233094116a45cd73f3108a533e51`.
+Evidence: `artifacts/diagnostics/multimodal/app-e2e-92fa2a7d/report.json`.
+The earlier settings-only ZIP is superseded because its full UI exit failed.
+
 The reported immediate-reopen folder loss is reproduced before the fix: Settings
 closes while keyword indexing is deliberately held pending, and the folder lists
 have not reached the settings database. Saving was incorrectly dependent on a

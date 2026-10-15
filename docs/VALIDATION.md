@@ -101,3 +101,30 @@ and the previous bundle. The previous ZIP is unchanged. Expensive model/resource
 workloads were not repeated for this UI-only correction; prior results and open
 quality/hardware/distribution gates retain their original scope. See the
 [internal-preview handoff](MULTIMODAL_INTERNAL_PREVIEW.md) for usage.
+
+## Settings persistence and full app validation — 2026-10-15
+
+`2f5173a` fixes the reproduced immediate-reopen folder loss by writing validated
+settings before the modal dialog closes. `f53e3d6` isolates native PDF rendering
+after the wider tests discovered a Windows PDF/D3D shutdown failure. Failed runs
+and native-stack evidence are retained; the intermediate settings-only package
+is superseded.
+
+The final self-contained executable passes all four app-runner phases with clean
+exit codes: Save/reopen while indexing is pending, a second-process restart,
+native picker, and the broad launcher/settings/evidence/Office/PDF/media suite.
+Index failure, overlapping saves, validation, Cancel and storage failure are
+covered. PDF checks cover navigation, worker cancellation, malformed input and
+temporary-data cleanup. Native regression checks: 351/351. Package contracts: 24.
+The separate actual-model scheduler check passes all seven content families,
+watched arrival/rename, pause/resume and revocation. These are functional checks,
+not independent retrieval-quality or minimum-hardware approval.
+
+Delivery: `artifacts/Scout-multimodal-preview-e2e-fixed.zip`, 85,328,869 bytes.
+SHA-256: `933498f14bb79ac0200e86a756cf02fceb8ef961f5bc8fca0bc839437d561e31`.
+All 566 ZIP members match staging/inventory; all 33 runtime files match source
+and the prior working preview. The final runner report binds the packaged app
+hash to its four clean phase exits:
+`artifacts/diagnostics/multimodal/app-e2e-92fa2a7d/report.json`.
+See [the app test report](APP_END_TO_END_TESTING.md) for coverage and limits.
+The user's running older Scout and personal settings were preserved.

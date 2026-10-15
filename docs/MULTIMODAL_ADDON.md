@@ -10,10 +10,18 @@ run, distribution review and remaining production checks are deferred; autonomou
 work stops after this handoff. Historical evidence and open gates below remain
 available and do not imply production approval.
 
+The current settings-persistence preview (`2f5173a`) also fixes folders disappearing
+when Settings is reopened during indexing. Choices are committed before the dialog
+closes. Indexing failures preserve those preferences, and storage-write failures
+keep the user's edits available in Settings. Use the handoff's latest ZIP and see
+[the app end-to-end report](APP_END_TO_END_TESTING.md) for tested flows and limits.
+The latest product commit is `f53e3d6`: PDF rasterization now uses an owned worker
+to keep a native Windows PDF/graphics shutdown failure outside Scout's UI process.
+
 Interactive folder browsing is corrected in `f5f0b9b`: the previous custom COM
 picker used an unregistered class and could terminate Scout. Settings now uses
 WPF's native folder-dialog wrapper and retains manual path entry if the browser
-cannot open. Use the replacement `Scout-multimodal-preview.zip` from the handoff;
+cannot open. Use the latest `Scout-multimodal-preview-e2e-fixed.zip` from the handoff;
 the older hardware-validation ZIP does not include this fix.
 
 Storage maintenance now keeps the selected generation and one recent completed

@@ -11,18 +11,22 @@ model locally, works with Laya off and requires no LibreOffice.
 
 ## Delivery
 
-Use `artifacts/Scout-multimodal-preview.zip`. It contains the
+Use `artifacts/Scout-multimodal-preview-e2e-fixed.zip`. It contains the
 tested application, bundled .NET runtime, validation driver and authored fixtures.
 Python, dependencies and model weights download when the add-on is installed;
 they are not inside this ZIP. No .NET SDK, Office or LibreOffice is required.
 
-The adjacent `artifacts/Scout-multimodal-preview.zip.sha256` identifies this ZIP.
+The adjacent `artifacts/Scout-multimodal-preview-e2e-fixed.zip.sha256` identifies this ZIP.
 The earlier hardware-validation ZIP is retained as historical evidence; use the
-new preview for interactive testing because it fixes the settings folder picker.
+new preview for interactive testing because it fixes the settings folder picker
+and saves folder choices before indexing starts. PDF previews use an owned renderer
+process to avoid a native graphics shutdown crash found in end-to-end testing.
+Close the older Scout instance
+and launch `package/Scout.exe` from the newly extracted delivery.
 
 | Identity | Commit |
 | --- | --- |
-| Packaged product, including folder-picker crash fix | `f5f0b9b` |
+| Packaged product, including folder-picker, persistence and PDF shutdown fixes | `f53e3d6` |
 | Prior full-model CPU/CUDA resource package | `eacfe164dd75d0c3e51b052ba9d6a788573a9be2` |
 | Shipping setup bytecode preparation | `4996824bff5ee8fdfcdfcfb7ec1e604a3c60f650` |
 | Recorded CPU/CUDA validation evidence | `5efdc8c` |
@@ -67,6 +71,13 @@ README or [hardware instructions](MULTIMODAL_HARDWARE_VALIDATION.md). The user
 will run this later; physical minimum-hardware support is not yet established.
 
 ## Verification and known limitations
+
+Folder preferences now persist before Settings closes. The reported immediate-
+reopen failure is reproduced before this correction. Real app integration tests
+cover pending indexing, overlapping saves, immediate reopen, a second-process
+restart, index failure, invalid input, Cancel and storage-write failure. The wider
+WPF preview suite and real-model all-family scheduler also pass. See the
+[end-to-end report and reproduction commands](APP_END_TO_END_TESTING.md).
 
 The folder-picker fix passes a clean Release build, all 351 native regression
 checks and 24 packaging contracts. An isolated WPF regression opens the actual
