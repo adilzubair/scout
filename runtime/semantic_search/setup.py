@@ -172,8 +172,8 @@ def main():
 def verify(generation, device):
     from semantic_search.embedding import FullEmbedder
     from PIL import Image
-    import numpy as np
     embedder = FullEmbedder(generation / 'model', device=device, threads=4)
+    import numpy as np
     frame = Image.new('RGB', (64, 64), 'blue')
     for content, kwargs in [
         ('readiness', {'query': True}), ({'image': frame}, {}),

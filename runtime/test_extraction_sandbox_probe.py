@@ -54,13 +54,17 @@ def denied_network():
         return 10060 if isinstance(error, TimeoutError) else (getattr(error, 'winerror', 0) or 0)
 
 report = dict(appcontainer=appcontainer, capabilityCount=capability_count, privateReadDenied=denied_read(), networkError=denied_network(),
-              inheritedSecret=os.environ.get('SCOUT_SANDBOX_TEST_SECRET', ''), pid=os.getpid())
+              inheritedSecret=os.environ.get('SCOUT_SANDBOX_TEST_SECRET', ''), pid=os.getpid(),
+              nativeThreadLimits={key:os.environ.get(key) for key in ('OMP_NUM_THREADS','MKL_NUM_THREADS','OPENBLAS_NUM_THREADS')})
 try:
     (Path(config['readOnlyRoot'])/'sandbox-must-not-write.txt').write_text('forbidden')
     report['runtimeWriteDenied']=False
 except PermissionError:report['runtimeWriteDenied']=True
 if config.get('checkPackage'):
     import tokenizers
+    import numpy
+    from threadpoolctl import threadpool_info
+    report['blasThreads']=[pool['num_threads'] for pool in threadpool_info() if pool['user_api']=='blas']
     report.update(prefix=sys.prefix,executable=sys.executable,packagePath=tokenizers.__file__)
 if config.get('liveDecode'):
     import av

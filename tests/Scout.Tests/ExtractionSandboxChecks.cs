@@ -131,8 +131,10 @@ static class ExtractionSandboxChecks
                 Check(report.GetProperty("capabilityCount").GetInt32() == 0, "parser received a capability");
                 Check(report.GetProperty("networkError").GetInt32() is 10013 or 10060, "sandbox parser reached the network");
                 Check(report.GetProperty("inheritedSecret").GetString() == "", "parent environment leaked");
+                Check(report.GetProperty("nativeThreadLimits").EnumerateObject().Count()==3 && report.GetProperty("nativeThreadLimits").EnumerateObject().All(value=>value.Value.GetString()=="1"),"Parser native pools were not capped before imports.");
                 if(direct)
                 {
+                    Check(report.GetProperty("blasThreads").GetArrayLength()>0 && report.GetProperty("blasThreads").EnumerateArray().All(value=>value.GetInt32()==1),"Actual parser BLAS pool exceeded its one-thread budget.");
                     Check(report.GetProperty("prefix").GetString()!.Equals(venv,StringComparison.OrdinalIgnoreCase),"private venv was not activated");
                     Check(report.GetProperty("executable").GetString()!.Equals(Path.GetFullPath(python),StringComparison.OrdinalIgnoreCase),"venv executable was not retained");
                     Check(IndexPolicy.Within(report.GetProperty("packagePath").GetString()!,venv),"package escaped its private venv");

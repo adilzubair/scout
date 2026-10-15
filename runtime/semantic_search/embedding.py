@@ -57,6 +57,10 @@ class FullEmbedder:
             raise ValueError('Invalid device or thread count')
         if dimensions not in (128, 256, 512, 768):
             raise ValueError('Unsupported embedding dimension')
+        # NumPy/SciPy/OpenMP initialize their own pools during imports. Setting
+        # only torch.set_num_threads later leaves those pools at host defaults.
+        for name in ('OMP_NUM_THREADS', 'MKL_NUM_THREADS', 'OPENBLAS_NUM_THREADS'):
+            os.environ[name] = str(threads)
         os.environ['HF_HUB_OFFLINE'] = '1'
         os.environ['TRANSFORMERS_OFFLINE'] = '1'
         os.environ['USE_TF'] = '0'

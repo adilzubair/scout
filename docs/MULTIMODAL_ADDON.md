@@ -48,6 +48,17 @@ Memory profiling/reduction and the physical 16 GB run remain open. The runner
 records hardware and raw measurements and exports only diagnostic text/JSON,
 excluding weights, private runtimes, download caches and generated indexes.
 
+The subsequent native-pool fix applies the configured CPU thread limit before
+NumPy, SciPy and OpenMP imports; isolated parsers use one native thread. The full
+FP32 model is retained. A paired in-memory probe kept all six text/query/image/
+audio/video/joint-AV embeddings byte-identical and reduced worker peak commit
+from 6.38 to 5.10 GiB. The real published app/CLR replay then used 5.68 GiB for
+all seventeen authored files plus preview and 5.28 GiB at 100K segments, including
+the test app and nested workers. The 100K warm semantic p95 was 928.34 ms.
+Its process-cold first query was 20.0023 s and missed the 20 s target; retain this
+result rather than rounding it into a pass. Physical minimum hardware, broader
+content-window resource cases, cold startup and other release gates remain open.
+
 Scout now has an independent setup entry point, authenticated embedding worker,
 Windows process lifetime, and Multimodal settings page. The preview installs and
 tests the full EmbeddingGemma 2 model and indexes explicitly selected folders in

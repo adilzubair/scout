@@ -380,6 +380,14 @@ Proceed in this order, committing each verified unit:
    worker/extractor gate. Profile process contributions and reduce memory before
    declaring the resource budget met. Keep raw measurements and the known failed
    long-path/disk-reserve rehearsals; an engineering exit code is not release approval.
+   Native-pool profiling has since reduced the same packaged workloads to 5.68 GiB
+   (all-family) and 5.28 GiB (100K), including the test app, with CPU FP32 and all
+   encoders retained. Set BLAS/OpenMP limits before imports and use one native
+   thread in parsers. Six authored embedding outputs stayed byte-identical in the
+   paired probe. The updated replay's p95 is 928.34 ms, but its process-cold first
+   query is 20.0023 s, above the 20 s target. Preserve that miss; investigate cold
+   startup and representative maximum-window resource cases before closing these
+   gates. The physical 16 GB result and broader Laya/battery/UI work remain open.
 10. Finish distribution obligations and clean standard-account install/update/removal
    checks, rebuild the package and run packaged WPF checks. Physical 16 GB CPU
    hardware validation is still outstanding; a memory cap on the available 32 GB

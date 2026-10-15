@@ -7,15 +7,30 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+import os
+from unittest.mock import patch
 
 import numpy as np
-from semantic_search.embedding import local_file, normalize_vector, validate_content
+from semantic_search.embedding import FullEmbedder, local_file, normalize_vector, validate_content
 from semantic_search.manifest import load_manifest, verify_model
 
 TEST_ROOT = Path(__file__).resolve().parents[1] / 'artifacts/diagnostics/multimodal/contracts'
 
 
 class MultimodalContracts(unittest.TestCase):
+    def test_native_pools_are_capped_before_first_torch_import(self):
+        class FirstTorchImport(Exception): pass
+        original_import = __import__
+        names = ('OMP_NUM_THREADS', 'MKL_NUM_THREADS', 'OPENBLAS_NUM_THREADS')
+        def import_probe(name, *args, **kwargs):
+            if name == 'torch':
+                self.assertEqual([os.environ[key] for key in names], ['3'] * 3)
+                raise FirstTorchImport()
+            return original_import(name, *args, **kwargs)
+        with patch.dict(os.environ, {key: '32' for key in names}), patch('semantic_search.embedding.verify_model', return_value={}), patch('builtins.__import__', side_effect=import_probe):
+            with self.assertRaises(FirstTorchImport):
+                FullEmbedder('unused-test-model', threads=3)
+
     @classmethod
     def setUpClass(cls):
         TEST_ROOT.mkdir(parents=True, exist_ok=True)

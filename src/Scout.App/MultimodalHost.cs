@@ -176,6 +176,7 @@ internal sealed class MultimodalHost : IDisposable
         start.Environment["SCOUT_EMBEDDING_MODEL"] = installed.Model;
         start.Environment["SCOUT_EMBEDDING_DEVICE"] = options.Device;
         start.Environment["SCOUT_EMBEDDING_THREADS"] = options.CpuThreads.ToString();
+        foreach(var name in new[]{"OMP_NUM_THREADS","MKL_NUM_THREADS","OPENBLAS_NUM_THREADS"})start.Environment[name]=options.CpuThreads.ToString();
         start.Environment["SCOUT_PARENT_PID"] = Environment.ProcessId.ToString();
         start.Environment["HF_HUB_OFFLINE"] = "1"; start.Environment["TRANSFORMERS_OFFLINE"] = "1";
         start.Environment["PYTHONDONTWRITEBYTECODE"] = "1";

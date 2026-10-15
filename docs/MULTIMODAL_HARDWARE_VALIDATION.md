@@ -61,8 +61,11 @@ regression, Laya-on resource use, representative throughput/battery/disk growth,
 independent retrieval quality and native distribution obligations remain open.
 No public distribution approval is asserted.
 
-The 32 GB development rehearsal completed the workload: process-cold first query
-17.57 s, 100K semantic p95 545.98 ms, whole-job peaks 7.37 GiB (all-family) and
-6.54 GiB (scale). Those whole-tree memory totals do not establish the <6 GiB
-worker/extractor target. This is a baseline validation bundle, not a release
-candidate or a claim that the minimum-machine/resource gates have passed.
+The initial 32 GB rehearsal exceeded the memory budget. After limiting native
+pools before imports (four model threads, one parser thread), the published
+replay's whole-job peaks were 5.68 GiB for all-family validation and 5.28 GiB for
+100K scale; the full FP32 model and all encoders remain loaded. Warm semantic p95
+was 928.34 ms. Its process-cold first query was 20.0023 s and missed the 20 s
+target. That miss remains recorded. Physical minimum hardware, maximum-window
+resources and other release gates remain open. This is a validation bundle,
+not a release candidate or minimum-hardware approval.
