@@ -1029,3 +1029,32 @@ revision, not a dependency-version upgrade. The native policy is restored, and
 ordinary storage/source hashes are preserved. Exact committed-package resource
 replay and refreshed physical-PC validation delivery follow; the earlier cold
 miss and broader release requirements remain recorded.
+
+The exact committed `eacfe16` revision-3 package now passes three CPU process-cold
+queries (13,192.8882, 10,771.6937 and 10,873.9388 ms), the pinned 21-file/seven-
+family production-window workload, video preview and 100,000 segments across
+400 files. Warm semantic p95 is 331.5853 ms (maximum 371.9998), with 27 unique
+model calls and zero cache hits. Whole-job peak commit is 6,253,801,472 bytes for
+extraction/preview and 5,437,054,976 bytes for scale; all five measured phases
+remain below 6 GiB. These targets pass for this current 32 GB host with Laya off.
+
+The same committed package also passes actual revision-3 CUDA preparation,
+controlled audit rejection, CPU fallback, offline retry, all 21 files/seven
+families and preview on both devices, CPU rollback, CUDA reactivation and final
+CPU restoration. Both generations contain 12,350 prepared bytecode files and all
+thirteen pinned model files verify. Current device-content cold queries take
+10,346.1210 ms on CPU and 12,642.5038 ms on CUDA; whole-job peaks are 6,230,167,552
+and 5,525,397,504 bytes. Independent verification preserves the old environment,
+model, shared interpreter and original database/source bytes, and binds the
+committed package, driver and runtime sources to the raw reports.
+
+The refreshed hardware ZIP has SHA-256
+`6c9807577c0a1c248c35582a0d2dcc5211dfb393418b9555fafd97cfd6b84a74`, with 533 base
+files, 33 source-matched runtime files and all 563 ZIP entries verified. The prior
+`20358424` bundle is retained. The user will run physical 16 GB validation later.
+Bytecode preparation addresses the measured repeated-compilation cost; the
+specific earlier 30.863 s miss remains historical evidence with an unproven cause.
+Independent quality/abstention, same-device dependency-version upgrades, remaining
+account/volume/parser lifecycle checks, WPF/Laya/concurrency and broader resource
+coverage, and distribution clearance remain open. No input budget, admission
+threshold, model precision or content-family scope changed.

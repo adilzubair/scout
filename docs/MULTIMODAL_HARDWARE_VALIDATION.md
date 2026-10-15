@@ -102,3 +102,10 @@ comparison reduced three CPU cold queries from 15.49–17.86 s to 10.33–10.64 
 with identical authored embedding hashes. Review this bundle's own measurements;
 that comparison does not predict physical 16 GB behaviour or establish release
 approval. Keep earlier misses and broader concurrency/quality requirements open.
+
+The exact committed `eacfe16` package's 32 GB CPU replay completes all 21 fixtures,
+preview and 100K retrieval. Three process-cold queries take 13.19/10.77/10.87 s;
+warm semantic p95 is 331.59 ms. Whole-job peak commit is 5.82 GiB for extraction/
+preview and 5.06 GiB for scale. These use the existing revision-3 installation
+with Laya off and the OS file cache unflushed. They are current-host engineering
+results; the physical 16 GB gate and broader release requirements remain open.
