@@ -452,3 +452,24 @@ The earlier authored pilot admitted every negative query at the provisional
 Physical 16 GB Windows validation, remaining lifecycle/resource checks and runtime
 distribution clearance remain separate release gates. The user will run the
 physical hardware bundle later. This diagnostic cannot make the add-on release ready.
+
+## Natural-code development intake
+
+Six public Python source files from more-itertools, python-slugify, dateutil,
+Sorted Containers, NetworkX and ItsDangerous are retained privately for development
+diagnostics. Each repository is pinned to an immutable commit and captured commit
+metadata hash. `scripts/intake-github-code.py` reconstructs every traversed Git tree
+hash and verifies selected source/license Git blob hashes and sizes. Downloads use
+constructed HTTPS URLs without redirects. Sources receive opaque filenames and
+are never imported or executed. Original license notices and provenance remain
+beside the ignored originals; these sources are not shipped with Scout.
+
+Ten offline contracts cover nested membership, forged tree entries, modified
+cached files/provenance, selected symlinks, path escapes, budgets, inert code and
+frozen-pool protection. Nine existing shared ESC transport/provenance contracts
+also pass. The actual six-source intake passes a fully offline byte-identical
+manifest replay. This is source preparation only: no labels are frozen and no
+model inference has occurred at this milestone. Content, rights, related-group
+and task review remain explicit. These repositories, derivatives and resulting
+queries are development material and must stay outside a future independent
+release holdout. The 0.35 admission floor and all seven-family gates are unchanged.

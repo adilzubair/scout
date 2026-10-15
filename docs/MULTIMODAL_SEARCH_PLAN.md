@@ -1058,3 +1058,13 @@ Independent quality/abstention, same-device dependency-version upgrades, remaini
 account/volume/parser lifecycle checks, WPF/Laya/concurrency and broader resource
 coverage, and distribution clearance remain open. No input budget, admission
 threshold, model precision or content-family scope changed.
+
+Quality work resumes with six pinned natural Python files from independent public
+repositories. A bounded inert-code intake verifies commit metadata, reconstructed
+Git trees and selected blob hashes; ten new offline integrity contracts and nine
+shared transport contracts pass. The completed private intake also replays offline
+without changing its manifest. It has not run inference or frozen task labels.
+Next, ground development positives and supported absent-capability negatives in
+the actual source contents, freeze before inference, and measure the unchanged
+production policy. Keep these related sources/queries out of the future release
+holdout. Physical 16 GB validation remains pending for the user's later run.
