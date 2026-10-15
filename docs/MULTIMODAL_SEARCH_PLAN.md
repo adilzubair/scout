@@ -3,7 +3,7 @@
 Date: 2026-10-15. Branch: `feature/multimodal-semantic-search`.
 Status: implementation active; resumed on 2026-10-15 from checkpoint `909bb60`.
 Retrieval, previews, OCR and format coverage are committed. The frozen evaluation
-foundation passes 323 Release checks; independent quality and release gates remain open.
+foundation passes 333 Release checks; independent quality and release gates remain open.
 This plan is the implementation checklist; the add-on remains a
 preview until the release gates below pass. The full-model runtime and content smoke probe
 are implemented and verified on CPU and CUDA. On 2026-10-14 the user directed
@@ -642,3 +642,20 @@ not independent quality proof. English (US) OCR is smoke-tested; Arabic is not
 installed and has no recognition-quality evidence. Packaged forced-death recovery,
 resource/hardware measurements and distribution/install checks remain open.
 The add-on is not release ready.
+
+The next quality slice adds a pinned ESC-10 natural-audio development diagnostic;
+see `docs/MULTIMODAL_QUALITY_EVALUATION.md`. Twenty unique original clips from ten
+classes have human-authored upstream presence labels and retained per-clip
+attribution. Ten ambiguous queries accept both known class matches. The inputs
+were frozen before inference; all sources and metadata reproduce byte-for-byte
+offline, with the Git tree and blob membership verified. Nine offline provenance
+contracts pass. These are development-only sources, not the independent holdout.
+There are no negative or precise-event-timing labels. Keep their original source
+identities and derivatives out of the future holdout. Physical 16 GB validation
+is pending the user's later run; do not ask for that hardware again.
+The first actual CPU run indexed all twenty sources but returned no files for
+all ten queries at every dimension. There were no adapter disagreements. The
+parser treats generic "recording" as video and excludes all audio candidates
+before scoring. Retain the frozen queries and failed report, correct the media
+eligibility bug, then rerun this same development regression without changing
+the admission floor. This is not an opened release holdout.
