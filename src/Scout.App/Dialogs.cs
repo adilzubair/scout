@@ -66,7 +66,7 @@ internal sealed class GroupWindow : Window
 internal sealed class SettingsWindow : Window
 {
     public ScoutSettings Value { get; private set; }
-    public SettingsWindow(ScoutSettings settings, Func<string, bool> applyHotkey, Action clearHistory, MultimodalHost? multimodalHost = null, Action? addonRemoved = null, SemanticService? semantic = null, Func<Window,string?>? pickFolder = null)
+    public SettingsWindow(ScoutSettings settings, Func<string, bool> applyHotkey, Action clearHistory, MultimodalHost? multimodalHost = null, Action? addonRemoved = null, SemanticService? semantic = null, Func<Window,string?>? pickFolder = null, Action<ScoutSettings>? persistSettings = null)
     {
         Value = settings;
         Title = "Scout settings"; Width = 800; Height = 654; MinWidth = 680; MinHeight = 460; WindowStartupLocation = WindowStartupLocation.CenterOwner;
@@ -408,11 +408,21 @@ internal sealed class SettingsWindow : Window
             if (embeddingEnabled.IsChecked == true && selectedTypes.Length == 0) { Error("Choose at least one content type.", 3, embeddingTypes.First().Value); return; }
             if (embeddingEnabled.IsChecked == true && MultimodalSetup.Find()?.Device != (string)embeddingDevice.SelectedItem) { Error("Install the add-on for the selected processing device first.", 3, embeddingInstall); return; }
             if (!applyHotkey(shortcut.Text.Trim())) { Error("That shortcut is invalid or already in use. Try Ctrl+Alt+S.", 0, shortcut); return; }
-            Value = new ScoutSettings { ChromeHistory = chrome.IsChecked == true, EdgeHistory = edge.IsChecked == true, WindowsSearch = windows.IsChecked == true, RecentItems = recent.IsChecked == true, WebFallback = web.IsChecked == true, AutomationFolders = automationFolders, ContentSearchEnabled = contentSearch.IsChecked == true, ContentFolders = indexedContentFolders, AiEnabled = ai.IsChecked == true, SemanticHelper = semanticHelper?.IsChecked == true, PythonPath = python.Text.Trim(), Model = (string)checkpoint.SelectedItem, Device = (string)device.SelectedItem, CpuThreads = settings.CpuThreads, Hotkey = shortcut.Text.Trim(), ExtraFolders = extra, Exclusions = exclusions };
-            Value.Multimodal = new() { Enabled = embeddingEnabled.IsChecked == true, Paused = embeddingPaused.IsChecked == true,
+            var next = new ScoutSettings { ChromeHistory = chrome.IsChecked == true, EdgeHistory = edge.IsChecked == true, WindowsSearch = windows.IsChecked == true, RecentItems = recent.IsChecked == true, WebFallback = web.IsChecked == true, AutomationFolders = automationFolders, ContentSearchEnabled = contentSearch.IsChecked == true, ContentFolders = indexedContentFolders, AiEnabled = ai.IsChecked == true, SemanticHelper = semanticHelper?.IsChecked == true, PythonPath = python.Text.Trim(), Model = (string)checkpoint.SelectedItem, Device = (string)device.SelectedItem, CpuThreads = settings.CpuThreads, Hotkey = shortcut.Text.Trim(), ExtraFolders = extra, Exclusions = exclusions };
+            next.Multimodal = new() { Enabled = embeddingEnabled.IsChecked == true, Paused = embeddingPaused.IsChecked == true,
                 PauseOnBattery = embeddingBattery.IsChecked == true,
                 Folders = embeddingRoots, Modalities = selectedTypes,OcrLanguages=selectedOcr, Device = (string)embeddingDevice.SelectedItem,
                 CpuThreads = (int)embeddingThreads.SelectedItem, IndexQuotaBytes = (long)embeddingQuota.SelectedItem * 1024*1024*1024 };
+            try { persistSettings?.Invoke(next); }
+            catch(Exception error) when(error is IOException or UnauthorizedAccessException or Microsoft.Data.Sqlite.SqliteException)
+            {
+                _ = applyHotkey(settings.Hotkey);
+                feedback.Text = "Settings couldn't be saved. Your edits are still here. Check access to Scout's data folder, then try Save settings again.";
+                feedback.Visibility = Visibility.Visible;
+                save.Focus();
+                return;
+            }
+            Value = next;
             DialogResult = true;
         };
         SelectPage(pages[0].Page);

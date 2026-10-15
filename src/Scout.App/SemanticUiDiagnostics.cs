@@ -40,9 +40,9 @@ public partial class MainWindow
         }
         var pack=Path.GetFullPath("artifacts/diagnostics/multimodal/office-fixtures-v2");
         if(!File.Exists(Path.Combine(pack,"fixtures.json")))return;
-        var addon=Path.GetFullPath("artifacts/diagnostics/multimodal/addon-no-office");
+        var addon=Path.GetFullPath(Environment.GetEnvironmentVariable("SCOUT_UI_TEST_ADDON_ROOT")??"artifacts/diagnostics/multimodal/addon-no-office");
         var installation=MultimodalSetup.Find(addon)??throw new IOException("Missing authored Office test runtime.");
-        var home=Path.GetFullPath(".runtime/python/cpython-3.12.13-windows-x86_64-none");
+        var home=Path.GetFullPath(Environment.GetEnvironmentVariable("SCOUT_UI_TEST_PYTHON_HOME")??".runtime/python/cpython-3.12.13-windows-x86_64-none");
         var scope=new SemanticScope(true,[pack],[],["documents","presentations","spreadsheets"],installation.Revision,"ui-office");
         var vector=new float[768];vector[0]=1;
         // This verifies actual sandbox extraction and UI navigation. Model quality

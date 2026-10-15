@@ -34,7 +34,7 @@ public partial class MainWindow : Window
     private SearchResult? lexicalCurrent;
     private IReadOnlyList<SearchHit> displayedHits = [];
     private RankResult? judgment;
-    private readonly EventWaitHandle showEvent = new(false, EventResetMode.AutoReset, "Local\\Scout.Show");
+    private readonly EventWaitHandle showEvent = new(false, EventResetMode.AutoReset, App.ShowEventName);
     private readonly RegisteredWaitHandle wait;
     private readonly DispatcherTimer indexRefresh;
     private readonly DispatcherTimer uiRefresh;
@@ -542,18 +542,20 @@ public partial class MainWindow : Window
     }
     private async void OpenGroupClick(object sender, RoutedEventArgs e) => await Execute(group.Values.ToArray());
     private void SettingsClick(object sender, RoutedEventArgs e) => ShowSettings();
-    internal async void ShowSettings()
+    internal async void ShowSettings() => await ShowSettingsAsync();
+    internal async Task ShowSettingsAsync()
     {
         Toggle(true);
         var dialog = new SettingsWindow(store.Settings, ApplyHotkey, () => store.ClearLaunchHistory(), multimodal,
-            () => { var saved = store.Settings; saved.Multimodal.Enabled = false; store.SaveSettings(saved); },index.Semantic) { Owner = this };
+            () => { var saved = store.Settings; saved.Multimodal.Enabled = false; store.SaveSettings(saved); },index.Semantic,persistSettings:store.SaveSettings) { Owner = this };
         if (dialog.ShowDialog() == true)
         {
-            search.Cancel(); revision++; uiRefresh.Stop(); await model.ResetAsync();
+            search.Cancel(); revision++; uiRefresh.Stop();
             try
             {
-                await index.ConfigureAsync(dialog.Value);
-                store.SaveSettings(dialog.Value);
+                // Settings is already durable before its dialog closes. Revoke
+                // old content eligibility immediately, then apply in background.
+                await Task.WhenAll(index.ConfigureAsync(dialog.Value),model.ResetAsync());
                 if(index.Semantic==null)await multimodal.ConfigureAsync(dialog.Value.Multimodal);
                 enriched = []; ClearGroup();
                 indexChanged = false; observedIndexVersion = index.Version; ScheduleSearch(false);
@@ -561,7 +563,7 @@ public partial class MainWindow : Window
             catch (Exception error) when (error is IOException or UnauthorizedAccessException or Microsoft.Data.Sqlite.SqliteException)
             {
                 indexChanged = false; observedIndexVersion = index.Version;
-                Status.Text = "Settings weren't saved. Check access to Scout's data folder and selected folders, then try again.";
+                Status.Text = "Settings saved. The content index couldn't be updated. Check folder access or restart Scout to retry.";
             }
             finally { uiRefresh.Start(); _ = model.WarmAsync(store.Settings); }
         }

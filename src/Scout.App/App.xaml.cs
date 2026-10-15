@@ -12,27 +12,54 @@ public partial class App : Application
     private IndexService? index;
     private ModelHost? model;
     private MultimodalHost? multimodal;
+    internal static bool IsIsolatedDiagnostic { get; private set; }
+    internal static string ShowEventName => IsIsolatedDiagnostic ? "Local\\Scout.Test.Show" : "Local\\Scout.Show";
     internal static string DataDirectory => Environment.GetEnvironmentVariable("SCOUT_DATA_DIR") ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Scout");
     protected override async void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
         var uiSmoke = e.Args.Contains("--ui-smoke-test");
         var folderPickerSmoke = e.Args.Contains("--folder-picker-smoke-test");
+        var settingsE2e = e.Args.Length == 2 && e.Args[0] == "--settings-e2e-test" && e.Args[1] is "write" or "read";
+        if(e.Args.Contains("--settings-e2e-test") && !settingsE2e){Shutdown(1);return;}
         var smoke = uiSmoke || folderPickerSmoke || e.Args.Contains("--smoke-test");
         var diagnose = e.Args.Contains("--diagnose");
         var realworld = e.Args.Contains("--realworld-diagnose");
         var bluetooth = e.Args.Contains("--bluetooth-diagnose");
-        if ((uiSmoke || folderPickerSmoke || realworld || bluetooth) && string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("SCOUT_DATA_DIR"))) { Shutdown(1); return; }
-        instance = new Mutex(true, smoke || diagnose || realworld || bluetooth ? "Local\\Scout.Test" : "Local\\Scout.Launcher", out var first);
+        IsIsolatedDiagnostic = smoke || settingsE2e || diagnose || realworld || bluetooth;
+        if ((uiSmoke || folderPickerSmoke || settingsE2e || realworld || bluetooth) && string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("SCOUT_DATA_DIR"))) { Shutdown(1); return; }
+        instance = new Mutex(true, IsIsolatedDiagnostic ? "Local\\Scout.Test" : "Local\\Scout.Launcher", out var first);
         if (!first)
         {
-            try { using var signal = EventWaitHandle.OpenExisting("Local\\Scout.Show"); signal.Set(); } catch (WaitHandleCannotBeOpenedException) { }
+            try { using var signal = EventWaitHandle.OpenExisting(ShowEventName); signal.Set(); } catch (WaitHandleCannotBeOpenedException) { }
             Shutdown(); return;
         }
         try
         {
             Directory.CreateDirectory(DataDirectory);
             var store = new ScoutStore(Path.Combine(DataDirectory, "scout.db"));
+            if (settingsE2e)
+            {
+                if (e.Args[1] == "write") SettingsPersistenceDiagnostics.Prepare(store);
+                index = SettingsPersistenceDiagnostics.CreateIndex(store);
+                model = new ModelHost(); multimodal = new MultimodalHost();
+                index.EnableSemantic(multimodal,DataDirectory);
+                var testMain = new MainWindow(store,index,model,multimodal); MainWindow = testMain;
+                testMain.Show();
+                await testMain.Dispatcher.InvokeAsync(() => { });
+                try
+                {
+                    await SettingsPersistenceDiagnostics.Run(testMain,store,index,e.Args[1]);
+                    File.WriteAllText(Path.Combine(DataDirectory,"settings-e2e-"+e.Args[1]+".txt"),"PASS settings UI, durable persistence, immediate reopen, index failure, validation, cancellation, ordinary search and restart verification.");
+                }
+                catch(Exception error)
+                {
+                    File.WriteAllText(Path.Combine(DataDirectory,"settings-e2e-"+e.Args[1]+".txt"),error.ToString());
+                    Environment.ExitCode=1;
+                }
+                finally { SettingsPersistenceDiagnostics.ReleaseIndex(); Shutdown(); }
+                return;
+            }
             if (diagnose)
             {
                 var testSettings = store.Settings;

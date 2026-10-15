@@ -188,9 +188,9 @@ public partial class MainWindow
         var mediaPack=Path.GetFullPath("artifacts/diagnostics/multimodal/media-fixtures-v1");
         if(Directory.Exists(mediaPack))
         {
-            var addon=Path.GetFullPath("artifacts/diagnostics/multimodal/addon-no-office");
+            var addon=Path.GetFullPath(Environment.GetEnvironmentVariable("SCOUT_UI_TEST_ADDON_ROOT")??"artifacts/diagnostics/multimodal/addon-no-office");
             var installation=MultimodalSetup.Find(addon)??throw new IOException("The authored media smoke needs its test add-on.");
-            var pythonHome=Path.GetFullPath(".runtime/python/cpython-3.12.13-windows-x86_64-none");
+            var pythonHome=Path.GetFullPath(Environment.GetEnvironmentVariable("SCOUT_UI_TEST_PYTHON_HOME")??".runtime/python/cpython-3.12.13-windows-x86_64-none");
             var mediaScope=new SemanticScope(true,[mediaPack],[],["audio","video"],installation.Revision,"preview-test");
             foreach(var name in new[]{"tone.wav","tone.mp3","tone.m4a","tone.flac","scene.mp4","scene.mov","scene.mkv","scene.webm"})
             {
