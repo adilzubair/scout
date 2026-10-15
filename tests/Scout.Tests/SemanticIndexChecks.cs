@@ -8,6 +8,43 @@ static class SemanticIndexChecks
     private static readonly DateTimeOffset Now = new(2026, 10, 14, 12, 0, 0, TimeSpan.Zero);
     public static void Run(Action<string, Action> test)
     {
+        test("Batched evidence preserves ranking, payloads and partial coverage with missing IDs",()=>With(f=>
+        {
+            var source=f.Source("selected/batch.txt");f.Index.Configure(f.Scope);f.Index.Reconcile([source]);
+            var segments=Enumerable.Range(1,3).Select(line=>Segment("evidence "+line) with
+                {Locator=new("lines"){StartLine=line,EndLine=line},Thumbnail=[(byte)line]}).ToArray();
+            Check(f.Index.Publish(f.Index.Claim(Now)!,source.Revision,Digest("batch"),segments,true,"page_limit",1_000_000)==SemanticPublish.Accepted);
+            var ids=f.Index.Vectors().OrderByDescending(row=>f.Index.Evidence(row.SegmentId)!.Locator.StartLine).Select(row=>row.SegmentId).ToArray();
+            var batch=f.Index.EvidenceBatch(ids);
+            Check(batch.Select(item=>item.SegmentId).SequenceEqual(ids) && batch.Select(item=>item.Locator.StartLine).SequenceEqual(new int?[]{3,2,1}));
+            Check(batch.All(item=>item.Partial && item.Coverage=="page_limit" && item.Path==source.Path && item.Revision==source.Revision &&
+                item.CandidateId==source.CandidateId && item.Modality=="text" && item.Text=="evidence "+item.Locator.StartLine && item.Thumbnail.SequenceEqual(new[]{(byte)item.Locator.StartLine!})));
+            Check(f.Index.EvidenceBatch([ids[2],"missing' OR 1=1 --",ids[0]]).Select(item=>item.SegmentId).SequenceEqual([ids[2],ids[0]]));
+            Check(f.Index.EvidenceBatch([ids[0],ids[0]]).Select(item=>item.SegmentId).SequenceEqual([ids[0],ids[0]]));
+            Check(f.Index.EvidenceBatch([]).Length==0);
+            Throws<ArgumentOutOfRangeException>(()=>f.Index.EvidenceBatch([ids[0],ids[1],ids[2],"fourth"]));
+        }));
+        test("Batched evidence cannot recover changed, excluded or disabled source generations",()=>With(f=>
+        {
+            var source=f.Seed("selected/a.txt");var id=f.Index.Vectors().Single().SegmentId;
+            f.Index.Reconcile([source with {Revision=Digest("changed")}]);Check(f.Index.EvidenceBatch([id]).Length==0);
+            source=f.Seed("selected/a.txt");id=f.Index.Vectors().Single().SegmentId;
+            f.Index.Configure(f.Scope with {Exclusions=[source.Path]});Check(f.Index.EvidenceBatch([id]).Length==0);
+            f.Seed("selected/a.txt");id=f.Index.Vectors().Single().SegmentId;
+            f.Index.Configure(f.Scope with {Enabled=false});Check(f.Index.EvidenceBatch([id]).Length==0);
+        }));
+        test("Batched evidence rejects a malformed stored locator before returning content",()=>With(f=>
+        {
+            f.Seed("selected/a.txt");var id=f.Index.Vectors().Single().SegmentId;
+            using(var connection=new SqliteConnection(new SqliteConnectionStringBuilder{DataSource=f.Database,Pooling=false}.ToString()))
+            {
+                connection.Open();using var command=connection.CreateCommand();
+                command.CommandText="UPDATE semantic_segments SET locator=$locator WHERE id=$id";
+                command.Parameters.AddWithValue("$locator","{\"Kind\":\"lines\",\"StartLine\":0,\"EndLine\":1}");command.Parameters.AddWithValue("$id",id);
+                Check(command.ExecuteNonQuery()==1);
+            }
+            Throws<InvalidDataException>(()=>f.Index.EvidenceBatch([id]));
+        }));
         test("Legacy formats and archives have metadata-only unsupported coverage without content jobs",()=>With(f=>
         {
             f.Index.Configure(f.Scope with {Families=MultimodalSettings.ContentTypes});

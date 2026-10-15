@@ -818,3 +818,21 @@ package and 547.4044 ms for the initial scope-cache probe, with 27 unique model
 queries and zero cache hits each. Host conditions vary; the older 1,099.034 ms
 miss remains recorded, and these runs do not establish physical 16 GB or UI
 approval. Per-evidence database-open overhead remains the next profiling target.
+
+Each admitted file now loads its ranked evidence in one bounded SQLite operation
+instead of opening a connection for each of up to three segments. The operation
+retains ready-status/scope filtering, locator validation, revision/path checks,
+partial coverage, thumbnails and input ranking order. Removed IDs are omitted;
+no evidence cache survives a source generation. A batch cannot exceed three IDs.
+Contracts cover ordered/missing/duplicate IDs, parameter binding, partial payloads,
+changed/excluded/disabled sources and malformed stored locators. The final native
+suite passes 348 checks, including the stronger repeated-segment lookup contract.
+
+The batching probe's unchanged 100,000-segment/400-file workload measured
+253.0177 ms semantic p95 (maximum 362.5127), 80.973 ms query-embedding p95 and
+184.4877 ms adapter/fusion p95. All 27 model calls were unique, with no query-cache
+hits. The unchanged-package and initial scope-cache probes measured 623.331 and
+547.4044 ms respectively. These are current-host engineering observations with
+varying load, not physical 16 GB or independent retrieval-quality approval. The
+older cold/p95 misses remain retained; exact committed packaged resource replay
+is the next verification step. No admission threshold or dependency pin changed.

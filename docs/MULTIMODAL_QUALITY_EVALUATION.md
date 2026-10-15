@@ -362,6 +362,19 @@ open. No model, dependency, protocol or admission-threshold pins changed.
 
 ## Open release evidence
 
+Retrieval overhead is now measured separately from model queries on the existing
+100,000-segment synthetic workload. Request-local file/family scope reuse and a
+single bounded evidence read per admitted file retain the structural, native
+revision and database checks before admission. The initial batching probe measures
+253.0177 ms semantic p95, 80.973 ms embedding p95 and 184.4877 ms adapter/fusion p95;
+the fresh unchanged package measures 623.331 ms semantic p95. Each run makes 27
+unique full-model CPU queries with zero query-cache hits. Host load differs, and
+the earlier 1,099.034 ms miss remains evidence. All 348 native contracts pass,
+including evidence ordering, removed/revoked rows, malformed locators and a source
+edited after cached retrieval. This verifies performance work and invariants;
+synthetic vectors do not establish retrieval quality, ordinary WPF latency or
+minimum hardware. Exact committed packaged resource replay remains separate.
+
 Natural images, video, joint audiovisual events, multilingual and complex Office
 content still need independent content-grounded tasks. The holdout needs supported
 negatives, close distractors, ambiguous queries and independent source groups

@@ -74,7 +74,7 @@ internal sealed partial class SemanticService
                     if(generation!=Epoch)return false;
                     var item=eligible[match.CandidateId];var current=SemanticSourceReader.Read(item.Target,Scope);
                     if(current==null || current.Revision!=match.Revision)return false;
-                    var evidence=match.SegmentIds.Select(target.Evidence).OfType<SemanticEvidence>()
+                    var evidence=target.EvidenceBatch(match.SegmentIds)
                         .Where(e=>e.CandidateId==item.Id && e.Revision==match.Revision && e.Path.Equals(item.Target,StringComparison.OrdinalIgnoreCase)).ToArray();
                     if(evidence.Length==0)return false;
                     admitted.Add(new(item,match.Score,evidence){Pinned=library.GetValueOrDefault(item.Id)?.Pinned==true});

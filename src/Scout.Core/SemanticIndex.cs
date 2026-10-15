@@ -229,17 +229,34 @@ public sealed class SemanticIndex : IDisposable
         }
         return new SemanticVectorSnapshot(Generation,Version,rows.ToArray());
     });
-    public SemanticEvidence? Evidence(string segmentId) => WithConnection(connection =>
+    public SemanticEvidence? Evidence(string segmentId) => EvidenceBatch([segmentId]).SingleOrDefault();
+    public SemanticEvidence[] EvidenceBatch(IReadOnlyList<string> segmentIds)
     {
-        if (!scope.Enabled) return null;
-        using var query = Command(connection, "SELECT s.id,f.id,f.revision,f.path,f.family,s.modality,s.locator,s.evidence,s.thumbnail,f.partial,f.detail FROM semantic_segments s JOIN semantic_files f ON f.id=s.file_id WHERE s.id=$id AND f.status='ready'", null, ("$id", segmentId));
-        using var reader = query.ExecuteReader();
-        if (!reader.Read() || !scope.Allows(reader.GetString(3), reader.GetString(4))) return null;
-        var locator = JsonSerializer.Deserialize<ContentLocator>(reader.GetString(6)) ?? throw new InvalidDataException("Missing locator.");
-        locator.Validate();
-        return new SemanticEvidence(reader.GetString(0), reader.GetString(1), reader.GetString(2), reader.GetString(3), reader.GetString(5),
-            locator, reader.GetString(7), (byte[])reader.GetValue(8)){Partial=reader.GetInt32(9)!=0,Coverage=reader.GetString(10)};
-    });
+        ArgumentNullException.ThrowIfNull(segmentIds);
+        if(segmentIds.Count>3)throw new ArgumentOutOfRangeException(nameof(segmentIds));
+        var ids=segmentIds.ToArray(); // Snapshot caller-owned input before taking the database lock.
+        if(ids.Length>3)throw new ArgumentOutOfRangeException(nameof(segmentIds));
+        if(ids.Length==0)return [];
+        return WithConnection(connection =>
+        {
+            if(!scope.Enabled)return [];
+            var parameters=ids.Select((id,i)=>(Name:"$id"+i,Value:(object)id)).ToArray();
+            using var query=Command(connection,"SELECT s.id,f.id,f.revision,f.path,f.family,s.modality,s.locator,s.evidence,s.thumbnail,f.partial,f.detail FROM semantic_segments s JOIN semantic_files f ON f.id=s.file_id WHERE s.id IN ("+
+                string.Join(',',parameters.Select(parameter=>parameter.Name))+") AND f.status='ready'",null,parameters);
+            using var reader=query.ExecuteReader();var found=new Dictionary<string,SemanticEvidence>();
+            while(reader.Read())
+            {
+                if(!scope.Allows(reader.GetString(3),reader.GetString(4)))continue;
+                var locator=JsonSerializer.Deserialize<ContentLocator>(reader.GetString(6))??throw new InvalidDataException("Missing locator.");locator.Validate();
+                var item=new SemanticEvidence(reader.GetString(0),reader.GetString(1),reader.GetString(2),reader.GetString(3),reader.GetString(5),
+                    locator,reader.GetString(7),(byte[])reader.GetValue(8)){Partial=reader.GetInt32(9)!=0,Coverage=reader.GetString(10)};
+                found.Add(item.SegmentId,item);
+            }
+            // SQL IN order is unspecified. Preserve ranked evidence order and omit
+            // rows that were removed, replaced or revoked since the vector snapshot.
+            return ids.Select(id=>found.GetValueOrDefault(id)).OfType<SemanticEvidence>().ToArray();
+        });
+    }
     public SemanticFileStatus[] Files(int maximum=600000,bool incompleteOnly=false) => WithConnection(connection =>
     {
         if(maximum is < 1 or > 600000)throw new ArgumentOutOfRangeException(nameof(maximum));
