@@ -25,14 +25,29 @@ static class MultimodalSessionChecks
             using var child=Process.Start(start)!;
             try
             {
-                var until=DateTime.UtcNow.AddSeconds(10);
-                while(!File.Exists(receipt)){if(child.HasExited || DateTime.UtcNow>=until)throw new IOException("Session owner did not start.");Thread.Sleep(25);}
-                var path=File.ReadAllText(receipt);
+                using var deadline=new CancellationTokenSource(TimeSpan.FromSeconds(10));
+                var path=ReadOwnerReceiptAsync(receipt,child,deadline.Token).GetAwaiter().GetResult();
                 MultimodalSession.Recover(root);Check(Directory.Exists(path));
                 child.Kill();Check(child.WaitForExit(10000));
                 MultimodalSession.Recover(root);Check(!Directory.Exists(path));
             }
             finally {if(!child.HasExited){child.Kill(true);child.WaitForExit(10000);}}
+        }));
+        test("Worker-session readiness checks wait for sharing locks and remain cancellable",()=>With(root=>
+        {
+            var receipt=Path.Combine(root,"owner-ready.txt");File.WriteAllText(receipt,"owned");
+            using var process=Process.GetCurrentProcess();using var deadline=new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            Task<string> pending;
+            using(var held=new FileStream(receipt,FileMode.Open,FileAccess.Read,FileShare.None))
+            {
+                pending=ReadOwnerReceiptAsync(receipt,process,deadline.Token);
+                Check(!pending.IsCompleted);
+                using var canceled=new CancellationTokenSource();var stopped=ReadOwnerReceiptAsync(receipt,process,canceled.Token);
+                canceled.Cancel();
+                try{stopped.GetAwaiter().GetResult();throw new IOException("Locked receipt ignored cancellation.");}
+                catch(OperationCanceledException)when(canceled.IsCancellationRequested){}
+            }
+            Check(pending.GetAwaiter().GetResult()=="owned");
         }));
         test("Worker recovery preserves unmarked directories and unexpected user files",()=>With(root=>
         {
@@ -57,6 +72,22 @@ static class MultimodalSessionChecks
         File.WriteAllText(receipt+".partial",session.DirectoryPath);
         File.Move(receipt+".partial",receipt);
         Thread.Sleep(TimeSpan.FromMinutes(2));return 0;
+    }
+    private static async Task<string> ReadOwnerReceiptAsync(string receipt,Process child,CancellationToken token)
+    {
+        while(true)
+        {
+            token.ThrowIfCancellationRequested();
+            if(child.HasExited)throw new IOException("Session owner did not start.");
+            try
+            {
+                using var file=new FileStream(receipt,FileMode.Open,FileAccess.Read,FileShare.Read|FileShare.Delete);
+                if(file.Length is < 1 or > 4096)throw new InvalidDataException("Invalid session-owner receipt.");
+                using var reader=new StreamReader(file);return await reader.ReadToEndAsync(token).ConfigureAwait(false);
+            }
+            catch(IOException error)when((error.HResult&0xffff) is 2 or 32 or 33)
+            {await Task.Delay(25,token).ConfigureAwait(false);}
+        }
     }
     private static void Check(bool value){if(!value)throw new IOException("Worker session assertion failed.");}
     private static void With(Action<string> action)
