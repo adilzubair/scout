@@ -2,6 +2,37 @@
 
 Date: 2026-10-15. Branch: `feature/multimodal-semantic-search`.
 
+Storage maintenance now keeps the selected generation and one recent completed
+rollback generation for the same device, plus two completed generations for the
+other device. Successful setup prunes older and unfinished generation directories.
+The settings action **Free unused add-on storage** also clears the private uv/HF
+download caches. It stops this app's workers first; another active runtime lease
+blocks cleanup. Package installation explicitly uses hardlinks, so deleting a
+cache entry leaves retained environment bytes available. Actual disk space freed
+can be smaller than the logical cache size because hardlinks share storage.
+
+Cleanup validates all selected trees before moving them into owned quarantine.
+Interrupted quarantined deletions can be retried. Links and unknown generation
+metadata block download-cache clearing. Generations referenced by unfinished
+sandbox permission recovery are kept. Cleanup preserves content indexes, ordinary
+Scout storage, selected originals, Laya and prepared previews. It does not reclaim
+old extraction assets or bypass cross-generation permission recovery. The model,
+private runtime and current installation remain installed.
+
+The published-library native run cleared 24,721 actual dependency-cache files and
+both cache directories, removed an unfinished generation, preserved a prepared
+video clip and its source, then passed real CPU queries and sandboxed parsing.
+An active worker blocked cleanup. The archived prior package subsequently
+verified and queried its retained environment offline; current-package reactivation
+also passed. Every retained prior venv/model file hash, ordinary database and
+source hash stayed unchanged. The successful retry reused an already-pruned
+completed-generation set; it does not independently repeat three-generation
+pruning. The first attempt's preview timeout and the separate retained-fixture
+assumption failure remain recorded. Playback now starts the private interpreter
+directly with trusted venv activation, matching content extraction. Ten maintenance
+guards, 333 full regression checks, 24 package contracts and the published WPF
+smoke pass. Clean-account, real exhausted-volume and distribution gates remain open.
+
 Scout now has an independent setup entry point, authenticated embedding worker,
 Windows process lifetime, and Multimodal settings page. The preview installs and
 tests the full EmbeddingGemma 2 model and indexes explicitly selected folders in

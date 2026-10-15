@@ -139,7 +139,7 @@ def main():
         # Refresh only unpublished environments, preserving packages/downloads.
         run([interpreter,'-m','venv','--without-pip','--copies',generation/'venv'],env)
         verify_venv_home(python,interpreter)
-        run([args.uv, 'pip', 'sync', '--python', python, '--require-hashes', '--index-strategy',
+        run([args.uv, 'pip', 'sync', '--python', python, '--require-hashes', '--link-mode', 'hardlink', '--index-strategy',
              'unsafe-best-match', ROOT / f'runtime/semantic_search/requirements.{args.device}.lock.txt'], env)
         model = generation / 'model'
         print('Preparing the full multimodal model...', flush=True)

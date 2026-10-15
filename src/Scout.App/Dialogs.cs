@@ -230,13 +230,16 @@ internal sealed class SettingsWindow : Window
         var embeddingCancel = new Button { Content = "Cancel setup", IsEnabled = false, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 0, 0, 6) };
         var embeddingTest = new Button { Content = "Test add-on", HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 0, 0, 6) };
         var embeddingRemove = new Button { Content = "Remove add-on", HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 0, 0, 6) };
+        var embeddingCleanup = new Button { Content = "Free unused add-on storage", IsEnabled=MultimodalSetup.Find()!=null, HorizontalAlignment=HorizontalAlignment.Left, Margin=new Thickness(0,0,0,6) };
+        AutomationProperties.SetName(embeddingCleanup,"Free unused add-on storage");
+        multimodal.Children.Add(embeddingCleanup);
         multimodal.Children.Add(embeddingInstall); multimodal.Children.Add(embeddingCancel); multimodal.Children.Add(embeddingTest); multimodal.Children.Add(embeddingRemove); multimodal.Children.Add(embeddingStatus);
         Note(multimodal, "Install downloads several GB and needs additional temporary disk space. Installation and removal take effect immediately. Removing the add-on preserves your ordinary file library and Laya.");
         // Keep setup actions near the top so an uninstalled add-on is easy to prepare.
         var downloadNote = multimodal.Children[multimodal.Children.Count - 1];
         multimodal.Children.Remove(downloadNote);
         var setupActions = new WrapPanel();
-        foreach (var button in new[] { embeddingInstall, embeddingCancel, embeddingTest, embeddingRemove })
+        foreach (var button in new[] { embeddingInstall, embeddingCancel, embeddingTest, embeddingCleanup, embeddingRemove })
         {
             multimodal.Children.Remove(button); button.Margin = new Thickness(0, 0, 8, 8); setupActions.Children.Add(button);
         }
@@ -270,6 +273,7 @@ internal sealed class SettingsWindow : Window
         void Busy(bool value)
         {
             embeddingInstall.IsEnabled = embeddingTest.IsEnabled = embeddingRemove.IsEnabled = embeddingDevice.IsEnabled = !value;
+            embeddingCleanup.IsEnabled=!value && MultimodalSetup.Find()!=null;
             embeddingCancel.IsEnabled = value;
             retryContent.IsEnabled = !value && semantic!=null;
             save.IsEnabled = !value;
@@ -334,6 +338,27 @@ internal sealed class SettingsWindow : Window
             catch (Microsoft.Data.Sqlite.SqliteException) { embeddingStatus.Text = "Content indexing is disabled, but the setting could not be saved. The add-on was kept. Try saving settings before removing it."; }
             catch (Exception error) when (error is IOException or UnauthorizedAccessException) { embeddingStatus.Text = "Removal did not finish. Close other add-on workers and try again."; }
             finally { Busy(false); }
+        };
+        embeddingCleanup.Click+=async(_,_)=>
+        {
+            Busy(true);embeddingStatus.Text="Freeing unused add-on storage...";
+            embeddingOperation=CancellationTokenSource.CreateLinkedTokenSource(setupLifetime.Token);
+            try
+            {
+                if(semantic!=null)await semantic.SuspendAsync();
+                if(multimodalHost!=null)await multimodalHost.BeginSetupAsync();
+                var result=await Task.Run(()=>MultimodalMaintenance.Cleanup(clearDownloadCaches:true,token:embeddingOperation.Token));
+                embeddingStatus.Text=$"Unused storage cleaned: {result.GenerationsRemoved} old or unfinished generations removed. Download caches cleared. Current installation, recent completed generations, content index and ordinary library kept.";
+                if(result.RecoveryGenerationsKept>0)embeddingStatus.Text+=" Generations with unfinished sandbox recovery were kept.";
+            }
+            catch(OperationCanceledException){embeddingStatus.Text="Storage cleanup stopped. The active installation is kept; retry to finish unused data cleanup.";}
+            catch(Exception error)when(error is IOException or UnauthorizedAccessException){embeddingStatus.Text="Storage cleanup did not finish. Verify the add-on, close other workers and retry.";}
+            finally
+            {
+                embeddingOperation.Dispose();embeddingOperation=null;Busy(false);
+                if(semantic is {IsDisposed:false})await semantic.ResumeAsync();
+                else if(multimodalHost is {IsDisposed:false})await multimodalHost.ConfigureAsync(multimodalOptions);
+            }
         };
 
         var privacy = Page("Privacy", "\uE72E", "Your search history belongs on your PC.");

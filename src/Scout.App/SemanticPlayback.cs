@@ -62,7 +62,7 @@ internal static class SemanticPlayback
                 var request=System.IO.Path.Combine(snapshot.Directory,"playback-request.json");
                 await File.WriteAllBytesAsync(request,JsonSerializer.SerializeToUtf8Bytes(new {schemaVersion=1,source=System.IO.Path.GetFileName(snapshot.Path),
                     sourceSha256=snapshot.ContentHash.ToLowerInvariant(),family=evidence.Modality,startSeconds=start,endSeconds=end}),token).ConfigureAwait(false);
-                var exit=await sandbox.RunAsync(installed.Python,[System.IO.Path.Combine(runtime,"semantic_search","playback.py"),"--request",request],snapshot.Directory,TimeSpan.FromSeconds(90),token).ConfigureAwait(false);
+                var exit=await sandbox.RunPythonAsync(home,installed.Python,[System.IO.Path.Combine(runtime,"semantic_search","playback.py"),"--request",request],snapshot.Directory,TimeSpan.FromSeconds(90),token).ConfigureAwait(false);
                 if(exit!=0)throw new IOException("The matched clip could not be prepared.");
                 using var ready=await SemanticExtractor.ReadJsonAsync(MultimodalSetup.OwnedPath(snapshot.Directory,"playback.json"),16384,token).ConfigureAwait(false);
                 var data=ready.RootElement;SemanticExtractor.Fields(data,["schemaVersion","name","bytes","sha256","sourceSha256","startSeconds","endSeconds"]);

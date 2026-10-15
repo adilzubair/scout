@@ -12,6 +12,8 @@ if (args.Length == 3 && args[0] == "--setup-lifecycle-child") return await Multi
 if (args.Length == 5 && args[0] == "--parser-lifecycle") return await LiveParserChecks.Run(args[1],args[2],args[3],args[4]);
 if (args.Length == 5 && args[0] == "--parser-owner") return await LiveParserChecks.Owner(args[1],args[2],args[3],int.Parse(args[4]));
 if (args.Length == 3 && args[0] == "--fresh-setup") return await FreshSetupChecks.Run(args[1],args[2]);
+if (args.Length == 5 && args[0] == "--multimodal-maintenance") return await MultimodalMaintenanceLifecycleChecks.Run(args[1],args[2],args[3],args[4]);
+if (args.Length == 4 && args[0] == "--maintenance-child") return await MultimodalMaintenanceLifecycleChecks.Child(args[1],args[2],args[3]);
 if (args.Length == 5 && args[0] == "--multimodal-upgrade") return await MultimodalUpgradeChecks.Run(args[1],args[2],args[3],args[4]);
 if (args.Length == 4 && args[0] == "--upgrade-child") return await MultimodalUpgradeChecks.Child(args[1],args[2],args[3]);
 if (args.Length == 3 && args[0] == "--fresh-setup-remove") return await FreshSetupChecks.Run(args[1],args[2],remove:true);
@@ -62,6 +64,10 @@ if (args is ["--owned-process-checks"])
 {
     OwnedProcessChecks.Run(Test);Console.WriteLine($"{total-failures.Count}/{total} owned-process checks passed.");return failures.Count==0?0:1;
 }
+if(args is ["--maintenance-checks"])
+{
+    MultimodalMaintenanceChecks.Run(Test);Console.WriteLine($"{total-failures.Count}/{total} maintenance checks passed.");return failures.Count==0?0:1;
+}
 var now = new DateTimeOffset(2026, 9, 23, 12, 0, 0, TimeSpan.Zero);
 var empty = new Dictionary<string, LibraryItem>();
 ParityChecks.Run(Test);
@@ -76,6 +82,7 @@ MultimodalSessionChecks.Run(Test);
 OwnedProcessChecks.Run(Test);
 WorkerReadinessChecks.Run(Test);
 ManagedPythonRemovalChecks.Run(Test);
+MultimodalMaintenanceChecks.Run(Test);
 SemanticIndexChecks.Run(Test);
 SemanticSourceChecks.Run(Test);
 ExtractionSandboxChecks.Run(Test);

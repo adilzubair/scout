@@ -11,7 +11,7 @@ static class MultimodalUpgradeChecks
 {
     private static void Check(bool value,string message){if(!value)throw new IOException(message);}
     private static string Hash(string path){using var file=File.OpenRead(path);return Convert.ToHexString(SHA256.HashData(file)).ToLowerInvariant();}
-    private static Dictionary<string,string> Inventory(string root)
+    internal static Dictionary<string,string> Inventory(string root)
     {
         var result=new Dictionary<string,string>();var pending=new Stack<string>();pending.Push(root);
         while(pending.TryPop(out var directory))foreach(var entry in Directory.EnumerateFileSystemEntries(directory))
@@ -21,11 +21,11 @@ static class MultimodalUpgradeChecks
         }
         return result;
     }
-    private static async Task<JsonElement> Phase(string probe,string phase,string addon,string root)
+    internal static async Task<JsonElement> Phase(string probe,string phase,string addon,string root,string command="--upgrade-child")
     {
         var report=Path.Combine(root,phase+".json");
         var start=new ProcessStartInfo(Path.Combine(probe,"Scout.Tests.exe")){UseShellExecute=false,CreateNoWindow=true,WorkingDirectory=probe,RedirectStandardOutput=true,RedirectStandardError=true};
-        foreach(var arg in new[]{"--upgrade-child",phase,addon,report})start.ArgumentList.Add(arg);
+        foreach(var arg in new[]{command,phase,addon,report})start.ArgumentList.Add(arg);
         foreach(var name in new[]{"UV_OFFLINE","HF_HUB_OFFLINE","TRANSFORMERS_OFFLINE"})start.Environment[name]="1";
         using var child=Process.Start(start)??throw new IOException("Could not launch upgrade phase.");
         async Task Pump(StreamReader reader,string suffix)

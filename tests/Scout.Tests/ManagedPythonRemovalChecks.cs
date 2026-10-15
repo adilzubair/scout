@@ -23,7 +23,7 @@ static class ManagedPythonRemovalChecks
             MultimodalSetup.Remove(addon);Check(!Directory.Exists(addon));
         }));
     }
-    private static void Junction(string root,string path,string target)
+    internal static void Junction(string root,string path,string target)
     {
         // Use the same standard-user Windows junction type uv creates.
         var script=Path.Combine(root,"junction.ps1");

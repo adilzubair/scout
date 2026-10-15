@@ -82,6 +82,10 @@ internal static partial class MultimodalSetup
         await Task.WhenAll(Read(owned.Output),Read(owned.Error),Finish());
         token.ThrowIfCancellationRequested();
         if(owned.Process.ExitCode!=0 || Find(addonRoot)?.Device!=device)throw new IOException("Add-on setup did not finish. Retry to reuse completed downloads.");
+        progress.Report("Freeing unused add-on generations...");
+        try{await Task.Run(()=>MultimodalMaintenance.Cleanup(addonRoot,token:token));}
+        catch(OperationCanceledException)when(token.IsCancellationRequested){progress.Report("Unused storage cleanup stopped; the verified add-on is ready.");}
+        catch(Exception error)when(error is IOException or UnauthorizedAccessException){progress.Report("Add-on verified. Unused storage cleanup can be retried in settings.");}
     }
     internal static ProcessStartInfo CreateStartInfo(string script,string addonRoot,string device)
     {

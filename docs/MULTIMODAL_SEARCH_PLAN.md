@@ -331,8 +331,14 @@ Proceed in this order, committing each verified unit:
    launcher now pins the patch interpreter, preserving unpublished retry caches.
    Its actual query and sandboxed parser/embedding checks pass. This current-account
    test does not discharge clean-account installation or minimum hardware gates.
-6. Current slice: obsolete-generation/cache reclamation, changed-dependency/device
-   upgrades and real disk-full recovery. Environment revision 2 now pins the
+6. Storage-maintenance native validation passes for cache/unfinished-generation
+   reclamation, prepared preview preservation, live-worker exclusion and retained
+   offline-package rollback/reactivation. Continue changed-dependency/device
+   upgrades and real disk-full recovery. Cleanup now
+   retains the active and recent completed generations, rejects links, excludes
+   live runtime leases and preserves sandbox recovery journals. An optional
+   settings action also clears private download caches; uv package installs use
+   explicit hardlinks. Environment revision 2 now pins the
    standard venv backend; a real offline upgrade between the archived prior and
    current published packages passes native-audit rejection, prior-package query,
    retry, exact-marker rollback and current-generation reactivation. Every prior
