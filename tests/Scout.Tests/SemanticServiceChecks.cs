@@ -138,14 +138,19 @@ static class SemanticServiceChecks
         }));
         test("Semantic lookup caches query vectors and invalidates stale sources and revoked scope",()=>With(async f=>
         {
+            f.Extract=(_,_)=>Task.FromResult(Good() with {Segments=Enumerable.Range(1,12).Select(line=>Good().Segments[0] with
+                {Locator=new("lines"){StartLine=line,EndLine=line}}).ToArray()});
             await f.Metadata.ConfigureAsync(f.Enabled());await Wait(()=>f.Service.Activity.Progress?.Ready==2);
             var local=SearchEngine.Search("authored evidence",Scope.Files,f.Metadata.Catalog,new Dictionary<string,LibraryItem>(),DateTimeOffset.Now);
             var first=await f.Service.SearchAsync(local,Scope.Files,f.Metadata.Catalog,new Dictionary<string,LibraryItem>(),DateTimeOffset.Now,default);
-            Check(first.Matches.Count==2 && f.Queries==1);
+            Check(first.Matches.Count==2 && first.Matches.All(match=>match.Evidence.Count==3) && f.Queries==1);
             await f.Service.SearchAsync(local,Scope.Files,f.Metadata.Catalog,new Dictionary<string,LibraryItem>(),DateTimeOffset.Now,default);
             Check(f.Queries==1,"unchanged query was re-embedded");
+            f.Blocked="low_memory"; // Keep a replacement from hiding stale-source validation.
             var proof=first.Matches[0].Evidence[0];File.WriteAllText(proof.Path,"changed source revision");
             Check(!f.Service.IsCurrent(proof));
+            var changed=await f.Service.SearchAsync(local,Scope.Files,f.Metadata.Catalog,new Dictionary<string,LibraryItem>(),DateTimeOffset.Now,default);
+            Check(changed.Matches.All(match=>match.Candidate.Id!=proof.CandidateId),"Changed source survived cached retrieval.");
             await f.Service.DisableAsync();
             Check(!f.Service.IsCurrent(first.Matches[1].Evidence[0]));
             var revoked=await f.Service.SearchAsync(local,Scope.Files,f.Metadata.Catalog,new Dictionary<string,LibraryItem>(),DateTimeOffset.Now,default);

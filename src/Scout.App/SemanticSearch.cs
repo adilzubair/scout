@@ -41,7 +41,21 @@ internal sealed partial class SemanticService
                     lock(stateGate)if(generation==Epoch){matrix=snapshot;queryVectors.Clear();}
                 }
                 var scopeSnapshot=Scope;
-                bool Allowed(SemanticVector row)=>eligible.TryGetValue(row.CandidateId,out var item) && scopeSnapshot.Allows(item.Target,row.Family);
+                // Scope/path policy is identical for a file's repeated segments.
+                // Keep this cache local to the request and include the family, so
+                // neither a different family nor a later scope can reuse it.
+                var allowed=new Dictionary<(string CandidateId,string Family),bool>();
+                bool Allowed(SemanticVector row)
+                {
+                    if(!eligible.TryGetValue(row.CandidateId,out var item))return false;
+                    var key=(row.CandidateId,row.Family);
+                    if(!allowed.TryGetValue(key,out var value))
+                    {
+                        value=scopeSnapshot.Allows(item.Target,row.Family);
+                        allowed.Add(key,value);
+                    }
+                    return value;
+                }
                 if(!snapshot.Vectors.Any(Allowed))return new(generation,[]);
                 var key=snapshot.Version+"|"+local.Query;
                 float[]? vector;lock(stateGate)queryVectors.TryGetValue(key,out vector);

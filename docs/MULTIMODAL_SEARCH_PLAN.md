@@ -806,3 +806,15 @@ different developer files remain untouched. Four new baseline/corruption/missing
 file/window-budget contracts pass; the native suite now passes 345 checks. This
 harness correction does not resolve the separate earlier media extraction failure
 or change any resource/quality target.
+
+Retrieval now reuses structural scope decisions for repeated segments of the same
+file/family within a single request. Ineligible catalog files return immediately;
+the cache never crosses a query or scope generation. Native source-revision and
+current database-evidence checks still run before each admitted file. The lookup
+contract now uses twelve segments per file, checks the three-evidence bound and
+rejects an edited source on a later cached query. All 345 native checks pass.
+Fresh 100,000-segment/400-file CPU runs measured 623.331 ms p95 for the unchanged
+package and 547.4044 ms for the initial scope-cache probe, with 27 unique model
+queries and zero cache hits each. Host conditions vary; the older 1,099.034 ms
+miss remains recorded, and these runs do not establish physical 16 GB or UI
+approval. Per-evidence database-open overhead remains the next profiling target.
