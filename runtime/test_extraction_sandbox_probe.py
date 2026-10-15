@@ -55,17 +55,48 @@ def denied_network():
 
 report = dict(appcontainer=appcontainer, capabilityCount=capability_count, privateReadDenied=denied_read(), networkError=denied_network(),
               inheritedSecret=os.environ.get('SCOUT_SANDBOX_TEST_SECRET', ''), pid=os.getpid())
+try:
+    (Path(config['readOnlyRoot'])/'sandbox-must-not-write.txt').write_text('forbidden')
+    report['runtimeWriteDenied']=False
+except PermissionError:report['runtimeWriteDenied']=True
 if config.get('checkPackage'):
     import tokenizers
     report.update(prefix=sys.prefix,executable=sys.executable,packagePath=tokenizers.__file__)
+if config.get('liveDecode'):
+    import av
+    def publish(name,value):
+        temporary=Path(name+'.partial')
+        temporary.write_text(json.dumps(value),encoding='utf-8')
+        temporary.replace(name)
+    def decode():
+        frames=0
+        with av.open('input.mp4') as container:
+            codec=container.streams.video[0].codec_context.name
+            for frame in container.decode(video=0):
+                if frame.width*frame.height>1024*1024:raise ValueError('fixture_pixel_limit')
+                frame.to_ndarray(format='rgb24');frames+=1
+                if frames>256:raise ValueError('fixture_frame_limit')
+        if not frames:raise ValueError('fixture_no_frames')
+        return frames,codec
+    frames,codec=decode()
+    report.update(frames=frames,codec=codec,avVersion=av.__version__)
+    child_mode=len(sys.argv)>2 and sys.argv[2]=='--child'
+    if child_mode:publish('child.json',report)
+    else:
+        child=subprocess.Popen([sys.executable,__file__,sys.argv[1],'--child'],creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
+        until=time.monotonic()+20
+        while not Path('child.json').is_file():
+            if child.poll() is not None or time.monotonic()>until:raise RuntimeError('live_child_failed')
+            time.sleep(.01)
+        report.update(child=json.loads(Path('child.json').read_text(encoding='utf-8')),childLauncherPid=child.pid)
+        publish('result.json',report)
+    while True:
+        count,_=decode();frames+=count
+        publish('child-heartbeat.json' if child_mode else 'root-heartbeat.json',dict(pid=os.getpid(),frames=frames))
+        time.sleep(.01)
 if len(sys.argv) > 2 and sys.argv[2] == '--child':
     Path('child.json').write_text(json.dumps(report), encoding='utf-8')
 else:
-    subprocess.run([sys.executable, __file__, sys.argv[1], '--child'], check=True, timeout=20)
+    subprocess.run([sys.executable, __file__, sys.argv[1], '--child'], check=True, timeout=20,creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
     report['child'] = json.loads(Path('child.json').read_text(encoding='utf-8'))
-    try:
-        (Path(config['readOnlyRoot']) / 'sandbox-must-not-write.txt').write_text('forbidden')
-        report['runtimeWriteDenied'] = False
-    except PermissionError:
-        report['runtimeWriteDenied'] = True
     Path('result.json').write_text(json.dumps(report), encoding='utf-8')

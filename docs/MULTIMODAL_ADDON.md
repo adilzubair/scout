@@ -708,3 +708,39 @@ existing-generation test does not discharge those gates.
 dotnet run --project tests/Scout.Tests -c Release --no-build -- --owned-process-checks
 dotnet run --project tests/Scout.Tests -c Release --no-build -- --multimodal-setup-lifecycle artifacts/Scout artifacts/diagnostics/multimodal/addon-no-office .runtime/python/cpython-3.12.13-windows-x86_64-none artifacts/diagnostics/multimodal/addon-host-slice/bootstrap/uv-0.11.27/uv.zip artifacts/diagnostics/multimodal/packaged-setup
 ```
+
+The model launcher now uses the same job-at-creation process wrapper as setup.
+Its venv launcher and interpreter belong to the job before executing; framework
+output is discarded through fixed buffers of 4,096 characters. AppContainer parser
+creation supplies both security capabilities and the job handle in its Windows
+startup attribute list. The existing zero-capability token, 1 GiB process limit,
+2 GiB job limit and sixteen-process cap remain enforced. Suspension lets the
+managed wrapper open its process handle; it no longer bridges an unassigned
+process between creation and job attachment. These paths have no unowned fallback.
+
+The live-parser harness uses the exact published app and bundled CLR, an owned
+authored video and the existing private development interpreter/venv. Its test
+script repeatedly decodes real frames through PyAV 19.0.1 in the root and child
+AppContainer processes. Both report zero capabilities, denied original reads and
+runtime writes, denied network, no inherited canary secret and private package paths.
+Their frame counters advance before the controller kills only the owning process.
+All three observed native parser/venv-launcher processes then exit. A new parser
+runs under the same recovered profile, repeats the isolation checks, restores the
+three runtime-root access-rule sets and removes the owned job. The outside source
+canary stays byte-identical. The decode loop is a controlled lifetime probe;
+production format fidelity and independent retrieval quality have separate gates.
+The probe remains a test-output helper and is excluded from the base package.
+
+On 2026-10-15 this live-decode owner-death/recovery command passed with at least
+sixty decoded frames recorded for each decoder before the final advancement check.
+The updated published model launcher also passed the real CPU owner-death and
+all-family index recovery command: sixteen files and twenty-seven segments across
+seven families, unchanged original/ordinary storage, restored runtime-root access
+rules and cleared abandoned work. The 323 Release checks, 24 package contracts,
+532-file package integrity and isolated published WPF checks pass. Fresh internet
+setup, new-generation rollback/cache recovery, independent quality, licensing and
+physical minimum-hardware gates remain open.
+
+```powershell
+dotnet run --project tests/Scout.Tests -c Release --no-build -- --parser-lifecycle artifacts/Scout artifacts/diagnostics/multimodal/addon-no-office/generations/GENERATION/venv/Scripts/python.exe .runtime/python/cpython-3.12.13-windows-x86_64-none artifacts/diagnostics/multimodal/parser-lifecycle
+```

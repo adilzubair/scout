@@ -453,8 +453,23 @@ junction. Both production paths are corrected. The base runtime remains unchange
 by setup; Python bytecode writes into the application directory are disabled.
 This does not establish a fresh internet install or a new-generation update.
 
-Next, apply job-at-creation ownership to model/parser startup and verify live
-parser owner death. Continue fresh-download/new-generation update and rollback,
+Job-at-creation ownership now also covers the model launcher and AppContainer
+parser. The parser's zero-capability token and existing 1 GiB process/2 GiB job/
+16-process limits are installed before its thread runs; suspension only allows
+the managed wrapper to acquire a stable process handle. The model host reuses
+the owned launcher and discards output in bounded buffers.
+
+A published-library live-parser test confirmed parent/child native PyAV decoding
+with advancing frame counters, zero capabilities, private-venv activation,
+source-read/runtime-write denial, network denial and a clean environment. Killing only its
+owner terminated all three observed parser/launcher processes. The same profile
+then executed a fresh isolated parser, restored runtime-root access rules and
+removed its owned job while preserving an outside canary. The updated model
+launcher also passed actual CPU owner-death/resume across 16 files, seven families
+and 27 segments. The published WPF checks pass. These are process-lifetime and
+engineering results, not quality or minimum-hardware approval.
+
+Next, continue fresh-download/new-generation update and rollback,
 interruption/disk-full and generation/cache cleanup checks, including generated
 cache links, followed by the independent
 content-grounded evaluation corpus. The first

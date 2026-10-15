@@ -9,6 +9,8 @@ if (args.Length >= 3 && args[0] == "--owned-child") return OwnedProcessChecks.Ch
 if (args.Length == 2 && args[0] == "--owned-parent") return OwnedProcessChecks.Parent(args[1]);
 if (args.Length == 6 && args[0] == "--multimodal-setup-lifecycle") return await MultimodalSetupLifecycleChecks.Run(args[1],args[2],args[3],args[4],args[5]);
 if (args.Length == 3 && args[0] == "--setup-lifecycle-child") return await MultimodalSetupLifecycleChecks.Child(args[1],args[2]);
+if (args.Length == 5 && args[0] == "--parser-lifecycle") return await LiveParserChecks.Run(args[1],args[2],args[3],args[4]);
+if (args.Length == 5 && args[0] == "--parser-owner") return await LiveParserChecks.Owner(args[1],args[2],args[3],int.Parse(args[4]));
 if (args.Length == 3 && args[0] == "--session-owner") return MultimodalSessionChecks.Owner(args[1],args[2]);
 if (args.Length == 5 && args[0] == "--multimodal-lifecycle") return await MultimodalLifecycleChecks.Run(args[1],args[2],args[3],args[4]);
 if (args.Length == 5 && args[0] == "--lifecycle-child") return await MultimodalLifecycleChecks.Child(args[1],args[2],args[3],args[4]);

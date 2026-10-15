@@ -17,6 +17,8 @@ internal sealed class MultimodalHost : IDisposable
     private readonly SemaphoreSlim configurationGate = new(1);
     private CancellationTokenSource session = new();
     private Process? process;
+    private OwnedProcess? ownedWorker;
+    private Task workerOutput=Task.CompletedTask;
     private int workerPid;
     private ProcessJob? job;
     private MultimodalLease? runtimeLease;
@@ -179,11 +181,10 @@ internal sealed class MultimodalHost : IDisposable
         start.Environment["PYTHONDONTWRITEBYTECODE"] = "1";
         try
         {
-            process = Process.Start(start) ?? throw new IOException("Could not start the multimodal worker.");
-            job = new ProcessJob(process); configuration = key;
+            ownedWorker=OwnedProcess.Start(start,token);process=ownedWorker.Process;
+            job=ownedWorker.Job;configuration=key;
             // Drain and discard framework output. Extracted content never becomes a log.
-            process.OutputDataReceived += (_, _) => { }; process.ErrorDataReceived += (_, _) => { };
-            process.BeginOutputReadLine(); process.BeginErrorReadLine();
+            workerOutput=Task.WhenAll(DrainAsync(ownedWorker.Output),DrainAsync(ownedWorker.Error));
             using var deadline = CancellationTokenSource.CreateLinkedTokenSource(token); deadline.CancelAfter(TimeSpan.FromSeconds(120));
             while (!File.Exists(readyFile))
             {
@@ -217,6 +218,12 @@ internal sealed class MultimodalHost : IDisposable
         { Stop(); throw new IOException("Invalid multimodal worker startup response.", error); }
         catch { Stop(); throw; }
     }
+    private static async Task DrainAsync(StreamReader reader)
+    {
+        var buffer=new char[4096];
+        try{while(await reader.ReadAsync(buffer).ConfigureAwait(false)!=0){}}
+        catch(Exception error)when(error is IOException or ObjectDisposedException){}
+    }
     internal static async Task<JsonDocument> ReadReadyAsync(string path,Process process,CancellationToken token)
     {
         while(true)
@@ -247,18 +254,13 @@ internal sealed class MultimodalHost : IDisposable
     private void Stop()
     {
         client?.Dispose(); client = null;
-        job?.Dispose(); job = null;
         try
         {
-            if (process is { HasExited: false }) { process.Kill(true); process.WaitForExit(10000); }
-            if (workerPid != 0)
-            {
-                try { using var worker = Process.GetProcessById(workerPid); worker.WaitForExit(10000); }
-                catch (ArgumentException) { }
-            }
+            ownedWorker?.Dispose();
+            workerOutput.GetAwaiter().GetResult();
         }
-        catch (Exception error) when (error is InvalidOperationException or System.ComponentModel.Win32Exception) { }
-        process?.Dispose(); process = null; workerPid = 0; configuration = "";
+        catch (Exception error) when (error is InvalidOperationException or System.ComponentModel.Win32Exception or OperationCanceledException or IOException) { }
+        ownedWorker=null;workerOutput=Task.CompletedTask;job=null;process = null; workerPid = 0; configuration = "";
         runtimeLease?.Dispose(); runtimeLease = null;
         if (workerSession != null)
         {

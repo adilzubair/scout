@@ -11,7 +11,7 @@ internal sealed class ProcessJob : IDisposable
     private readonly SafeFileHandle handle;
     internal SafeFileHandle Handle=>handle;
     internal ProcessJob():this(0,0,0) { }
-    private ProcessJob(long processMemoryBytes,long jobMemoryBytes,uint activeProcesses)
+    internal ProcessJob(long processMemoryBytes,long jobMemoryBytes,uint activeProcesses)
     {
         if (processMemoryBytes < 0 || jobMemoryBytes < 0) throw new ArgumentOutOfRangeException(nameof(processMemoryBytes));
         handle = CreateJobObject(IntPtr.Zero, null);

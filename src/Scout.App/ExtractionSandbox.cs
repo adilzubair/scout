@@ -76,21 +76,24 @@ internal sealed class ExtractionSandbox : IDisposable
         if (jobDirectory.Equals(root, StringComparison.OrdinalIgnoreCase) || !IndexPolicy.Within(jobDirectory, root)) throw new IOException("Extraction workspace escaped its owner.");
         Grant(jobDirectory, FileSystemRights.Modify | FileSystemRights.ReadAndExecute);
         MarkLowIntegrity(jobDirectory);
+        using var job=new ProcessJob(1024L*1024*1024,2L*1024*1024*1024,16);
         var capabilities = new SecurityCapabilities { Sid = sid }; // zero capabilities
         var capabilitiesPointer = Marshal.AllocHGlobal(Marshal.SizeOf<SecurityCapabilities>());
-        var attributes = IntPtr.Zero; var environment = IntPtr.Zero;
+        var attributes = IntPtr.Zero; var environment = IntPtr.Zero;var jobList=IntPtr.Zero;
         var initialized = false;
         ProcessInfo info = default;
         try
         {
             Marshal.StructureToPtr(capabilities, capabilitiesPointer, false);
             nuint size = 0;
-            InitializeProcThreadAttributeList(IntPtr.Zero, 1, 0, ref size);
+            InitializeProcThreadAttributeList(IntPtr.Zero, 2, 0, ref size);
             attributes = Marshal.AllocHGlobal(checked((int)size));
-            if (!InitializeProcThreadAttributeList(attributes, 1, 0, ref size)) throw new Win32Exception(Marshal.GetLastWin32Error());
+            if (!InitializeProcThreadAttributeList(attributes, 2, 0, ref size)) throw new Win32Exception(Marshal.GetLastWin32Error());
             initialized = true;
             if (!UpdateProcThreadAttribute(attributes, 0, (nuint)0x20009, capabilitiesPointer, (nuint)Marshal.SizeOf<SecurityCapabilities>(), IntPtr.Zero, IntPtr.Zero))
                 throw new Win32Exception(Marshal.GetLastWin32Error());
+            jobList=Marshal.AllocHGlobal(IntPtr.Size);Marshal.WriteIntPtr(jobList,job.Handle.DangerousGetHandle());
+            if(!UpdateProcThreadAttribute(attributes,0,0x2000D,jobList,(nuint)IntPtr.Size,IntPtr.Zero,IntPtr.Zero))throw new Win32Exception(Marshal.GetLastWin32Error());
             var startup = new StartupInfoEx { Startup = new StartupInfo { Size = Marshal.SizeOf<StartupInfoEx>(), Flags = 1, ShowWindow = 0 }, Attributes = attributes };
             var windows = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
             // A clean environment prevents credential/endpoint/Python injection inheritance.
@@ -105,11 +108,12 @@ internal sealed class ExtractionSandbox : IDisposable
             if(venvExecutable!=null)variables["__PYVENV_LAUNCHER__"]=venvExecutable;
             environment = Marshal.StringToHGlobalUni(string.Join('\0', variables.Select(pair => pair.Key + "=" + pair.Value)) + "\0\0");
             var command = new StringBuilder(string.Join(' ', new[] { executable }.Concat(arguments).Select(Quote)));
-            // Suspended start closes the create/assign race: parsers cannot run before the job owns them.
+            // Creation installs capabilities and job membership atomically. Suspension
+            // only gives the managed wrapper time to acquire its stable process handle.
             if (!CreateProcess(executable, command, IntPtr.Zero, IntPtr.Zero, false, 0x08080404, environment, jobDirectory, ref startup, out info))
                 throw new Win32Exception(Marshal.GetLastWin32Error());
             using var process = Process.GetProcessById((int)info.Pid);
-            using var job = new ProcessJob(process, 1024L*1024*1024, 2L*1024*1024*1024, 16);
+            _=process.Handle;token.ThrowIfCancellationRequested();
             if (ResumeThread(info.Thread) == uint.MaxValue) throw new Win32Exception(Marshal.GetLastWin32Error());
             using var deadline = CancellationTokenSource.CreateLinkedTokenSource(token); deadline.CancelAfter(timeout);
             try { await process.WaitForExitAsync(deadline.Token).ConfigureAwait(false); return process.ExitCode; }
@@ -121,13 +125,15 @@ internal sealed class ExtractionSandbox : IDisposable
         }
         finally
         {
-            // An assignment/resume failure must also terminate the suspended process.
+            // Resume failures also close the already assigned job on leaving this scope.
             if (info.Process != IntPtr.Zero) { TerminateProcess(info.Process, 1); CloseHandle(info.Process); }
             if (info.Thread != IntPtr.Zero) CloseHandle(info.Thread);
             if (environment != IntPtr.Zero) Marshal.FreeHGlobal(environment);
             if (initialized) DeleteProcThreadAttributeList(attributes);
             if (attributes != IntPtr.Zero) Marshal.FreeHGlobal(attributes);
+            if(jobList!=IntPtr.Zero)Marshal.FreeHGlobal(jobList);
             Marshal.FreeHGlobal(capabilitiesPointer);
+            GC.KeepAlive(job);
         }
     }
     private void Grant(string path, FileSystemRights rights)
