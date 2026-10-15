@@ -914,3 +914,26 @@ lock-violation 33. The successful separate run reacquired both locks in 0.6576 m
 with zero retries; it does not establish the cause of that earlier transient.
 All 24 package contracts pass. Exact committed-package resource replay and
 validation-bundle refresh follow this implementation milestone.
+
+The exact self-contained `317b288` package now passes the full pinned 21-file,
+seven-family CPU replay, production-window fixtures, video preview and 100,000
+segments across 400 files. Three process-cold queries take 12,876.8949, 9,448.6961
+and 9,889.9265 ms. Semantic p95 is 297.3272 ms (maximum 318.2054), with 27 unique
+model calls and zero cache hits. Whole-job peak commit is 6,228,635,648 bytes for
+extraction/preview and 5,473,267,712 bytes for scale; all five measured phases
+stay below 6 GiB. These current-host engineering targets pass. The run uses the
+existing CPU add-on on the 32 GB development machine with Laya off; it does not
+measure physical 16 GB behaviour, ordinary WPF latency or concurrent workloads.
+Earlier failures remain retained, including the unexplained media extraction and
+immediate post-cancellation lock failures.
+
+The refreshed validation ZIP preserves the tested committed app/driver, 533 base
+files, 33 source-matched runtime files and 563 individually verified ZIP entries.
+Its SHA-256 is `20358424f4bbe20048bf69bf2bc0dd0f45a174d3cfa435f1ad34e07de33553a0`;
+the previous `772f55d` bundle is preserved. The source-bound private receipt links
+the fresh/lifecycle precommit build and the exact committed resource assembly
+identities separately. The user will run physical-PC validation later. Next
+complete actual changed-dependency/device upgrade, remaining account/volume and
+parser lifecycle checks, independent content-grounded quality/abstention and
+WPF/Laya/concurrency validation. Distribution clearance remains open; this package
+is a validation preview, and release readiness is still false.

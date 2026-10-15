@@ -85,3 +85,12 @@ parameters and encoders remain loaded. The integrated 21-file replay peaked at
 These are development-machine engineering measurements; the OS file cache was not flushed.
 Physical minimum hardware, broader concurrency and other release gates remain
 open. This is a validation bundle, not release or minimum-hardware approval.
+
+The current bundle is rebuilt from `317b288`, including isolated setup/worker
+environments. Its 32 GB CPU replay passes all 21 fixtures and video preview:
+process-cold queries take 12.88/9.45/9.89 seconds and warm semantic p95 at 100K
+segments is 297.33 ms. Whole-job peak commit is 5.80 GiB for extraction/preview
+and 5.10 GiB for scale. This uses an existing CPU installation with Laya off;
+fresh installation under controlled environment overrides is verified separately.
+The earlier timings remain historical evidence. Physical 16 GB validation and
+the broader release requirements above remain open.
