@@ -26,6 +26,8 @@ def main():
                         help='Use production 2048-token text, 1 MP image, 12 s audio and eight-frame AV window sizes.')
     parser.add_argument('--blas-threads', type=int, choices=range(1, 33))
     parser.add_argument('--immediate-purge', action='store_true')
+    parser.add_argument('--import-timings', action='store_true', help='Aggregate nested constructor imports; adds diagnostic overhead.')
+    parser.add_argument('--platform-trace', action='store_true', help='Time Windows platform WMI calls without altering their results.')
     args = parser.parse_args()
     output = args.output.resolve()
     output.mkdir(parents=True, exist_ok=False)
@@ -66,6 +68,16 @@ def main():
     sampler = threading.Thread(target=sample, daemon=True)
     sampler.start()
     events = []
+    import_timings = {}
+    import_gate = threading.Lock()
+    import_local = threading.local()
+    dropped_import_names = 0
+    platform_calls = []
+    original_wmi = None
+    platform_module = None
+    original_source_to_code = None
+    source_loader = None
+    compilation = dict(files=0, sourceBytes=0, seconds=0.0)
 
     def mark(name):
         nonlocal stage
@@ -84,9 +96,38 @@ def main():
                            scriptSha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest()))
     try:
         from semantic_search.embedding import FullEmbedder
+        if args.import_timings:
+            from importlib.machinery import SourceFileLoader as source_loader
+            original_source_to_code = source_loader.source_to_code
+            def timed_compile(*values, **options):
+                began = time.perf_counter()
+                try:
+                    return original_source_to_code(*values, **options)
+                finally:
+                    elapsed = time.perf_counter()-began
+                    with import_gate:
+                        compilation['files'] += 1
+                        compilation['sourceBytes'] += len(values[1]) if len(values)>1 else 0
+                        compilation['seconds'] += elapsed
+            source_loader.source_to_code = timed_compile
+        if args.platform_trace:
+            import platform as platform_module
+            original_wmi = getattr(platform_module, '_wmi_query', None)
+            if original_wmi is not None:
+                def timed_wmi(*values, **options):
+                    began = time.perf_counter()
+                    try:
+                        return original_wmi(*values, **options)
+                    finally:
+                        if len(platform_calls) < 256:
+                            platform_calls.append(dict(table=str(values[0])[:32] if values else '',
+                                keys=[str(value)[:64] for value in values[1:9]],
+                                stage=stage,startSeconds=began-started,seconds=time.perf_counter()-began))
+                platform_module._wmi_query = timed_wmi
         original_import = builtins.__import__
         observed = set()
         def timed_import(name, *values, **options):
+            nonlocal dropped_import_names
             first = name in ('torch', 'sentence_transformers') and name not in observed
             if first:
                 observed.add(name)
@@ -100,7 +141,37 @@ def main():
                     if args.blas_threads:
                         os.environ['OPENBLAS_NUM_THREADS'] = str(args.blas_threads)
                 mark('import-' + name)
-            result = original_import(name, *values, **options)
+            if args.import_timings:
+                stack = getattr(import_local, 'stack', None)
+                if stack is None:
+                    stack = import_local.stack = []
+                frame = [time.perf_counter(), 0.0]
+                stack.append(frame)
+                try:
+                    result = original_import(name, *values, **options)
+                finally:
+                    elapsed = time.perf_counter()-frame[0]
+                    stack.pop()
+                    if stack:
+                        stack[-1][1] += elapsed
+                    context = values[0] if values else options.get('globals')
+                    level = values[3] if len(values)>3 else options.get('level', 0)
+                    key = str(name)
+                    if level and isinstance(context, dict):
+                        package = context.get('__package__') or context.get('__name__', '').rpartition('.')[0]
+                        prefix = package.rsplit('.', level-1)[0] if level>1 else package
+                        key = prefix + ('.'+key if key else '')
+                    key = (key or '<empty-import-name>')[:200]
+                    with import_gate:
+                        if key not in import_timings and len(import_timings) >= 4096:
+                            dropped_import_names += 1
+                        else:
+                            row = import_timings.setdefault(key, dict(calls=0, inclusiveSeconds=0.0, selfSeconds=0.0))
+                            row['calls'] += 1
+                            row['inclusiveSeconds'] += elapsed
+                            row['selfSeconds'] += max(0.0, elapsed-frame[1])
+            else:
+                result = original_import(name, *values, **options)
             if first:
                 mark('after-import-' + name)
             return result
@@ -110,6 +181,8 @@ def main():
             embedder = FullEmbedder(args.model, device='cpu', threads=4)
         finally:
             builtins.__import__ = original_import
+            if original_source_to_code is not None:
+                source_loader.source_to_code = original_source_to_code
         import torch
         import sentence_transformers
         from threadpoolctl import threadpool_info
@@ -175,6 +248,11 @@ def main():
                                      ('MIMALLOC_PURGE_DELAY','MIMALLOC_PURGE_DECOMMITS')},
                                  integritySeconds=embedder.integrity_seconds, modelLoadSeconds=embedder.load_seconds,
                                  importOrder='Observed from production FullEmbedder constructor; imports are not preloaded',
+                                 nestedImportTimings=import_timings, droppedImportNames=dropped_import_names,
+                                 platformTraceRequested=args.platform_trace, platformWmiCalls=platform_calls,
+                                 platformWmiTraceSupported=original_wmi is not None,
+                                 nestedImportTracing=args.import_timings,
+                                 sourceCompilation=compilation,
                                  events=events, vectors=vectors, torch=torch.__version__,
                                  sentenceTransformers=sentence_transformers.__version__,
                                  scope='Single Python process, CPU FP32, authored in-memory inputs; no parser/index, quality or physical-minimum approval',
@@ -183,6 +261,10 @@ def main():
         write('failure.json', dict(type=type(error).__name__, message=str(error), events=events))
         raise
     finally:
+        if original_source_to_code is not None:
+            source_loader.source_to_code = original_source_to_code
+        if original_wmi is not None:
+            platform_module._wmi_query = original_wmi
         stop.set()
         sampler.join(2)
         write('samples.json', samples)

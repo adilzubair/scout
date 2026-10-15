@@ -77,6 +77,7 @@ python scripts/build-multimodal-resource-fixtures.py --baseline <baseline-bundle
 dotnet run --project tests/Scout.Tests -c Release --no-build -- --hardware-bundle artifacts/Scout <new-bundle-folder> <resource-fixture-folder>
 dotnet run --project tests/Scout.Tests -c Release --no-build -- --multimodal-startup artifacts/Scout <verified-addon> <output-folder>
 dotnet run --project tests/Scout.Tests -c Release --no-build -- --multimodal-device-upgrade artifacts/Scout <passed-retained-fresh-case> <resource-bundle/fixtures> <output-parent>
+dotnet run --project tests/Scout.Tests -c Release --no-build -- --multimodal-python-profile scripts/profile-multimodal-memory.py <verified-cpu-addon> <output-parent>
 ```
 
 The resource builder verifies the baseline hashes and pinned tokenizer, exact
@@ -93,6 +94,14 @@ original CPU marker, comparing every original CPU environment/model file and the
 ordinary database/source. Its 12 GiB free-space check is a test reserve, not a
 measured product minimum. This exercises CPU/CUDA dependency builds; it does not
 establish same-device version upgrades, independent quality or release approval.
+
+The Python profile runs the full FP32 constructor and six authored in-memory
+embedding inputs through the private CPU interpreter, production child environment
+and shared runtime lease. It records bounded nested import timings, source
+compilation and unmodified Windows platform-query timings. Hooks preserve return
+values and exceptions. This is a developer diagnostic with overhead; its SDK
+driver and small authored inputs do not establish end-to-end worker latency,
+production-window resource use or retrieval quality.
 
 Scout now has an independent setup entry point, authenticated embedding worker,
 Windows process lifetime, and Multimodal settings page. The preview installs and

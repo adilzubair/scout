@@ -975,3 +975,19 @@ trials and place most elapsed time between worker launch and readiness. They do
 not reproduce or diagnose the earlier 30,862.9321 ms miss; keep that failure open
 and investigate the model-startup interval under representative load. No input
 budget, threshold, dependency pin or production code changed for this follow-up.
+
+The new isolated constructor profiler separates the worker-readiness interval
+without changing production code. On the fresh CPU environment it measures
+0.652 s pinned-model verification, 2.421 s Torch import, 8.681 s Sentence
+Transformers import and 3.704 s model loading. Bounded nested tracing preserves
+all six authored query/text/image/audio/video/joint-AV vector hashes exactly.
+Windows platform queries total about 0.05 s in the traced runs, so they are not
+the observed dominant cost. The final trace measures 3,529 source compilations
+(68,469,847 bytes) taking 4.897 s, with 3,282 import-name aggregates and no dropped
+names. The fresh venv has 12,350 Python source files and no bytecode files; the
+earlier fast reusable CPU venv contains 3,356 bytecode files. These observations
+support testing setup-time bytecode preparation next, without reducing model or
+modality coverage. They do not diagnose or waive the earlier 30.863 s miss.
+The profiling process retains all 2,977,485,952 FP32 parameter bytes and remains
+below 6 GiB whole-job commit on this development host. Its small authored inputs
+and diagnostic overhead are separate from the published worker/resource gates.
