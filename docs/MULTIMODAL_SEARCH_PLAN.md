@@ -1,7 +1,24 @@
 # Scout multimodal semantic search implementation plan
 
 Date: 2026-10-15. Branch: `feature/multimodal-semantic-search`.
-Status: implementation active; independent quality and release validation in progress.
+Status: internal-preview handoff complete; production release work deferred.
+
+The user approved changing the finish line to ready for internal testing, with
+at most 60 minutes of remaining work from the 2026-10-15 scope change. The revised
+objective is to hand over the existing optional, LibreOffice-free, seven-family
+preview with its validated ZIP, usage instructions, commits and known issues.
+Only demonstrated installation/indexing/search/evidence blockers justify fixes
+in this finalization. No such product blocker was found in the handoff checks.
+The existing package's full inventory, runtime sources and checksum verify;
+see [the internal-preview handoff](MULTIMODAL_INTERNAL_PREVIEW.md).
+
+The internal-preview objective is complete. Stop autonomous goal work after
+handoff. The extensive quality benchmark, physical 16 GB run, distribution review,
+remaining lifecycle/UI/resource checks and the original production acceptance
+criteria below are deferred follow-ups. They do not block this internal preview
+and are not waived or represented as passed. Preserve unfinished corpus work;
+do not expand it as a prerequisite to delivery.
+
 Retrieval, previews, OCR and format coverage are committed. The frozen evaluation
 foundation passes 351 Release checks; independent quality and release gates remain open.
 This plan is the implementation checklist; the add-on remains a
@@ -1064,7 +1081,6 @@ repositories. A bounded inert-code intake verifies commit metadata, reconstructe
 Git trees and selected blob hashes; ten new offline integrity contracts and nine
 shared transport contracts pass. The completed private intake also replays offline
 without changing its manifest. It has not run inference or frozen task labels.
-Next, ground development positives and supported absent-capability negatives in
-the actual source contents, freeze before inference, and measure the unchanged
-production policy. Keep these related sources/queries out of the future release
-holdout. Physical 16 GB validation remains pending for the user's later run.
+Under the approved internal-preview scope, further task grounding, freezing and
+inference are deferred. Keep these related sources/queries out of the future
+release holdout. Physical 16 GB validation remains pending for the user's later run.

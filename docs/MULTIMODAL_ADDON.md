@@ -2,6 +2,14 @@
 
 Date: 2026-10-15. Branch: `feature/multimodal-semantic-search`.
 
+The approved deliverable is now ready for internal testing. Start with the
+[concise preview handoff](MULTIMODAL_INTERNAL_PREVIEW.md) for the tested ZIP,
+installation steps, commit identities and known issues. The existing seven-
+family package is unchanged. The extensive quality benchmark, physical 16 GB
+run, distribution review and remaining production checks are deferred; autonomous
+work stops after this handoff. Historical evidence and open gates below remain
+available and do not imply production approval.
+
 Storage maintenance now keeps the selected generation and one recent completed
 rollback generation for the same device, plus two completed generations for the
 other device. Successful setup prunes older and unfinished generation directories.
