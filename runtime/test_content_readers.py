@@ -24,6 +24,12 @@ def tokens(text):
 def entries(path, values):
     with zipfile.ZipFile(path, 'w') as archive:
         for name,value in values.items(): archive.writestr(name,value)
+
+def odf_sheet(path, body):
+    entries(path, {'content.xml': '<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" '
+        'xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0">'
+        '<office:body><office:spreadsheet><table:table table:name="Forecast">'+body+
+        '</table:table></office:spreadsheet></office:body></office:document-content>'})
 def content(writer):
     return [json.loads((writer.output/item['name']).read_text(encoding='utf-8')) for item in writer.files]
 
@@ -215,6 +221,60 @@ class Readers(unittest.TestCase):
             writer = SegmentWriter(Path(folder)/'out',tokens); office(source,writer)
             text = '\n'.join(item['evidence'] for item in content(writer))
             for value in ('merged 2 columns','A2: 42000','A3: 42000','B3: false'): self.assertIn(value,text)
+    def test_odf_declared_multirow_headers_and_grouped_rows_keep_real_addresses(self):
+        with tempfile.TemporaryDirectory(dir=TEST_ROOT) as folder:
+            source=Path(folder)/'grouped.ods'
+            odf_sheet(source,'''<table:table-header-rows>
+                <table:table-row><table:table-cell table:number-columns-spanned="3"><text:p>Budget 2026</text:p></table:table-cell><table:covered-table-cell table:number-columns-repeated="2"/></table:table-row>
+                <table:table-row><table:table-cell><text:p>Region</text:p></table:table-cell><table:table-cell><text:p>Actual</text:p></table:table-cell><table:table-cell><text:p>Plan</text:p></table:table-cell></table:table-row>
+                </table:table-header-rows><table:table-rows><table:table-row><table:table-cell><text:p>North</text:p></table:table-cell><table:table-cell office:value="42000"/><table:table-cell office:value="50000"/></table:table-row></table:table-rows>
+                <table:table-row-group><table:table-rows><table:table-row table:number-rows-repeated="2"><table:table-cell/></table:table-row>
+                <table:table-row><table:table-cell><text:p>South</text:p></table:table-cell><table:table-cell office:value="17000"/><table:table-cell office:value="21000"/></table:table-row></table:table-rows></table:table-row-group>''')
+            writer=SegmentWriter(Path(folder)/'out',tokens);office(source,writer)
+            chunks=content(writer)
+            north=next(chunk for chunk in chunks if 'B3: 42000' in chunk['evidence'])
+            south=next(chunk for chunk in chunks if 'B6: 17000' in chunk['evidence'])
+            for chunk,row in ((north,3),(south,6)):
+                for expected in ('Declared header rows:', 'A1: Budget 2026 [merged 3 columns × 1 rows]', 'A2: Region', 'B2: Actual', 'C2: Plan'):
+                    self.assertIn(expected,chunk['evidence'])
+                self.assertEqual(chunk['locator'],dict(kind='sheet',sheet='Forecast',startCell=f'A{row}',endCell=f'C{row}'))
+    def test_odf_group_header_context_does_not_leak_to_sibling_or_outer_rows(self):
+        with tempfile.TemporaryDirectory(dir=TEST_ROOT) as folder:
+            source=Path(folder)/'scope.ods'
+            odf_sheet(source,'''<table:table-header-rows><table:table-row><table:table-cell><text:p>Global</text:p></table:table-cell></table:table-row></table:table-header-rows>
+                <table:table-row-group><table:table-header-rows><table:table-row><table:table-cell><text:p>Local</text:p></table:table-cell></table:table-row></table:table-header-rows>
+                <table:table-row><table:table-cell office:value="11"/></table:table-row></table:table-row-group>
+                <table:table-row-group><table:table-rows><table:table-row><table:table-cell office:value="22"/></table:table-row></table:table-rows></table:table-row-group>
+                <table:table-row><table:table-cell office:value="33"/></table:table-row>''')
+            writer=SegmentWriter(Path(folder)/'out',tokens);office(source,writer)
+            chunks=content(writer)
+            local=next(chunk for chunk in chunks if 'A3: 11' in chunk['evidence'])
+            self.assertIn('A1: Global',local['evidence']);self.assertIn('A2: Local',local['evidence'])
+            for address in ('A4: 22','A5: 33'):
+                value=next(chunk['evidence'] for chunk in chunks if address in chunk['evidence'])
+                self.assertIn('A1: Global',value);self.assertNotIn('Local',value)
+    def test_odf_header_context_limits_are_explicit_without_losing_original_header_cells(self):
+        with tempfile.TemporaryDirectory(dir=TEST_ROOT) as folder:
+            source=Path(folder)/'large-header.ods'
+            odf_sheet(source,'<table:table-header-rows><table:table-row><table:table-cell><text:p>'+('h'*10000)+
+                '</text:p></table:table-cell></table:table-row></table:table-header-rows><table:table-rows><table:table-row><table:table-cell office:value="7"/></table:table-row></table:table-rows>')
+            writer=SegmentWriter(Path(folder)/'out',tokens);office(source,writer)
+            self.assertIn('sheet_context_limit',writer.reasons)
+            self.assertTrue(any('A2: 7' in item['evidence'] for item in content(writer)))
+            self.assertTrue(all(len(tokens(item['content']['text']).ids)<=2048 for item in content(writer)))
+            bodies=[]
+            for item in content(writer):
+                if item['locator']['startCell']!='A1':continue
+                value=item['content']['text'].split('\n',2)[-1]
+                if value.startswith('A1 (continued):\n'):value=value[len('A1 (continued):\n'):]
+                bodies.append(value)
+            self.assertEqual(''.join(bodies),'A1: '+'h'*10000)
+    def test_odf_excessive_row_container_nesting_is_rejected(self):
+        with tempfile.TemporaryDirectory(dir=TEST_ROOT) as folder:
+            source=Path(folder)/'deep.ods'
+            odf_sheet(source,'<table:table-row-group>'*65+'<table:table-row><table:table-cell office:value="1"/></table:table-row>'+'</table:table-row-group>'*65)
+            with self.assertRaisesRegex(ValueError,'odf_row_nesting_budget'):
+                office(source,SegmentWriter(Path(folder)/'out',tokens))
     def test_authored_office_pack_extracts_all_six_formats_without_renderer(self):
         pack = ROOT/'artifacts/diagnostics/multimodal/office-fixtures-v2'
         if not (pack/'fixtures.json').is_file(): self.skipTest('Author the development Office fixture pack first')

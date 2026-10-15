@@ -235,6 +235,47 @@ def odf_assets(archive, tree, writer, locator):
         else: writer.reasons.add('embedded_object_unavailable')
     return True
 
+class SheetHeadings:
+    """Bound context separately from the original cells, which are still emitted."""
+    def __init__(self, writer, parent=None):
+        self.writer = writer
+        self.lines = list(parent.lines) if parent else []
+        self.chars = parent.chars if parent else 0
+        self.declared = parent.declared if parent else False
+    def add(self, lines, declared):
+        if declared and not self.declared:
+            self.lines, self.chars = [], 0
+        elif not declared and self.lines:
+            return
+        self.declared |= declared
+        for line in lines:
+            room = 8192-self.chars
+            if len(self.lines) >= 128 or room <= 0:
+                self.writer.reasons.add('sheet_context_limit'); break
+            if len(line) > room: self.writer.reasons.add('sheet_context_limit')
+            self.lines.append(line[:room]); self.chars += len(self.lines[-1])
+    def context(self, name):
+        label = 'Declared header rows' if self.declared else 'Leading row context'
+        return 'Sheet: '+name+'\n'+label+': '+' | '.join(self.lines)+'\n'
+
+
+def odf_rows(table, writer):
+    """Visit only row containers in document order; groups own their context."""
+    T = '{'+NS['table']+'}'
+    stack = [(iter(table), False, SheetHeadings(writer))]
+    while stack:
+        children, header, headings = stack[-1]
+        node = next(children, None)
+        if node is None:
+            stack.pop(); continue
+        if node.tag == T+'table-row':
+            yield node, header, headings
+        elif node.tag in (T+'table-header-rows', T+'table-rows', T+'table-row-group'):
+            if len(stack) >= 64: raise ValueError('odf_row_nesting_budget')
+            scoped = SheetHeadings(writer, headings) if node.tag == T+'table-row-group' else headings
+            stack.append((iter(node), header or node.tag == T+'table-header-rows', scoped))
+
+
 def odf(archive, writer, suffix):
     content = xml(archive, 'content.xml')
     if suffix == '.odp':
@@ -261,8 +302,8 @@ def odf(archive, writer, suffix):
         for table in content.findall('.//table:table', NS):
             name = table.get(T+'name', '')
             if not 1 <= len(name) <= 200: raise ValueError('sheet_name_budget')
-            row_number, nonempty, heading = 1, 0, []
-            for row in table.findall('table:table-row', NS):
+            row_number, nonempty = 1, 0
+            for row, header, headings in odf_rows(table, writer):
                 repeat = int(row.get(T+'number-rows-repeated', '1'))
                 if not 1 <= repeat <= 1048576 or row_number+repeat-1 > 1048576: raise ValueError('sheet_row_budget')
                 values, col = [], 1
@@ -288,9 +329,9 @@ def odf(archive, writer, suffix):
                 for row_offset in range(repeat):
                     current = row_number+row_offset
                     lines = [f'{column(c)}{current}: {v}' + (f' [merged {wide} columns × {high} rows]' if wide > 1 or high > 1 else '') for c,v,wide,high in values]
-                    if not heading: heading = lines.copy()
+                    headings.add(lines, header)
                     locator = dict(kind='sheet', sheet=name, startCell=column(values[0][0])+str(current), endCell=column(values[-1][0])+str(current))
-                    if not writer.table('Sheet: '+name+'\nHeaders: '+' | '.join(heading)+'\n', lines, locator): return
+                    if not writer.table(headings.context(name), lines, locator): return
                     nonempty += len(values)
                 row_number += repeat
             locator = dict(kind='sheet', sheet=name, startCell='A1', endCell='A1')

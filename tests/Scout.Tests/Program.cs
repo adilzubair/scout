@@ -41,6 +41,7 @@ if (args.Length == 7 && args[0] == "--multimodal-eval") return await MultimodalE
 if (args.Length == 5 && args[0] == "--multimodal-review") return await MultimodalReview.Run(args[1], args[2], args[3], args[4]);
 if (args.Length == 3 && args[0] == "--multimodal-scale") return await MultimodalScaleBenchmark.Run(args[1], args[2]);
 if (args.Length == 3 && args[0] == "--semantic-extractor") return await SemanticExtractorChecks.Smoke(args[1], args[2]);
+if (args.Length == 3 && args[0] == "--sheet-context-sandbox") return await SpreadsheetContextChecks.Run(args[1], args[2]);
 if (args.Length == 3 && args[0] == "--semantic-scheduler") return await SemanticServiceChecks.Smoke(args[1], args[2]);
 if (args.Length == 3 && args[0] == "--sandbox-crash") return ExtractionSandboxChecks.Crash(args[1], args[2]);
 if (args.Length == 3 && args[0] == "--realworld") return RealWorldAudit.Run(args[1], args[2]);

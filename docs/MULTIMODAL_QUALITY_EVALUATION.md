@@ -219,6 +219,50 @@ rights and related-source review. None has been used for model inference, and no
 negative task was inferred from an omission. The future 400-task holdout and its
 seven-family requirements remain unchanged.
 
+## ODS row structure and additional originals
+
+Conformance review against the [ODF row-container specification](https://docs.oasis-open.org/office/OpenDocument/v1.3/OpenDocument-v1.3-part3-schema.html)
+found that direct-child-only traversal skipped declared header rows, row groups
+and row-list containers. The reader now visits these containers in document order,
+counts repeated/empty rows at their real positions and preserves declared multirow
+headers. Group-local context is inherited and restored at group boundaries rather
+than leaking into a sibling group or later outer rows. Without declared headers,
+the repeated context is labelled `Leading row context`, rather than claiming a
+data row is a declared header. Merged-cell spans remain explicit.
+
+Context storage is bounded to 128 entries/8,192 characters, independently of the
+original cell bodies. Abbreviation reports `sheet_context_limit`; original header
+cells still pass through the normal cell-aware, token-bounded writer. Row-container
+nesting is limited to 64 levels. Parser capabilities, archive/XML limits, model
+artifacts and admission thresholds are unchanged. Runtime-byte hashing changes
+the reader identity, so the durable index invalidates earlier extraction results.
+
+Four new regression cases fail on the original traversal and pass after the fix;
+all 25 reader contracts pass. The actual zero-capability parser and trusted receipt
+bridge also pass four authored cases: grouped rows with merged/multirow headers,
+group-local context, oversized header context and excessive nesting rejection.
+The three accepted files produce twelve text segments, at most 1,515 raw tokens
+with the pinned tokenizer. Originals remain unchanged and owned work is removed.
+The boundary uses deterministic unit vectors solely to validate receipts; it does
+not load the embedding model or establish retrieval quality.
+
+An additional pinned public intake contains 36 originals (6,766,914 bytes): 34 ODS
+files and two readmes from nine concept/version groups. Public record metadata,
+declared CC BY 4.0 attribution, publisher MD5, source SHA256 and original selection
+bytes are preserved. Offline replay verifies the same originals and provenance.
+The no-model sandbox review prepares 31 sources into 5,067 verified text segments;
+the actual tokenizer maximum is 1,019 raw tokens. Five sources are explicitly
+unavailable because `content.xml` exceeds the existing 8 MiB XML-part budget. The
+batch returns nonzero and retains those failures. Thirteen prepared sources reach
+the per-file segment limit. None of the inspected natural sources within the XML
+budget uses declared row containers; the new row-container fix is established by
+the authored conformance cases, not by pretending this natural batch exercises it.
+
+These originals remain unapproved and unsplit. Embedded-object/layout limits,
+large legitimate XML parts, XLSX table/merged-header relationships, rights and
+cross-corpus grouping still require work. No model predictions or new admission
+threshold decisions were made from this candidate pool.
+
 ## Open release evidence
 
 Natural images, video, joint audiovisual events, multilingual and complex Office

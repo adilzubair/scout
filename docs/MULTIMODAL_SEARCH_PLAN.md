@@ -717,3 +717,25 @@ The separate offline CUDA worker smoke check also passes text, image, audio,
 video and joint audiovisual inference with finite normalized 768-dimensional
 vectors and outgoing Python sockets blocked. This uses authored engineering
 inputs; no predictions have been opened on the new natural-content candidates.
+
+The ODS reader now traverses standard header-row, grouped-row and row-list
+containers, preserves real cell addresses across repeated/empty rows and repeats
+declared multirow/merged header context. Nested groups inherit context without
+leaking local headings to siblings. Leading rows without a declaration are
+labelled as context. Header storage and traversal depth have explicit bounds;
+oversized context is marked partial while original header cells are still emitted.
+Four baseline failures now pass within 25 reader contracts. Four actual sandbox
+contracts also pass, with twelve accepted text segments (maximum 1,515 raw tokens)
+and explicit excessive-nesting rejection. These authored checks do not establish
+natural retrieval quality. Reader-byte hashing invalidates old index generations.
+
+The unopened ODS candidate pool adds 36 originals from nine concept/version groups
+and reproduces offline. The production no-model review prepares 31 sources into
+5,067 validated text segments (maximum 1,019 raw tokens), preserving all originals.
+Five legitimate large `content.xml` parts exceed the current 8 MiB budget and are
+explicitly unavailable; thirteen sources also reach the segment limit. These
+failures remain recorded. No inspected in-budget original uses the row containers
+covered by the authored tests. Large XML handling and XLSX table/merged-header
+relationships remain reader-fidelity work, alongside the full seven-family corpus,
+source rights, supported negatives, ambiguity/group review and 400-task holdout.
+Physical 16 GB, performance, lifecycle and distribution gates remain open.
