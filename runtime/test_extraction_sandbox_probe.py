@@ -16,6 +16,13 @@ def report_error(kind, value, trace):
 sys.excepthook = report_error
 
 config = json.loads(Path(sys.argv[1]).read_text(encoding='utf-8-sig'))
+if config.get('schemaVersion') == 1 and 'sourceSha256' in config:
+    # Developer harness only: the C# caller supplies the fixed authored media pack.
+    # Its private traceback diagnoses failures while production still emits codes.
+    from semantic_search.extract import require_sandbox, extract
+    require_sandbox()
+    extract(Path(sys.argv[1]))
+    raise SystemExit(0)
 kernel = ctypes.WinDLL('kernel32', use_last_error=True)
 advapi = ctypes.WinDLL('advapi32', use_last_error=True)
 kernel.GetCurrentProcess.restype = wintypes.HANDLE

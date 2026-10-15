@@ -32,6 +32,7 @@ if (args.Length == 3 && args[0] == "--extraction-sandbox") return await Extracti
 if (args.Length == 3 && args[0] == "--extraction-python") return await ExtractionSandboxChecks.Smoke(args[1], args[2],true);
 if (args.Length == 4 && args[0] == "--extract-readers") return await ExtractionSandboxChecks.Readers(args[1], args[2], args[3]);
 if (args.Length == 4 && args[0] == "--extract-media") return await ExtractionSandboxChecks.Media(args[1], args[2], args[3]);
+if (args.Length == 4 && args[0] == "--extract-media-diagnostic") return await ExtractionSandboxChecks.Media(args[1], args[2], args[3],true);
 if (args.Length == 3 && args[0] == "--semantic-playback") return await SemanticPlaybackChecks.Run(args[1], args[2]);
 if (args.Length == 3 && args[0] == "--playback-crash") return await SemanticPlaybackChecks.Crash(args[1], args[2]);
 if (args.Length == 3 && args[0] == "--semantic-scans") return await SemanticScanChecks.Run(args[1], args[2]);
@@ -41,6 +42,7 @@ if (args.Length == 7 && args[0] == "--multimodal-eval") return await MultimodalE
 if (args.Length == 5 && args[0] == "--multimodal-review") return await MultimodalReview.Run(args[1], args[2], args[3], args[4]);
 if (args.Length == 3 && args[0] == "--multimodal-scale") return await MultimodalScaleBenchmark.Run(args[1], args[2]);
 if (args.Length == 3 && args[0] == "--semantic-extractor") return await SemanticExtractorChecks.Smoke(args[1], args[2]);
+if (args.Length == 3 && args[0] == "--semantic-extractor-races") return await SemanticExtractorChecks.Smoke(args[1], args[2],true);
 if (args.Length == 3 && args[0] == "--sheet-context-sandbox") return await SpreadsheetContextChecks.Run(args[1], args[2]);
 if (args.Length == 3 && args[0] == "--semantic-scheduler") return await SemanticServiceChecks.Smoke(args[1], args[2]);
 if (args.Length == 3 && args[0] == "--sandbox-crash") return ExtractionSandboxChecks.Crash(args[1], args[2]);

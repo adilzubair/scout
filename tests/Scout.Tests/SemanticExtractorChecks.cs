@@ -94,7 +94,7 @@ static class SemanticExtractorChecks
             Throws<InvalidDataException>(()=>PreparedManifest.ReadAsync(f.Root,f.Hash,default).GetAwaiter().GetResult());
         }));
     }
-    public static async Task<int> Smoke(string addonRoot,string home)
+    public static async Task<int> Smoke(string addonRoot,string home,bool racesOnly=false)
     {
         var installation=MultimodalSetup.Find(addonRoot) ?? throw new IOException("Missing isolated test add-on.");
         var root=Path.GetFullPath("artifacts/diagnostics/multimodal/extractor-host/"+Guid.NewGuid().ToString("N"));
@@ -104,6 +104,8 @@ static class SemanticExtractorChecks
         try
         {
             using var index = new SemanticIndex(Path.Combine(root,"semantic.db")); index.Configure(scope);
+            if(!racesOnly)
+            {
             var jointRequests=0;
             Task<EmbeddingResult> Embed(object content,CancellationToken token)
             {
@@ -135,22 +137,26 @@ static class SemanticExtractorChecks
                 Check(index.Vectors().Where(row=>row.Family=="video").Any(row=>index.Evidence(row.SegmentId)!.Text.Contains("Synchronized")),"joint audiovisual evidence was not durably published");
                 Console.WriteLine("PASS actual CPU joint AV requests, normalized vectors and durable timestamp evidence");
             }
+            }
             // Use an embedding boundary double only for deterministic mutation/revocation races.
             var original=Path.Combine(selected,"race.txt");File.WriteAllText(original,"original content");
             EmbeddingResult Good() => new(Enumerable.Range(0,768).Select(i=>i==0?1f:0f).ToArray(),10,1);
+            var mutationEntered=false;var revocationEntered=false;
             await using(var extractor=new SemanticExtractor(addonRoot,installation,()=>scope,(_,_)=>
-                {File.WriteAllText(original,"changed during embedding");return Task.FromResult(Good());},home))
+                {mutationEntered=true;File.WriteAllText(original,"changed during embedding");return Task.FromResult(Good());},home))
             {
                 var source=SemanticSourceReader.Read(original,scope)!;
                 try {await extractor.ExtractAsync(source,default);throw new Exception("Changed original accepted.");}catch(IOException){}
+                Check(mutationEntered && File.ReadAllText(original)=="changed during embedding","Mutation boundary was not exercised.");
                 Check(Directory.GetDirectories(extractor.WorkRoot,"source-*").Length==0);
             }
             File.WriteAllText(original,"revocation content");
             await using(var extractor=new SemanticExtractor(addonRoot,installation,()=>scope,(_,_)=>
-                {scope=scope with {Enabled=false};return Task.FromResult(Good());},home))
+                {revocationEntered=true;scope=scope with {Enabled=false};return Task.FromResult(Good());},home))
             {
                 var source=SemanticSourceReader.Read(original,scope)!;
                 try {await extractor.ExtractAsync(source,default);throw new Exception("Revoked source accepted.");}catch(IOException){}
+                Check(revocationEntered && !scope.Enabled,"Revocation boundary was not exercised.");
                 Check(Directory.GetDirectories(extractor.WorkRoot,"source-*").Length==0);
             }
             scope=scope with {Enabled=true};
@@ -159,13 +165,16 @@ static class SemanticExtractorChecks
                 {entered.TrySetResult();await Task.Delay(Timeout.Infinite,token);return Good();},home))
             {
                 using var cancel=new CancellationTokenSource(); var source=SemanticSourceReader.Read(original,scope)!;
-                var pending=extractor.ExtractAsync(source,cancel.Token);await entered.Task.WaitAsync(TimeSpan.FromMinutes(2));cancel.Cancel();
+                var pending=extractor.ExtractAsync(source,cancel.Token);
+                await Task.WhenAny(entered.Task,pending).WaitAsync(TimeSpan.FromMinutes(2));
+                if(!entered.Task.IsCompleted){await pending;throw new IOException("Cancellation boundary was not exercised.");}
+                cancel.Cancel();
                 try {await pending;throw new Exception("Canceled extraction accepted.");}catch(OperationCanceledException){}
                 Check(Directory.GetDirectories(extractor.WorkRoot,"source-*").Length==0);
             }
             Console.WriteLine("PASS extractor host mutation, revocation, cancellation and owned-copy cleanup");
             index.Configure(scope with {Enabled=false}); Check(index.Vectors().Length==0 && index.Progress.Files==0);
-            Console.WriteLine("PASS all-family durable publication and revocation");
+            Console.WriteLine(racesOnly?"PASS source races and disabled-index clearing":"PASS all-family durable publication and revocation");
             return 0;
         }
         catch(Exception error){Console.Error.WriteLine(error);return 1;}

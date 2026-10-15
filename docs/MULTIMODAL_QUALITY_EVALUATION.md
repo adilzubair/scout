@@ -263,6 +263,55 @@ large legitimate XML parts, XLSX table/merged-header relationships, rights and
 cross-corpus grouping still require work. No model predictions or new admission
 threshold decisions were made from this candidate pool.
 
+## Bounded large-ODS streaming
+
+The five original ODS XML-budget rejections above now prepare successfully. Only
+ODS `content.xml` uses the streaming path, bounded to the existing 64 MiB member
+limit. Other XML parts retain their 8 MiB bound, and the archive remains limited
+to 256 MiB expanded/10,000 entries. A no-tree preflight validates the entire XML
+stream and ZIP CRC before extraction begins; DTDs/entities, excessive depth
+(256) and more than four million XML elements are rejected. Malformed content
+after an early segment quota therefore cannot publish an apparently valid prefix.
+The implementation uses the [CPython XML parser target and pull APIs](https://docs.python.org/3.12/library/xml.etree.elementtree.html).
+
+Extraction retains a row subtree and removes completed nodes from their parents.
+Live rows have a 100,000-node limit and an 8 MiB data-read window checked in 64 KiB
+chunks. The first chunk can precede the row start; this window is not an exact
+serialized-row-length measurement. Header, cell, segment, prepared-byte, sandbox
+memory and timeout limits still apply. Nonempty cells, cached formulas, repeated
+rows and declared/group-local headers retain their earlier handling. Embedded
+images remain vision inputs and use their containing cell/range rather than a
+sheet-wide placeholder. Nested subtables are explicitly unavailable.
+
+All 35 reader contracts pass. They cover large valid sheets, malformed tails,
+UTF-8/UTF-16 DTD rejection, size/header mismatches, archive limits, depth/node/row
+bounds and an image in C2. The authored 90,000-row/four-segment test keeps Python
+traced allocations below 12 MiB; this is neither process RSS nor full-model memory.
+Eight actual sandbox cases pass, including explicit pre-inference rejections and
+the C2 image. Their 269 text segments stay within 2,048 raw tokens (maximum 1,515),
+and the image bytes/visible blue pixels are verified. Originals and owned cleanup
+are checked at both boundaries.
+
+The unchanged 36-source natural pool now yields 6,347 verified text segments,
+maximum 1,568 raw tokens. All five previously unavailable originals are represented.
+The prior 31 sources retain identical content/locator/asset multisets; 28 retain
+the original ordered receipts and three now emit cached chart data in source XML
+order. Eighteen sources reach the segment quota, and layout/embedded-object limits
+remain explicit. This is bounded preparation, not complete indexing or retrieval
+quality approval. The pool remains unsplit, unapproved and unopened to inference.
+
+The native suite passes 341 checks. An initial 339/340 run exposed a transient
+sharing error in a session-owner test receipt read; its bounded read helper and a
+real held-file/cancellation test correct the harness. Preserve that failed run.
+The first full-model integration run then stopped on a generic media extraction
+error after publishing fourteen files. A private authored-media diagnostic passed
+all sixteen files, and an isolated real CPU run passed all seventeen files across
+seven families, joint AV and durable publication. The earlier media failure is
+unexplained and remains a lifecycle/resource investigation, not an erased result.
+Source-race checks additionally assert that mutation/revocation callbacks actually
+ran and propagate a parser failure promptly when cancellation's boundary is never
+reached. A targeted current run passes those stronger assertions.
+
 ## Open release evidence
 
 Natural images, video, joint audiovisual events, multilingual and complex Office

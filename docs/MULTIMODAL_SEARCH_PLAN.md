@@ -3,7 +3,7 @@
 Date: 2026-10-15. Branch: `feature/multimodal-semantic-search`.
 Status: implementation active; independent quality and release validation in progress.
 Retrieval, previews, OCR and format coverage are committed. The frozen evaluation
-foundation passes 340 Release checks; independent quality and release gates remain open.
+foundation passes 341 Release checks; independent quality and release gates remain open.
 This plan is the implementation checklist; the add-on remains a
 preview until the release gates below pass. The full-model runtime and content smoke probe
 are implemented and verified on CPU and CUDA. On 2026-10-14 the user directed
@@ -739,3 +739,31 @@ covered by the authored tests. Large XML handling and XLSX table/merged-header
 relationships remain reader-fidelity work, alongside the full seven-family corpus,
 source rights, supported negatives, ambiguity/group review and 400-task holdout.
 Physical 16 GB, performance, lifecycle and distribution gates remain open.
+
+Large ODS XML now uses a complete, no-tree structural/DTD/CRC preflight followed
+by bounded row streaming. The streamed `content.xml` ceiling is 64 MiB; other XML
+parts remain at 8 MiB and archive/sandbox/output limits are unchanged. Depth,
+global element count and live-row windows are explicit. Completed nodes are
+discarded, malformed tails fail before any prefix can publish, and embedded
+images keep their real containing-cell locators. All 35 reader contracts and
+eight native sandbox cases pass. The actual C2 image bytes and 269 text segments
+(maximum 1,515 raw tokens) are verified; this authored evidence is not quality or
+minimum-hardware approval.
+
+All 36 unchanged ODS/readme originals now prepare into 6,347 verified text
+segments (maximum 1,568 raw tokens). Prior content/locator/asset multisets remain
+identical for the earlier 31 successes; cached charts reorder in three files.
+The original five rejections remain preserved. Eighteen sources still reach
+the segment cap, and visual/embedded-object limits remain explicit. These
+candidates remain unapproved and unsplit, with no embedding predictions opened.
+
+The 341-check native suite includes a deterministic readiness sharing/cancellation
+contract after a test-helper race caused an initial 339/340 result. A full-model
+run stopped on a generic media parsing error after fourteen publications; the
+sixteen-file private parser diagnostic and a later isolated seventeen-file CPU
+integration passed. Preserve both outcomes and investigate the earlier failure
+before release. Targeted source-race tests now assert callback entry and pass
+without running the model workload again. XLSX table/merged-header fidelity,
+whole-corpus rights/group/ambiguity review, supported negatives and the 400-task
+holdout remain next, alongside the existing physical 16 GB, performance, lifecycle
+and distribution gates. No threshold, model or dependency pins changed.

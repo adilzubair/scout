@@ -151,19 +151,32 @@ static class ExtractionSandboxChecks
     private static void Check(bool value, string message = "Sandbox assertion failed") { if (!value) throw new Exception(message); }
     public static Task<int> Readers(string python, string home, string model) => ReadPack(python, home, model,
         "office-fixtures-v2", ["notes.docx", "notes.odt", "growth.pptx", "growth.odp", "sales.xlsx", "sales.ods"]);
-    public static Task<int> Media(string python, string home, string model)
+    public static Task<int> Media(string python, string home, string model,bool diagnostic=false)
     {
         using var manifest = JsonDocument.Parse(File.ReadAllText(Path.GetFullPath("artifacts/diagnostics/multimodal/media-fixtures-v1/fixtures.json")));
-        return ReadPack(python, home, model, "media-fixtures-v1", manifest.RootElement.GetProperty("items").EnumerateArray().Select(item => item.GetProperty("file").GetString()!).ToArray());
+        return ReadPack(python, home, model, "media-fixtures-v1", manifest.RootElement.GetProperty("items").EnumerateArray().Select(item => item.GetProperty("file").GetString()!).ToArray(),diagnostic);
     }
-    private static async Task<int> ReadPack(string python, string home, string model, string packName, string[] files)
+    private static async Task<int> ReadPack(string python, string home, string model, string packName, string[] files,bool diagnostic=false)
     {
         var root = Path.GetFullPath("artifacts/diagnostics/multimodal/sandbox-readers/" + Guid.NewGuid().ToString("N")); Directory.CreateDirectory(root);
         var runtime = Path.Combine(AppContext.BaseDirectory, "runtime");
         var pack = Path.GetFullPath("artifacts/diagnostics/multimodal/" + packName);
         try
         {
-            var roots = new[] { Path.GetFullPath(home), Path.GetDirectoryName(Path.GetDirectoryName(Path.GetFullPath(python)))!, runtime, Path.GetFullPath(model) };
+            var tokenizer=Path.GetFullPath(Path.Combine(model,"tokenizer.json"));
+            var readableModel=Path.GetFullPath(model);
+            if(diagnostic)
+            {
+                // Match the production parser: private venv/base Python and only
+                // a verified tokenizer copy, with no grant on the model weights.
+                readableModel=Path.Combine(root,"assets");Directory.CreateDirectory(readableModel);
+                var copy=Path.Combine(readableModel,"tokenizer.json");File.Copy(tokenizer,copy);
+                using var definition=JsonDocument.Parse(File.ReadAllText(Path.Combine(runtime,"embeddinggemma2_model.json")));
+                var expected=definition.RootElement.GetProperty("files").GetProperty("tokenizer.json");
+                Check(await SemanticExtractor.VerifiedAsync(copy,expected.GetProperty("bytes").GetInt64(),expected.GetProperty("sha256").GetString()!,default),"Diagnostic tokenizer mismatch.");
+                tokenizer=copy;
+            }
+            var roots = new[] { Path.GetFullPath(home), Path.GetDirectoryName(Path.GetDirectoryName(Path.GetFullPath(python)))!, runtime, readableModel };
             using var sandbox = new ExtractionSandbox(root, roots);
             foreach (var file in files)
             {
@@ -172,9 +185,12 @@ static class ExtractionSandboxChecks
                 var source = Path.Combine(work, "input" + Path.GetExtension(file)); File.Copy(Path.Combine(pack,file), source);
                 var request = Path.Combine(work, "request.json");
                 var hash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(source))).ToLowerInvariant();
-                File.WriteAllText(request, JsonSerializer.Serialize(new { schemaVersion = 1, source = Path.GetFileName(source), sourceSha256 = hash, family = SemanticFormats.Family(source)!, tokenizer = Path.GetFullPath(Path.Combine(model, "tokenizer.json")) }));
-                var exit = await sandbox.RunAsync(Path.GetFullPath(python), [Path.Combine(runtime,"semantic_search","extract.py"), "--request",request], work, TimeSpan.FromSeconds(120), default);
-                if (exit != 0) throw new IOException("Reader failed for " + file + ": " + (File.Exists(Path.Combine(work,"failed.json")) ? File.ReadAllText(Path.Combine(work,"failed.json")) : "no error record"));
+                File.WriteAllText(request, JsonSerializer.Serialize(new { schemaVersion = 1, source = Path.GetFileName(source), sourceSha256 = hash, family = SemanticFormats.Family(source)!, tokenizer }));
+                var exit = diagnostic ? await sandbox.RunPythonAsync(Path.GetFullPath(home),Path.GetFullPath(python),[Path.Combine(runtime,"test_extraction_sandbox_probe.py"),request],work,TimeSpan.FromSeconds(120),default) :
+                    await sandbox.RunAsync(Path.GetFullPath(python), [Path.Combine(runtime,"semantic_search","extract.py"), "--request",request], work, TimeSpan.FromSeconds(120), default);
+                if (exit != 0) throw new IOException("Reader failed for " + file + ": " +
+                    (diagnostic && File.Exists(Path.Combine(work,"probe-error.txt")) ? File.ReadAllText(Path.Combine(work,"probe-error.txt")) :
+                     File.Exists(Path.Combine(work,"failed.json")) ? File.ReadAllText(Path.Combine(work,"failed.json")) : "no error record"));
                 using var ready = JsonDocument.Parse(File.ReadAllText(Path.Combine(work,"output","ready.json")));
                 Check(ready.RootElement.GetProperty("sourceSha256").GetString()!.Equals(hash,StringComparison.OrdinalIgnoreCase));
                 var segments = ready.RootElement.GetProperty("segments").EnumerateArray().ToArray();
