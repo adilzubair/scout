@@ -3,7 +3,7 @@
 Date: 2026-10-15. Branch: `feature/multimodal-semantic-search`.
 Status: implementation active; restart verification on 2026-10-15 follows checkpoint `fc3f8ea`.
 Retrieval, previews, OCR and format coverage are committed. The frozen evaluation
-foundation passes 307 Release checks; independent quality and release gates remain open.
+foundation passes 311 Release checks; independent quality and release gates remain open.
 This plan is the implementation checklist; the add-on remains a
 preview until the release gates below pass. The full-model runtime and content smoke probe
 are implemented and verified on CPU and CUDA. On 2026-10-14 the user directed
@@ -423,8 +423,21 @@ its source runtime passes offline CPU readiness for text, image, audio, video an
 joint audiovisual input using the existing development generation. This does not
 establish clean-account installation or independent retrieval quality.
 
-Next, continue packaged add-on install/update/interruption/removal and recovery
-checks, followed by the independent content-grounded evaluation corpus. The first
+Worker session ownership and recovery are now implemented. Four contracts cover
+active owners, forced death, marker initialization and unknown/legacy content.
+A private copy of the published libraries and self-contained CLR passed an actual
+CPU forced-death/resume run: 16 authored files, seven families, 27 segments. The
+worker died with its owner, an unpublished running job survived in SQLite, and
+restart restored the index. The abandoned readiness/source work was removed while
+an active session survived; four runtime-root ACLs matched their pre-run rules.
+Semantic index removal preserved ordinary database bytes and original sources.
+The final published WPF smoke checks also pass. These checks reuse the existing
+development add-on and explicit private interpreter override, so they do not
+establish clean-account setup or minimum hardware support.
+
+Next, continue packaged add-on install/update/interruption/removal, live parser
+death and generation/cache cleanup checks, followed by the independent
+content-grounded evaluation corpus. The first
 full run timed out waiting for quota pause/resume (306/307); targeted scheduler
 checks (16/16) and the complete rerun (307/307) passed. Preserve this unresolved
 intermittent result and the improved timeout diagnostics for lifecycle work.

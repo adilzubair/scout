@@ -616,3 +616,37 @@ review; it always reports `distributionApproved: false`. See
 # Run using that generation's interpreter, so its own installed metadata is collected.
 C:/Path/To/Addon/generations/GENERATION/venv/Scripts/python.exe runtime/semantic_search/notices.py --generation C:/Path/To/Addon/generations/GENERATION
 ```
+
+Worker session directories now have an OS byte lock in `session.owner`. Startup
+can remove a dead owner's readiness files without using a potentially reused PID
+as proof of ownership. Active owners remain locked across processes. Recovery
+handles an empty marker left before initialization and an incomplete `ready.tmp`.
+Deletion is limited to known files inside the owned session directory; unexpected
+contents and older unmarked sessions are preserved. Explicit add-on removal still
+owns the complete private add-on tree. Four Release contracts cover this behavior.
+
+The packaged lifecycle probe copies the published app/Core/runtime bytes, adds a
+private test driver and uses the published self-contained desktop CLR. It pauses
+after the first actual CPU embedding and kills only that driver, allowing Windows
+job ownership to terminate the real model worker. Before restart, SQLite must still
+contain a running job and no partial vectors. Restart indexes sixteen authored
+sources across all seven families, then suspends the worker and removes the
+semantic database. The probe compares runtime-root access rules before/after,
+checks prepared-source and dead-session cleanup, keeps another process's session
+alive and verifies that original source bytes and the ordinary database survive.
+It preserves reports/logs and removes the copied payload after a successful run;
+failed payloads remain available when a recovery journal may refer to their paths.
+
+On 2026-10-15 the final probe passed with 27 segments, matching access rules on the
+private base interpreter, venv, published runtime and tokenizer-assets roots.
+The complete Release suite passes 311 checks, the package suite passes 24 and the
+fresh 532-file package passes integrity and isolated WPF checks. A readiness-file
+publication race in the new test helper was fixed before the final passing run.
+This is process-death recovery with an existing development CPU generation and an
+explicit interpreter override. It is not clean standard-account installation,
+live-parser death, setup interruption, complete format/quality evaluation or
+physical 16 GB resource validation; those gates remain open.
+
+```powershell
+dotnet run --project tests/Scout.Tests -c Release --no-build -- --multimodal-lifecycle artifacts/Scout artifacts/diagnostics/multimodal/addon-no-office .runtime/python/cpython-3.12.13-windows-x86_64-none artifacts/diagnostics/multimodal/packaged-lifecycle
+```

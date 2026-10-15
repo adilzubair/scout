@@ -5,6 +5,9 @@ using Scout.Core;
 
 if (args.Length == 3 && args[0] == "--profile") return SearchProfiler.Run(args[1], args[2]);
 if (args.Length == 2 && args[0] == "--job-parent") return MultimodalChecks.JobParent(args[1]);
+if (args.Length == 3 && args[0] == "--session-owner") return MultimodalSessionChecks.Owner(args[1],args[2]);
+if (args.Length == 5 && args[0] == "--multimodal-lifecycle") return await MultimodalLifecycleChecks.Run(args[1],args[2],args[3],args[4]);
+if (args.Length == 5 && args[0] == "--lifecycle-child") return await MultimodalLifecycleChecks.Child(args[1],args[2],args[3],args[4]);
 if (args.Length == 2 && args[0] == "--multimodal-host") return await MultimodalChecks.HostSmoke(args[1]);
 if (args.Length == 3 && args[0] == "--extraction-sandbox") return await ExtractionSandboxChecks.Smoke(args[1], args[2]);
 if (args.Length == 3 && args[0] == "--extraction-python") return await ExtractionSandboxChecks.Smoke(args[1], args[2],true);
@@ -53,6 +56,7 @@ ContentSearchChecks.Run(Test);
 IndexRaceChecks.Run(Test);
 SettingsUiChecks.Run(Test);
 MultimodalChecks.Run(Test);
+MultimodalSessionChecks.Run(Test);
 SemanticIndexChecks.Run(Test);
 SemanticSourceChecks.Run(Test);
 ExtractionSandboxChecks.Run(Test);

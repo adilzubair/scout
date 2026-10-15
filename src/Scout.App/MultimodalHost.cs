@@ -21,7 +21,8 @@ internal sealed class MultimodalHost : IDisposable
     private ProcessJob? job;
     private MultimodalLease? runtimeLease;
     private HttpClient? client;
-    private string configuration = "", sessionDirectory = "";
+    private string configuration = "";
+    private MultimodalSession? workerSession;
     private bool disposed;
     private int pendingQueries;
     private int indexingActivity;
@@ -162,8 +163,8 @@ internal sealed class MultimodalHost : IDisposable
         if (configuration == key && process is { HasExited: false } && client != null) return;
         Stop(); State = MultimodalState.Loading; Status = "Loading multimodal add-on…";
         runtimeLease = new MultimodalLease(root);
-        sessionDirectory = MultimodalSetup.OwnedPath(root, "sessions/" + Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(sessionDirectory);
+        workerSession = MultimodalSession.Create(root);
+        var sessionDirectory = workerSession.DirectoryPath;
         var readyFile = Path.Combine(sessionDirectory, "ready.json");
         var secret = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
         var start = new ProcessStartInfo(installed.Python) { UseShellExecute = false, CreateNoWindow = true, WorkingDirectory = sessionDirectory, RedirectStandardOutput = true, RedirectStandardError = true };
@@ -242,15 +243,14 @@ internal sealed class MultimodalHost : IDisposable
         catch (Exception error) when (error is InvalidOperationException or System.ComponentModel.Win32Exception) { }
         process?.Dispose(); process = null; workerPid = 0; configuration = "";
         runtimeLease?.Dispose(); runtimeLease = null;
-        if (sessionDirectory.Length > 0)
+        if (workerSession != null)
         {
             try
             {
-                var owned = MultimodalSetup.OwnedPath(root, Path.GetRelativePath(root, sessionDirectory));
-                if (Directory.Exists(owned)) Directory.Delete(owned, true);
+                workerSession.Dispose();
             }
             catch (Exception error) when (error is IOException or UnauthorizedAccessException) { }
-            sessionDirectory = "";
+            workerSession = null;
         }
     }
     public void Dispose()
