@@ -44,6 +44,8 @@ if (args.Length == 3 && args[0] == "--multimodal-scale") return await Multimodal
 if (args.Length == 3 && args[0] == "--semantic-extractor") return await SemanticExtractorChecks.Smoke(args[1], args[2]);
 if (args.Length == 3 && args[0] == "--semantic-extractor-races") return await SemanticExtractorChecks.Smoke(args[1], args[2],true);
 if (args.Length == 3 && args[0] == "--sheet-context-sandbox") return await SpreadsheetContextChecks.Run(args[1], args[2]);
+if (args.Length == 3 && args[0] == "--xlsx-context-sandbox") return await XlsxContextChecks.Run(args[1], args[2]);
+if (args.Length == 3 && args[0] == "--xlsx-context-model") return await XlsxContextChecks.Run(args[1], args[2],true);
 if (args.Length == 3 && args[0] == "--semantic-scheduler") return await SemanticServiceChecks.Smoke(args[1], args[2]);
 if (args.Length == 3 && args[0] == "--sandbox-crash") return ExtractionSandboxChecks.Crash(args[1], args[2]);
 if (args.Length == 3 && args[0] == "--realworld") return RealWorldAudit.Run(args[1], args[2]);

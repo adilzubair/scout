@@ -312,6 +312,54 @@ Source-race checks additionally assert that mutation/revocation callbacks actual
 ran and propagate a parser failure promptly when cancellation's boundary is never
 reached. A targeted current run passes those stronger assertions.
 
+## XLSX table and leading-row context
+
+XLSX evidence now follows each worksheet's declared table relationships. Table
+names, cell ranges, column names and declared header/totals row counts are retained;
+cached cell values stay in their original cell locators. A hidden header does not
+invent header cells. Declared multirow headers repeat in later evidence, with
+bounded storage. Formula definitions remain literal metadata and are never
+evaluated. These semantics follow the [Open XML table definition](https://learn.microsoft.com/en-us/dotnet/api/documentformat.openxml.spreadsheet.table?view=openxml-3.0.1).
+
+Table evidence uses its own column groups, preventing a neighbouring table or an
+unrelated first-sheet note from becoming its header. Leading merged titles and
+subheadings retain their ranges. Undeclared leading rows are labelled as context;
+the reader does not infer arbitrary later header regions or reconstruct a visual
+layout. Groups contain at most eight columns. Sheets without tables or merges
+retain their previous whole-row batching rather than losing coverage to smaller
+mid-row batches.
+
+At most 256 tables and 4,096 merge anchors are retained per sheet. Leading context
+uses at most eight populated rows; each context cache holds at most 128 entries
+and 8,192 characters. Excess context is explicitly partial. Invalid/reversed/out-
+of-grid ranges, inconsistent table widths/counts, overlapping declared tables and
+invalid relationships fail before inference. External relationships are never
+fetched. Existing package, cell, text/token, output and AppContainer limits apply.
+
+All 43 combined content/ODS/XLSX reader contracts, eight pinned-tokenizer replays,
+341 native regression checks and 24 package contracts pass. Six authored native
+XLSX cases pass: four accepted sources and two explicit pre-inference rejections.
+The accepted sources also pass through the full CPU model with 15 text segments,
+maximum 1,289 raw tokens. This full-model run preceded the final plain-sheet-only
+batching adjustment; its table/merged inputs use the same scoped batching.
+
+The exact final reader prepares four retained original XLSX files into 545 text
+segments, maximum 2,048 raw tokens. Independent ZIP/XML checks match original
+cached cell literals to their emitted cell locators: all 744 cells in the data
+dictionary (three declared tables) and all 1,359 cells in the smaller merged
+workbook are represented. The two dense workbooks reach the 256-segment limit:
+16,896 of 246,438 and 17,280 of 59,705 cached cells are represented. Their missing
+cells remain visible in the private audit; this is not complete workbook coverage.
+Visual layout remains unavailable. Originals, prepared-asset hashes and owned
+cleanup are verified.
+
+These four originals are a subset of the existing eleven-source Office pool,
+not four new independent source groups. They remain unapproved, unsplit and
+unopened to model inference. This milestone establishes bounded reader behaviour,
+not retrieval quality or general spreadsheet fidelity. The prior failed media
+integration run and all quality, resource, lifecycle and distribution gates remain
+open. No model, dependency, protocol or admission-threshold pins changed.
+
 ## Open release evidence
 
 Natural images, video, joint audiovisual events, multilingual and complex Office

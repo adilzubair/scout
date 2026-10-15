@@ -1,6 +1,7 @@
 """Inert Office content extraction without Office, LibreOffice or formula evaluation."""
 import io
 from contextlib import closing
+from collections import OrderedDict
 from pathlib import Path, PurePosixPath
 import re
 import xml.etree.ElementTree as ET
@@ -117,6 +118,146 @@ def cell_position(value):
     if col > 16384 or row > 1048576: raise ValueError('sheet_cell_budget')
     return col, row
 
+def sheet_range(value, reason):
+    match = re.fullmatch(r'(\$?[A-Z]{1,3}\$?[1-9][0-9]{0,6})(?::(\$?[A-Z]{1,3}\$?[1-9][0-9]{0,6}))?', value or '')
+    if not match: raise ValueError(reason)
+    try:
+        left,top = cell_position(match[1].replace('$',''))
+        right,bottom = cell_position((match[2] or match[1]).replace('$',''))
+    except ValueError: raise ValueError(reason) from None
+    if left>right or top>bottom: raise ValueError(reason)
+    return left,top,right,bottom
+
+
+def range_name(bounds):
+    left,top,right,bottom = bounds
+    return column(left)+str(top)+':'+column(right)+str(bottom)
+
+def table_count(value, reason):
+    value=value.strip()
+    if not re.fullmatch(r'\+?[0-9]{1,10}',value) or int(value)>4294967295:raise ValueError(reason)
+    return int(value)
+
+
+class XlsxTable:
+    def __init__(self, tree):
+        if tree.tag != '{'+NS['s']+'}table': raise ValueError('invalid_table_definition')
+        self.bounds = sheet_range(tree.get('ref'),'invalid_table_range')
+        self.name = tree.get('displayName') or tree.get('name') or '[unnamed]'
+        if not 1 <= len(self.name) <= 255: raise ValueError('table_name_budget')
+        self.internal_name = tree.get('name',self.name)
+        if not 1 <= len(self.internal_name) <= 255: raise ValueError('table_name_budget')
+        self.columns = tree.findall('./s:tableColumns/s:tableColumn',NS)
+        definition = tree.find('s:tableColumns',NS)
+        if len(self.columns)!=self.bounds[2]-self.bounds[0]+1 or definition is None or table_count(definition.get('count',str(len(self.columns))),'table_column_mismatch')!=len(self.columns):
+            raise ValueError('table_column_mismatch')
+        if any(not node.get('name') for node in self.columns): raise ValueError('invalid_table_column')
+        self.header_rows=table_count(tree.get('headerRowCount','1'),'invalid_table_row_counts')
+        self.total_rows=table_count(tree.get('totalsRowCount','0'),'invalid_table_row_counts')
+        if self.header_rows+self.total_rows>self.bounds[3]-self.bounds[1]+1: raise ValueError('invalid_table_row_counts')
+        self.headers, self.header_chars = [], 0
+    def describe(self, left=None, right=None):
+        left = self.bounds[0] if left is None else left
+        right = self.bounds[2] if right is None else right
+        names = [column(self.bounds[0]+i)+': '+node.get('name') for i,node in enumerate(self.columns) if left<=self.bounds[0]+i<=right]
+        return f'Declared table: {self.name}\nRange: {range_name(self.bounds)}\nHeader rows: {self.header_rows}\nTotals rows: {self.total_rows}\nColumns: '+' | '.join(names)+'\n'
+    def schema(self):
+        text = self.describe()
+        if self.internal_name!=self.name: text+='Internal table name: '+self.internal_name+'\n'
+        for i,node in enumerate(self.columns):
+            for tag,label in (('calculatedColumnFormula','Calculated formula (not evaluated)'),('totalsRowFormula','Totals formula (not evaluated)')):
+                formula = node.find('s:'+tag,NS)
+                if formula is not None and formula.text: text+=f'{column(self.bounds[0]+i)} {label}: '+formula.text+'\n'
+            if node.get('totalsRowFunction'): text+=column(self.bounds[0]+i)+' Totals function: '+node.get('totalsRowFunction')+'\n'
+        return text
+
+
+class XlsxContext:
+    def __init__(self, archive, target, tree, writer):
+        self.writer, self.tables, self.merges = writer, [], {}
+        for node in tree.findall('./s:mergeCells/s:mergeCell',NS):
+            bounds = sheet_range(node.get('ref'),'invalid_merged_range')
+            anchor = column(bounds[0])+str(bounds[1])
+            if anchor in self.merges: raise ValueError('duplicate_merged_anchor')
+            if len(self.merges)<4096: self.merges[anchor]=bounds
+            else: writer.reasons.add('sheet_merge_limit')
+        related = relationships(archive,target)
+        seen = set()
+        for part in tree.findall('./s:tableParts/s:tablePart',NS):
+            identifier = part.get(R+'id')
+            if identifier not in related: raise ValueError('invalid_table_relationship')
+            name,kind = related[identifier]
+            if not kind.endswith('/table'): raise ValueError('invalid_table_relationship')
+            if name is None: writer.reasons.add('external_resource_unavailable'); continue
+            if name in seen: raise ValueError('duplicate_table_relationship')
+            seen.add(name)
+            if len(self.tables)>=256: writer.reasons.add('sheet_table_limit'); continue
+            table = XlsxTable(xml(archive,name))
+            l,t,r,b = table.bounds
+            if any(not (r<old.bounds[0] or l>old.bounds[2] or b<old.bounds[1] or t>old.bounds[3]) for old in self.tables): raise ValueError('overlapping_table_ranges')
+            self.tables.append(table)
+        self.leading, self.leading_chars, self.leading_rows, self.leading_done = [], 0, 0, False
+    def bounded(self, entries, chars, value):
+        line = value[2]
+        if len(entries)>=128 or chars>=8192:
+            self.writer.reasons.add('sheet_context_limit'); return chars
+        room = 8192-chars
+        if len(line)>room: self.writer.reasons.add('sheet_context_limit')
+        entries.append((value[0],value[1],line[:room],value[3])); return chars+min(len(line),room)
+    def leading_row(self, values):
+        if not values or self.leading_done: return
+        if self.leading_rows>=8:
+            self.writer.reasons.add('sheet_context_limit'); self.leading_done=True; return
+        self.leading_rows+=1
+        for address,col,row,line in values:
+            merged = self.merges.get(address)
+            self.leading_chars=self.bounded(self.leading,self.leading_chars,(col,merged[2] if merged else col,line,merged is not None))
+        self.leading_done = not any(address in self.merges for address,_,_,_ in values)
+    def owner(self, col, row):
+        return next((i for i,table in enumerate(self.tables) if table.bounds[0]<=col<=table.bounds[2] and table.bounds[1]<=row<=table.bounds[3]),None)
+    def key(self, owner, col):
+        if not self.tables and not self.merges: return None,None
+        start = self.tables[owner].bounds[0] if owner is not None else 1
+        return owner,(col-start)//8
+    def header(self, owner, address, col, row, line):
+        if owner is None: return
+        table = self.tables[owner]
+        if row>=table.bounds[1]+table.header_rows: return
+        merged = self.merges.get(address)
+        table.header_chars=self.bounded(table.headers,table.header_chars,(col,merged[2] if merged else col,line,True))
+    def context(self, name, key):
+        owner,group = key
+        if group is None: left,right=1,16384
+        else:
+            left=(self.tables[owner].bounds[0] if owner is not None else 1)+group*8
+            right=min(left+7,self.tables[owner].bounds[2] if owner is not None else 16384)
+        text='Sheet: '+name+'\n'
+        if owner is not None:
+            table=self.tables[owner];text+=table.describe(left,right)
+            headers=[line for start,end,line,_ in table.headers if start<=right and end>=left]
+            if headers:text+='Declared header cells: '+' | '.join(headers)+'\n'
+            leading=[line for start,end,line,merged in self.leading if merged and start<=right and end>=left]
+        else:leading=[line for start,end,line,_ in self.leading if start<=right and end>=left]
+        if leading:text+='Leading sheet rows: '+' | '.join(leading)+'\n'
+        return text
+
+
+def xlsx_value(cell, strings, writer):
+    address=cell.get('r','');col,row=cell_position(address)
+    value=cell.find('s:v',NS);cached=(value.text or '') if value is not None else ''
+    kind=cell.get('t','n')
+    if kind=='s':
+        if not cached.isdigit() or int(cached)>=len(strings): raise ValueError('invalid_shared_string')
+        cached=strings[int(cached)]
+    elif kind=='inlineStr':cached=''.join(node.text or '' for node in cell.findall('.//s:t',NS))
+    elif kind=='b':
+        if cached not in ('0','1'):raise ValueError('invalid_boolean_cell')
+        cached='TRUE' if cached=='1' else 'FALSE'
+    if cell.find('s:f',NS) is not None and value is None:
+        cached='[Formula result unavailable]';writer.reasons.add('formula_cache_unavailable')
+    return address,col,row,cached
+
+
 def xlsx(archive, writer):
     strings = []
     if 'xl/sharedStrings.xml' in archive.namelist():
@@ -129,45 +270,41 @@ def xlsx(archive, writer):
         target, kind = related[sheet.get(R+'id')]
         if target is None or not kind.endswith('/worksheet'): raise ValueError('invalid_sheet_relationship')
         content = xml(archive, target)
-        merges = [node.get('ref', '') for node in content.findall('./s:mergeCells/s:mergeCell', NS)]
-        for merged in merges:
-            if ':' not in merged: raise ValueError('invalid_merged_range')
-            for endpoint in merged.split(':'): cell_position(endpoint)
-        lines, bounds, heading = [], None, []
-        def flush():
-            if not lines: return True
-            context = 'Sheet: '+name+'\nHeaders: '+' | '.join(heading)+'\nMerged ranges: '+', '.join(merges[:256])+'\n'
-            left,top,right,bottom=bounds
-            return writer.table(context, lines, dict(kind='sheet', sheet=name, startCell=column(left)+str(top), endCell=column(right)+str(bottom)))
-        count = 0
+        context = XlsxContext(archive,target,content,writer)
+        for table in context.tables:
+            l,t,r,b=table.bounds
+            if not writer.text('Sheet: '+name+'\n'+table.schema(),dict(kind='sheet',sheet=name,startCell=column(l)+str(t),endCell=column(r)+str(b))):return
+        buckets, pending, count = OrderedDict(), 0, 0
+        def flush(key):
+            nonlocal pending
+            lines=buckets.pop(key);pending-=len(lines)
+            return writer.table(context.context(name,key),lines,dict(kind='sheet',sheet=name))
         for row in content.findall('./s:sheetData/s:row', NS):
-            row_lines = []
+            values=[]
             for cell in row.findall('s:c', NS):
                 count += 1
-                if count > 1000000: writer.reasons.add('sheet_cell_limit'); flush(); return
-                address = cell.get('r', '')
-                col_number,row_number=cell_position(address)
-                value = cell.find('s:v', NS)
-                cached = value.text or '' if value is not None else ''
-                kind = cell.get('t', 'n')
-                if kind == 's':
-                    if not cached.isdigit() or int(cached) >= len(strings): raise ValueError('invalid_shared_string')
-                    cached = strings[int(cached)]
-                elif kind == 'inlineStr': cached = ''.join(node.text or '' for node in cell.findall('.//s:t', NS))
-                elif kind == 'b':
-                    if cached not in ('0', '1'): raise ValueError('invalid_boolean_cell')
-                    cached = 'TRUE' if cached == '1' else 'FALSE'
-                if cell.find('s:f', NS) is not None and value is None:
-                    cached = '[Formula result unavailable]'; writer.reasons.add('formula_cache_unavailable')
+                if count>1000000:
+                    writer.reasons.add('sheet_cell_limit')
+                    for key in list(buckets):
+                        if not flush(key):return
+                    return
+                address,col_number,row_number,cached=xlsx_value(cell,strings,writer)
                 if not cached: continue
-                bounds=(col_number,row_number,col_number,row_number) if bounds is None else (min(bounds[0],col_number),min(bounds[1],row_number),max(bounds[2],col_number),max(bounds[3],row_number))
-                row_lines.append(address+': '+cached)
-            if not heading and row_lines: heading = row_lines.copy()
-            lines.extend(row_lines)
-            if len(lines) >= 128:
-                if not flush(): return
-                lines, bounds = [], None
-        if not flush(): return
+                merged=context.merges.get(address)
+                line=address+': '+cached+((' [merged '+range_name(merged)+']') if merged else '')
+                values.append((address,col_number,row_number,line))
+            context.leading_row(values)
+            for address,col_number,row_number,line in values:
+                owner=context.owner(col_number,row_number);context.header(owner,address,col_number,row_number,line)
+                key=context.key(owner,col_number);buckets.setdefault(key,[]).append(line);pending+=1
+                if key!=(None,None) and len(buckets[key])>=128 and not flush(key):return
+                if key!=(None,None) and pending>=4096 and not flush(next(iter(buckets))):return
+            # Plain sheets retain the previous whole-row batching. Scoped column
+            # groups only apply when tables or merged relationships require them.
+            if (None,None) in buckets and len(buckets[(None,None)])>=128:
+                if not flush((None,None)):return
+        for key in list(buckets):
+            if not flush(key):return
         # Drawing anchors supply sheet/cell evidence for embedded images and charts.
         for drawing in content.findall('./s:drawing', NS):
             drawing_part, relation = relationships(archive, target)[drawing.get(R+'id')]

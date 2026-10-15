@@ -767,3 +767,32 @@ without running the model workload again. XLSX table/merged-header fidelity,
 whole-corpus rights/group/ambiguity review, supported negatives and the 400-task
 holdout remain next, alongside the existing physical 16 GB, performance, lifecycle
 and distribution gates. No threshold, model or dependency pins changed.
+
+The XLSX reader now resolves declared table parts and keeps their names, ranges,
+column schemas and actual declared header rows with later cell evidence. Separate
+tables retain separate context; leading merged titles preserve their ranges.
+Undeclared leading rows remain labelled context, with no inference of arbitrary
+later headers or visual layout. Eight-column groups and explicit table/merge/header
+bounds keep context controlled. Invalid metadata fails before inference, external
+relationships remain unavailable and formulas remain inert. Plain sheets retain
+the earlier whole-row batching. Reader-byte hashing invalidates old extraction
+and index generations.
+
+All 43 combined reader, eight actual-tokenizer, 341 native and 24 package checks
+pass. Six authored XLSX sandbox cases include four accepted workbooks and two
+pre-inference rejections. The accepted workbooks also pass the full CPU model
+(15 text segments, maximum 1,289 raw tokens); the final adjustment affected only
+plain-sheet batching, which those scoped inputs do not use. A final no-model
+review of four existing original XLSX files prepares 545 segments, maximum 2,048
+raw tokens. Independent checks locate every cached cell in two originals (744 and
+1,359 cells), including a data dictionary with three declared tables. Two dense
+workbooks remain segment-limited, representing 16,896/246,438 and 17,280/59,705
+cells. Original hashes and owned cleanup pass. This is bounded extraction evidence;
+the four sources remain unapproved, unsplit and unopened to model predictions.
+
+Continue with cross-corpus rights/group/ambiguity review, independent seven-family
+tasks, supported negatives and the frozen 400-task holdout. Arbitrary spreadsheet
+layouts and large-sheet coverage remain limitations. The unexplained earlier
+media failure, cold/p95 misses, remaining lifecycle checks and distribution
+clearance remain open. The user will run the refreshed validation bundle on the
+physical 16 GB PC later; no hardware approval is implied by this milestone.
