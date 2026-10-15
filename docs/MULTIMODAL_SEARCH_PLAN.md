@@ -1012,3 +1012,20 @@ This ordered current-host comparison does not identify the earlier 30.863 s miss
 or establish physical 16 GB, quality or concurrency approval. Shipping setup must
 compile only a new generation and retain immutable old generations for rollback;
 that integration and exact packaged replays follow this experiment.
+
+Shipping setup now requests bytecode compilation for unpublished generations and
+uses setup environment revision 3. Model, dependency and interpreter pins remain
+unchanged. The existing-ready-generation branch still performs only verification
+and notices. Seventeen Python setup/model-reuse contracts, 351 native checks and
+24 package contracts pass; the self-contained package retains 533 base files and
+33 allowlisted runtime files.
+
+An actual offline upgrade from the preserved revision-2 published package to the
+new preview passes injected native-audit rejection after compiling 12,350 files,
+old-package query/parser fallback, offline retry/model reuse, new query/parser,
+exact old-marker rollback and current-generation reactivation. Every old venv and
+model file hash remains unchanged. This is a cache-preparation environment
+revision, not a dependency-version upgrade. The native policy is restored, and
+ordinary storage/source hashes are preserved. Exact committed-package resource
+replay and refreshed physical-PC validation delivery follow; the earlier cold
+miss and broader release requirements remain recorded.

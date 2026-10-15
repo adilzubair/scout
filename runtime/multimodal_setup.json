@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "environmentRevision": 2,
+  "environmentRevision": 3,
   "venvBackend": "cpython-stdlib",
   "cacheLinkMode": "hardlink",
   "pythonVersion": "3.12.13",

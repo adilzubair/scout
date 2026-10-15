@@ -44,7 +44,9 @@ class SetupContracts(unittest.TestCase):
             self.assertNotIn('officeManifestSha256', marker)
             self.assertFalse(any('office' in str(command).casefold() for command in commands))
             for command in commands:
-                if Path(command[0]).name=='uv.exe':self.assertEqual(command[1],'--no-config')
+                if Path(command[0]).name=='uv.exe':
+                    self.assertEqual(command[1],'--no-config')
+                    self.assertIn('--compile-bytecode',command)
                 else:self.assertEqual(command[1:5],['-I','-B','-X','utf8'])
             self.assertEqual(marker, json.loads((root/'generations'/marker['generation']/'installed.json').read_text()))
 

@@ -104,7 +104,8 @@ values and exceptions. This is a developer diagnostic with overhead; its SDK
 driver and small authored inputs do not establish end-to-end worker latency,
 production-window resource use or retrieval quality.
 
-The bytecode trial clones an owned fresh CPU environment with no existing bytecode,
+The historical bytecode trial uses a matching pre-bytecode package/driver and
+clones an owned fresh CPU environment with no existing bytecode,
 records three cold startups and a constructor profile, compiles with the pinned
 offline installer, then repeats the measurements and checks all seven families.
 It compares authored vector hashes, preserves the original environment/interpreter/
@@ -123,6 +124,13 @@ the product path by user direction. Office evidence will use extracted text,
 cells, chart data and embedded images, without exact Office page/slide rendering.
 
 ## Settings and installation
+
+Setup revision 3 prepares package bytecode before publishing a new runtime
+generation. Workers keep bytecode writes disabled while reading valid prepared
+caches. Existing ready generations are verified without modifying their package
+files; the prior generation remains available to the prior package for rollback.
+Model and dependency versions are unchanged, and verified model files are reused
+locally during the refresh.
 
 Setup and the model worker now build a child-only environment with private
 profiles, temporary files and model caches. Python starts in isolated mode with

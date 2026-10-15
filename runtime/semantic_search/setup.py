@@ -143,7 +143,9 @@ def main():
         # Refresh only unpublished environments, preserving packages/downloads.
         run(python_command(interpreter,'-m','venv','--without-pip','--copies',generation/'venv'),env)
         verify_venv_home(python,interpreter)
-        run([args.uv, '--no-config', 'pip', 'sync', '--python', python, '--require-hashes', '--link-mode', 'hardlink', '--index-strategy',
+        # Prepare caches while the generation is unpublished. Runtime -B still
+        # reads valid bytecode while preserving immutable ready environments.
+        run([args.uv, '--no-config', 'pip', 'sync', '--python', python, '--require-hashes', '--compile-bytecode', '--link-mode', 'hardlink', '--index-strategy',
              'unsafe-best-match', ROOT / f'runtime/semantic_search/requirements.{args.device}.lock.txt'], env)
         model = generation / 'model'
         print('Preparing the full multimodal model...', flush=True)
