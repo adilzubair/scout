@@ -375,6 +375,19 @@ edited after cached retrieval. This verifies performance work and invariants;
 synthetic vectors do not establish retrieval quality, ordinary WPF latency or
 minimum hardware. Exact committed packaged resource replay remains separate.
 
+The subsequent exact `bcfec8d` packaged rehearsal completes all 21 pinned files
+across seven families, full-window stress inputs and bounded video preview. Its
+three cold queries are 9,671.4878/9,675.5928/9,593.861 ms; 100,000-segment semantic
+p95 is 256.636 ms, embedding p95 79.932 ms and adapter/fusion p95 175.8071 ms, with
+27 unique model queries and zero cache hits. Whole-job peak commit is
+6,243,721,216 bytes for extraction and 5,437,243,392 bytes for scale; all measured
+phases remain below 6 GiB. The source-bound private receipt records exact product,
+core, driver, model/protocol, runtime and ZIP hashes. This current 32 GB/Laya-off
+rehearsal passes those engineering targets while preserving earlier failed runs.
+It uses an existing CPU installation; physical minimum hardware, fresh-account
+installation, ordinary WPF timing, concurrent Laya/UI/indexing and quality remain
+unproven. The earlier intermittent media failure remains unexplained.
+
 Natural images, video, joint audiovisual events, multilingual and complex Office
 content still need independent content-grounded tasks. The holdout needs supported
 negatives, close distractors, ambiguous queries and independent source groups

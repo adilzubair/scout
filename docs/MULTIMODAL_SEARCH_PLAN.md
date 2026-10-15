@@ -3,7 +3,7 @@
 Date: 2026-10-15. Branch: `feature/multimodal-semantic-search`.
 Status: implementation active; independent quality and release validation in progress.
 Retrieval, previews, OCR and format coverage are committed. The frozen evaluation
-foundation passes 341 Release checks; independent quality and release gates remain open.
+foundation passes 348 Release checks; independent quality and release gates remain open.
 This plan is the implementation checklist; the add-on remains a
 preview until the release gates below pass. The full-model runtime and content smoke probe
 are implemented and verified on CPU and CUDA. On 2026-10-14 the user directed
@@ -836,3 +836,23 @@ hits. The unchanged-package and initial scope-cache probes measured 623.331 and
 varying load, not physical 16 GB or independent retrieval-quality approval. The
 older cold/p95 misses remain retained; exact committed packaged resource replay
 is the next verification step. No admission threshold or dependency pin changed.
+
+The exact self-contained package from `bcfec8d` now completes the full pinned
+21-file/seven-family CPU rehearsal, including production-window text/image/audio/
+joint-AV inputs, bounded video preview and the 100,000-segment workload. Three
+process-cold queries take 9,671.4878, 9,675.5928 and 9,593.861 ms. Warm semantic
+p95 is 256.636 ms (maximum 260.8398), embedding p95 79.932 ms and adapter/fusion
+p95 175.8071 ms, with 27 unique model calls and zero query-cache hits. Whole-job
+peak commit is 6,243,721,216 bytes for extraction and 5,437,243,392 bytes for scale;
+all five measured phases remain below 6 GiB. These current-host engineering
+targets pass. Startup code was unchanged; earlier slower cold/p95 and media-failure
+runs remain retained, and the earlier media error is still unexplained.
+
+This is a 32 GB development-machine run using the already installed CPU add-on,
+with Laya off. It proves neither fresh installation nor physical 16 GB behaviour,
+ordinary WPF latency, Laya/concurrent UI workloads or independent retrieval quality.
+The refreshed hardware ZIP contains the exact tested `bcfec8d` product/driver,
+533 base files, 33 source-matched runtime files and 563 verified archive entries.
+Its SHA-256 is `772f55dae67449c88204b4f82f5403e0a7132226f22b6b0f99864e610d2c752b`.
+The user will run it on the physical PC later. Quality/abstention, broader resource
+and lifecycle evidence, and distribution clearance remain release requirements.
