@@ -86,7 +86,7 @@ These are development-machine engineering measurements; the OS file cache was no
 Physical minimum hardware, broader concurrency and other release gates remain
 open. This is a validation bundle, not release or minimum-hardware approval.
 
-The current bundle is rebuilt from `317b288`, including isolated setup/worker
+The prior bundle was rebuilt from `317b288`, including isolated setup/worker
 environments. Its 32 GB CPU replay passes all 21 fixtures and video preview:
 process-cold queries take 12.88/9.45/9.89 seconds and warm semantic p95 at 100K
 segments is 297.33 ms. Whole-job peak commit is 5.80 GiB for extraction/preview
@@ -94,3 +94,11 @@ and 5.10 GiB for scale. This uses an existing CPU installation with Laya off;
 fresh installation under controlled environment overrides is verified separately.
 The earlier timings remain historical evidence. Physical 16 GB validation and
 the broader release requirements above remain open.
+
+The bytecode-preparation bundle uses setup environment revision 3. New generations
+prepare trusted package bytecode during setup; the full model, encoders and
+production input windows are unchanged. The controlled development-machine
+comparison reduced three CPU cold queries from 15.49–17.86 s to 10.33–10.64 s,
+with identical authored embedding hashes. Review this bundle's own measurements;
+that comparison does not predict physical 16 GB behaviour or establish release
+approval. Keep earlier misses and broader concurrency/quality requirements open.
