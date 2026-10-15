@@ -85,6 +85,69 @@ The admission floor stayed at 0.35. These results expose ranking and selectivity
 limitations; they do not clear the release-quality gate or the earlier negative
 admission failure. The full 336 regression checks and 24 package contracts pass.
 
+## Unopened natural-image candidates
+
+`scripts/intake-coco-images.py` prepares an image candidate pool from the official
+COCO 2017 validation annotations. The complete annotation archive is pinned to
+252,907,541 bytes and SHA256
+`113a836d90195ee1f884e704da6304dfaaecff1f023f49b6ca93c4aaae470268`.
+Only the two bounded validation JSON members are read. The publisher's terms are
+retained with their pinned Git blob hash. COCO annotations are CC BY 4.0; images
+have their own licenses and attribution obligations. See the
+[publisher's terms](https://raw.githubusercontent.com/cocodataset/cocodataset.github.io/master/dataset/termsofuse.htm).
+
+The first batch selects forty images deterministically before inference, using
+only entries marked CC BY 2.0 in the publisher's image metadata. Each original
+JPEG is checked against its HTTPS publisher's ETag checksum and receives a local
+SHA256, opaque filename and atomic download receipt. Transfers are limited to
+8 MiB per image, 100 images and 512 MiB per batch. Redirects are rejected for
+image downloads. Interrupted transfers reuse only verified receipts and bytes.
+All images, captions, object annotations and attribution evidence remain private
+under ignored diagnostics, outside the base package and hardware bundle.
+
+```powershell
+& .runtime/semantic-search/cpu-venv/Scripts/python.exe scripts/intake-coco-images.py --annotations artifacts/diagnostics/multimodal/coco-intake/annotations_trainval2017.zip --output artifacts/diagnostics/multimodal/coco-images-holdout-candidates-v1 --count 40
+& .runtime/semantic-search/cpu-venv/Scripts/python.exe scripts/intake-coco-images.py --capture-attribution --output artifacts/diagnostics/multimodal/coco-images-holdout-candidates-v1
+```
+
+The archive is available from the official download page. Acquire it separately
+and verify the pinned hash; the script does not install a downloader or fetch the
+whole image archive. `--offline` verifies existing source/metadata receipts and
+makes no network requests. Use a new pool directory for a new batch. Completed
+intake and attribution evidence cannot be overwritten. Rate limits, authorization
+errors and server failures stop attribution capture; 404/410 and unresolved
+canonical routes are recorded without following an unrelated photo or host.
+
+The production AppContainer review exporter accepts bounded `coco-<id>` identities
+alongside Commons identities. `--multimodal-review` uses the actual selected-root
+snapshot, no-network readers and prepared-media receipt checks, with a deterministic
+embedding boundary for export. It never invokes the embedding model or retrieves
+against candidate queries. The first batch exported all forty sources, and every
+prepared image was inspected on hash-linked contact sheets. All 200 upstream human
+captions were cross-checked. They are not 200 independent tasks. Forty draft queries
+were authored from visible content; no release task or split has been approved.
+
+Review exposed errors and disagreements in the annotations and draft observations.
+The first draft misidentified a character-shaped iced cookie as a jar; individual
+image inspection corrected it before inference. Pig/dog and ski-direction conflicts
+in upstream captions were excluded from draft query claims. Both observation
+versions and their hash links are preserved. Captions and finite object annotations
+do not prove exhaustive absence, so no negative tasks were inferred from omissions.
+
+Current Flickr author/license capture found 31 metadata matches, two conflicts
+(CC BY-ND and CC BY-NC) and seven unresolved originals. The nine conflicts/unresolved
+originals are excluded from provisional holdout use pending review. The other 31
+remain provisional: a metadata match is not completed rights or related-source
+review. Current author URLs and original photo IDs support conservative grouping;
+the batch has 38 provisional author/photo groups. Full-corpus derivative/event
+overlap and source rights still need review before freezing. Possible model-training
+overlap is unknown. No holdout predictions have been opened.
+
+Thirteen offline intake/attribution contracts and all 337 regression checks pass.
+Actual offline replay reproduced all source bytes, captions, selection and attribution
+evidence, with only batch timestamps changing. These checks establish reproducible
+candidate preparation, rather than retrieval quality or license clearance.
+
 ## Open release evidence
 
 Natural images, video, joint audiovisual events, multilingual and complex Office

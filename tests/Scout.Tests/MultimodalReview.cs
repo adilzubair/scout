@@ -13,6 +13,7 @@ static class MultimodalReview
     private static readonly JsonSerializerOptions Json = new() { PropertyNamingPolicy=JsonNamingPolicy.CamelCase,WriteIndented=true };
     internal sealed record Asset(string File,string Kind,long Bytes,string Sha256,double? OffsetSeconds=null);
     private sealed record Source(string Id,string Family,string File,long Bytes,string Sha256);
+    internal static bool SourceIdentity(string? id)=>id!=null && Regex.IsMatch(id,@"^(?:commons|coco)-[0-9]{1,20}\z");
 
     internal static string SourceFile(string pool,string relative)
     {
@@ -55,7 +56,7 @@ static class MultimodalReview
         }).ToArray();
         if(sources.Length is < 1 or > 100 || sources.Sum(s=>s.Bytes)>512L*1024*1024 ||
             sources.Select(s=>s.Id).Distinct().Count()!=sources.Length || sources.Select(s=>s.File).Distinct(StringComparer.OrdinalIgnoreCase).Count()!=sources.Length ||
-            sources.Any(s=>s.Bytes is < 1 or > 32*1024*1024 || !Regex.IsMatch(s.Id,"^commons-[0-9]+$") || !Regex.IsMatch(s.Sha256,"^[0-9a-f]{64}$") || s.Family is not ("images" or "audio" or "video")))
+            sources.Any(s=>s.Bytes is < 1 or > 32*1024*1024 || !SourceIdentity(s.Id) || !Regex.IsMatch(s.Sha256,"^[0-9a-f]{64}$") || s.Family is not ("images" or "audio" or "video")))
             throw new InvalidDataException("Invalid candidate source budget or identity.");
         foreach(var source in sources)
         {

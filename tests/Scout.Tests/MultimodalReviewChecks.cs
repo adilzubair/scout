@@ -4,6 +4,12 @@ static class MultimodalReviewChecks
 {
     public static void Run(Action<string,Action> test)
     {
+        test("Content review accepts bounded provider identities without path syntax",()=>
+        {
+            foreach(var id in new[]{"commons-147960076","coco-397133"})if(!MultimodalReview.SourceIdentity(id))throw new Exception("Known provider rejected.");
+            foreach(var id in new string?[]{null,"coco-","other-123","coco-../123","coco-123/child","coco-123\n","coco-"+new string('1',21)})
+                if(MultimodalReview.SourceIdentity(id))throw new Exception("Unsafe review identity accepted.");
+        });
         test("Content review sources require opaque flat paths",()=>
         {
             var pool=Path.GetFullPath("artifacts/diagnostics/multimodal/review-path-contract");

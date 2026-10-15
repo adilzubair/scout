@@ -3,7 +3,7 @@
 Date: 2026-10-15. Branch: `feature/multimodal-semantic-search`.
 Status: implementation active; resumed on 2026-10-15 from checkpoint `909bb60`.
 Retrieval, previews, OCR and format coverage are committed. The frozen evaluation
-foundation passes 336 Release checks; independent quality and release gates remain open.
+foundation passes 337 Release checks; independent quality and release gates remain open.
 This plan is the implementation checklist; the add-on remains a
 preview until the release gates below pass. The full-model runtime and content smoke probe
 are implemented and verified on CPU and CUDA. On 2026-10-14 the user directed
@@ -664,3 +664,20 @@ admitted for every query, so recall at twenty does not establish selectivity.
 Keep both reports, the unchanged 0.35 floor and the remaining quality failures.
 This is not an opened release holdout. All 336 regression checks and 24 package
 contracts pass after the correction.
+
+Forty COCO validation images and 200 upstream human captions are now preserved as
+unopened holdout candidates, with pinned archive/terms, per-image ETag and SHA256,
+and current Flickr author/license evidence. All forty passed the production
+no-network review export without model inference. The prepared images and all
+captions were reviewed, yielding forty content-grounded draft queries. Corrections
+and contradictory captions are retained; none is an approved holdout task yet.
+Current metadata matches CC BY for 31 originals; two have license conflicts and
+seven have unresolved canonical originals. Exclude those nine pending review.
+The 31 remaining provisional candidates still need rights and full-corpus related
+source review. Same-author/photo grouping yields 38 provisional groups for the
+whole batch. Do not count 200 captions as 200 independent tasks or derive negatives
+from omitted captions/object classes. Actual intake/attribution replay passed
+offline, alongside thirteen Python contracts and 337 regression checks. Continue
+the all-family corpus, resolve source/group review, author supported negatives,
+then freeze at least 400 tasks before changing admission or opening holdout
+predictions. The 0.35 floor and all release gates remain unchanged.
