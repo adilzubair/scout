@@ -704,6 +704,49 @@ new-generation update/rollback, disk-full recovery, cache reclamation, live pars
 death, physical 16 GB validation and independent quality remain open. This seeded
 existing-generation test does not discharge those gates.
 
+The subsequent empty-root upstream installation found a separate fresh-setup
+failure: uv 0.11.27 generated a Windows venv launcher with its mutable
+minor-version junction embedded, even when given the canonical patch executable.
+Notice collection correctly rejected the linked base path and setup withheld its
+ready marker. Editing `pyvenv.cfg` alone did not change that launcher's base prefix.
+Setup now invokes the resolved patch interpreter's standard
+[`venv --without-pip --copies`](https://docs.python.org/3.12/library/venv.html),
+then verifies the bounded, unlinked configuration against that same patch path.
+uv still installs the hash-locked packages. Retrying an unpublished environment
+refreshes its launcher/configuration while retaining packages, model files and
+download caches; already published environments return through verification only.
+
+The real upstream-download case subsequently passed under a non-admin token using
+the published application and bundled CLR: all five prepared-input paths, notice
+inventory integrity, a real CPU query, and actual AppContainer parsing/embedding
+without an interpreter override. Its ordinary database and original source were
+preserved. Eight setup contracts and eight notice contracts pass. This recovery
+case began with an absent add-on and no inherited cache/interpreter overrides;
+it does not establish a clean Windows account, new-generation upgrade, minimum
+hardware, retrieval quality or distribution approval.
+
+The opt-in test harness retains failed downloads and attempt logs. A retry accepts
+only its failed, unpublished empty-root case. The removal variant also deletes the
+new private runtime/cache after the query and parser checks, preserving original
+sources and ordinary storage. Its 12 GiB workspace reserve is a test precondition,
+not a measured product minimum.
+
+The separate first-attempt empty-root/removal run also passed on 2026-10-15:
+no seeded artifacts, no inherited cache/interpreter overrides, a non-admin token,
+all five encoder paths, actual CPU query and sandboxed parsing/embedding. Setup
+took about 290 seconds on the development connection/machine. The complete
+runtime/cache directory and copied test payload were removed; original sources
+and ordinary database bytes were preserved. Reports, tested package ZIP/inventory,
+driver source, notice manifest and failure/retry history remain under ignored
+diagnostics. This covers real generated-cache removal on this account; clean-account
+setup, new-generation upgrade/rollback and disk-full recovery remain open.
+
+```powershell
+dotnet run --project tests/Scout.Tests -c Release --no-build -- --fresh-setup artifacts/Scout artifacts/diagnostics/multimodal/fresh-setup
+dotnet run --project tests/Scout.Tests -c Release --no-build -- --fresh-setup-retry artifacts/Scout <retained-fresh-case>
+dotnet run --project tests/Scout.Tests -c Release --no-build -- --fresh-setup-remove artifacts/Scout artifacts/diagnostics/multimodal/fresh-setup
+```
+
 ```powershell
 dotnet run --project tests/Scout.Tests -c Release --no-build -- --owned-process-checks
 dotnet run --project tests/Scout.Tests -c Release --no-build -- --multimodal-setup-lifecycle artifacts/Scout artifacts/diagnostics/multimodal/addon-no-office .runtime/python/cpython-3.12.13-windows-x86_64-none artifacts/diagnostics/multimodal/addon-host-slice/bootstrap/uv-0.11.27/uv.zip artifacts/diagnostics/multimodal/packaged-setup

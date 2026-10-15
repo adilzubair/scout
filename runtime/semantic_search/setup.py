@@ -43,6 +43,22 @@ def copy_model(source, destination):
     verify_model(destination)
 
 
+def verify_venv_home(python, interpreter):
+    """Require the same immutable patch path used by the standard venv launcher."""
+    cfg=python.parent.parent/'pyvenv.cfg'
+    for path in (cfg,*cfg.parents):
+        if path.is_symlink() or path.is_junction():raise ValueError('linked_interpreter_configuration')
+    with cfg.open('rb') as stream:raw=stream.read(16385)
+    if len(raw)>16384:raise ValueError('interpreter_configuration_budget')
+    lines=raw.decode('utf-8').splitlines()
+    homes=[line[7:] for line in lines if line.startswith('home = ')]
+    expected=interpreter.resolve(strict=True).parent
+    if len(homes)!=1 or not Path(homes[0]).is_absolute() or Path(homes[0])!=expected:
+        raise ValueError('unexpected_interpreter_home')
+    for path in (expected,*expected.parents):
+        if path.is_symlink() or path.is_junction():raise ValueError('linked_interpreter_home')
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--root', type=Path, required=True)
@@ -82,8 +98,12 @@ def main():
             print('Existing add-on generation verified.', flush=True)
             return
         print('Preparing the isolated embedding environment...', flush=True)
-        if not python.is_file():
-            run([args.uv, 'venv', '--python', sys.executable, generation / 'venv'], env)
+        interpreter=Path(sys.executable).resolve(strict=True)
+        # uv's Windows launcher embeds a mutable minor-version junction even
+        # with an explicit patch path. CPython's launcher honors its pinned home.
+        # Refresh only unpublished environments, preserving packages/downloads.
+        run([interpreter,'-m','venv','--without-pip','--copies',generation/'venv'],env)
+        verify_venv_home(python,interpreter)
         run([args.uv, 'pip', 'sync', '--python', python, '--require-hashes', '--index-strategy',
              'unsafe-best-match', ROOT / f'runtime/semantic_search/requirements.{args.device}.lock.txt'], env)
         model = generation / 'model'

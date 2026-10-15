@@ -1,7 +1,7 @@
 # Scout multimodal semantic search implementation plan
 
 Date: 2026-10-15. Branch: `feature/multimodal-semantic-search`.
-Status: implementation active; restart verification on 2026-10-15 follows checkpoint `fc3f8ea`.
+Status: implementation active; resumed on 2026-10-15 from checkpoint `909bb60`.
 Retrieval, previews, OCR and format coverage are committed. The frozen evaluation
 foundation passes 323 Release checks; independent quality and release gates remain open.
 This plan is the implementation checklist; the add-on remains a
@@ -291,12 +291,12 @@ results as end-to-end release evidence.
 | Area | Verified checkpoint | Remaining work |
 | --- | --- | --- |
 | Runtime | Full-model CPU/CUDA and all-encoder prepared-input probes; pinned artifacts (`c9febee`) | Exact shipped-resource, codec distribution and minimum-hardware validation |
-| Add-on lifecycle | Independent host/settings/setup (`6c6be38`); model-only readiness without LibreOffice (`df62e0b`) | Clean standard-account installation, interrupted upgrade/removal, cache reclamation and app lifecycle integration |
-| Durable index | SQLite queue and app scheduler: source replacement, quota/resource pauses, revocation, retry and metadata events | Packaged process-death recovery and large-library performance |
+| Add-on lifecycle | Independent host/settings/setup; atomic process ownership; seeded offline cancellation/retry/removal; real empty-root upstream install, failed-install recovery, private parser/query and full runtime/cache removal | Clean-account setup, new-generation update/rollback, disk-full recovery and obsolete-generation reclamation |
+| Durable index | SQLite queue and scheduler; published-library CPU owner-death/resume across 16 files, seven families and 27 segments (`909bb60`) | Broader source distributions, UI/ordinary-search timing and resource/quality gates |
 | Source acquisition | Native identity checks and hashed owned snapshots (`f87fb8b`) | Revalidate source and scope across extraction, embedding, display and launch |
-| Extractor bridge | Receipt/hash/payload validation, private tokenizer copy, source rechecks, owned-copy cleanup, resource guards and Settings progress | Packaged crash/upgrade checks and full resource/quality evaluation |
-| Document/image readers | Six Office formats with sandbox-backed WPF locator previews; bounded OCR; explicit unsupported/encrypted/corrupt statuses and scoped coverage review | Independent content/language quality, additional fidelity cases exposed by evaluation and packaged parser crash cleanup |
-| Audio/video readers | Bounded PyAV readers connected to indexing; separate and synchronized AV windows; full-model CPU/CUDA joint-input compatibility | Independent natural audiovisual quality, packaged cancellation/crash cleanup and resource gates |
+| Extractor bridge | Receipt/hash/payload validation, source rechecks, resource guards and progress; parser job assigned at creation and live native decoder owner-death/recovery (`909bb60`) | Upgrade/failure scenarios and full resource/quality evaluation |
+| Document/image readers | Six Office formats with sandbox-backed WPF locator previews; bounded OCR; explicit unsupported/encrypted/corrupt statuses and scoped coverage review | Independent content/language quality and additional fidelity cases exposed by evaluation |
+| Audio/video readers | Bounded PyAV readers; separate and synchronized AV windows; CPU/CUDA joint-input compatibility; live decoder owner-death/recovery | Independent natural audiovisual quality, broader cancellation/upgrade scenarios and resource gates |
 | Retrieval/UI | Constrained retrieval and preview engineering contracts, real CPU code/image queries, retained selection/revoked actions, and all eight required media extensions in WPF | Independent quality/admission evaluation, richer locator/format fixtures and packaged lifecycle validation |
 | Release validation | Frozen quality protocol/development pilot and production-adapter replay; grouped-source 25K/100K/500K scale baseline with uncached CPU queries | Independent 400-task holdout, abstention calibration, Laya on/off, broader source distributions/UI timing, throughput/resources, physical minimum hardware and clean packaging/install |
 
@@ -322,24 +322,48 @@ Proceed in this order, committing each verified unit:
 4. Document/image coverage foundation completed: PDF scans, bounded Windows OCR,
    unsupported/encrypted/corrupt statuses and scoped coverage review pass. Keep
    independent fidelity/language evaluation and packaged parser crash cleanup open.
-5. Current slice: collect a diverse, licensed natural-media candidate pool with
+5. Empty-root upstream CPU setup recovery now passes using
+   the published application and its bundled CLR. Verify the private interpreter,
+   all five prepared-input paths (text, image, audio, video and joint AV), an actual
+   query, notices and preservation of ordinary storage. Record inherited cache/
+   interpreter overrides and retain downloads on failure. The real download case
+   exposed uv's embedded mutable interpreter alias; the standard CPython venv
+   launcher now pins the patch interpreter, preserving unpublished retry caches.
+   Its actual query and sandboxed parser/embedding checks pass. This current-account
+   test does not discharge clean-account installation or minimum hardware gates.
+6. Current slice: new-generation update/rollback, disk-full recovery and obsolete
+   generation reclamation. The separate first-attempt empty-root install/removal
+   run now passes with the actual generated cache, all encoder readiness paths,
+   CPU query and sandboxed parsing. Preserve a usable prior
+   generation and ordinary search; reject links escaping the owned add-on tree.
+   Model and parser process ownership at creation, actual native-decoder owner
+   death/recovery and seeded offline setup cancellation/retry/removal already pass
+   (`9831a31`, `909bb60`); repeat them only when relevant code changes.
+7. Collect a diverse, licensed natural-media candidate pool with
    original checksums, provenance, bounded downloads and interruption recovery.
    Review actual content, license obligations and related-source groups before
    assigning splits or labels. Provider metadata alone never approves a holdout.
-6. Freeze at least 400 independent content-grounded holdout tasks across all seven
+   For audio, assess [FSD50K's published human annotations](https://zenodo.org/records/4060432)
+   as independently grounded event labels. Retain both dataset and per-clip
+   attribution; exclude restrictive clip licenses from the candidate subset.
+   Clip-level labels support positive event presence, not an assumption that
+   unlisted events are absent or that precise time boundaries are known.
+8. Freeze at least 400 independent content-grounded holdout tasks across all seven
    families, including natural sound and joint audiovisual queries, before tuning
    admission. Preserve the opened development pilot as regression evidence.
    Run file/locator/abstention and dimension comparisons, then fix measured failures
    and validate with a fresh unopened holdout when necessary. Joint AV inputs now
    consume both encoders on CPU/CUDA and change when either channel changes;
    independently grounded sound-plus-visual retrieval still needs evaluation.
-7. Run the specified 25K/100K/500K corpus-size, CPU/GPU, ordinary-search regression,
+9. Extend the completed development-machine 25K/100K/500K baseline with CPU/GPU, ordinary-search regression,
    throughput, memory, battery, disk and lifecycle benchmarks. Validate the physical
    16 GB CPU laptop separately from the available 32 GB development machine.
-8. Finish distribution notices and clean standard-account install/update/removal
+10. Finish distribution obligations and clean standard-account install/update/removal
    checks, rebuild the package and run packaged WPF checks. Physical 16 GB CPU
    hardware validation is still outstanding; a memory cap on the available 32 GB
-   machine is not a substitute. Report any failed or unavailable gate explicitly.
+   machine is not a substitute. Retained package notices are implemented, while
+   exact native codec/source correspondence and distribution approval remain open.
+   Report any failed or unavailable gate explicitly.
 
 The user-authorized restart does not change the all-content scope or relax the
 release targets. No LibreOffice installation, renderer troubleshooting or Office
@@ -478,6 +502,19 @@ checks (16/16) and the complete rerun (307/307) passed. Preserve this unresolved
 intermittent result and the improved timeout diagnostics for lifecycle work.
 Keep the physical 16 GB machine and native distribution obligations as explicit
 release gates; neither has been discharged by development-machine smoke tests.
+
+The empty-root upstream-download case has since passed recovery with the published
+application, bundled CLR, non-admin token and no cache/interpreter overrides.
+It exposed uv's embedded minor-version launcher alias. Setup now creates or
+refreshes an unpublished environment using the resolved patch interpreter's
+standard venv launcher and verifies its bounded, unlinked home configuration.
+Ready generations remain unchanged. All five readiness paths, notice integrity,
+actual CPU query and sandboxed parsing/embedding pass; ordinary storage and source
+bytes are preserved. A separate first-attempt empty-root install and complete
+runtime/cache removal also passes under a non-admin token, without seeded artifacts
+or inherited cache/interpreter overrides. Eight setup and eight notice contracts
+pass. Continue the remaining new-generation/failure and obsolete-generation checks;
+this result does not discharge clean-account, hardware, quality or distribution gates.
 
 Distribution audit now retains 71 installed package notice inventories, interpreter
 terms and pinned supplemental OCR/tokenizer/model license texts. Eight notice and
