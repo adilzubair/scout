@@ -10,6 +10,7 @@ public static class FileTypes
         ["image"] = [".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp", ".tif", ".tiff", ".heic", ".svg"],
         ["video"] = [".mp4", ".mkv", ".mov", ".avi", ".webm", ".wmv"],
         ["audio"] = [".mp3", ".wav", ".m4a", ".ogg", ".flac", ".aac"],
+        ["recording"] = [".mp4", ".mkv", ".mov", ".avi", ".webm", ".wmv", ".mp3", ".wav", ".m4a", ".ogg", ".flac", ".aac"],
         ["archive"] = [".zip", ".7z", ".rar", ".tar", ".gz"]
     };
     public static string[] Extensions(string family) => Families.GetValueOrDefault(family) ?? [family];

@@ -52,6 +52,18 @@ static class SemanticRetrievalChecks
             var catalog=new SearchCatalog([image]);var local=SearchEngine.Search("screenshot showing payment failure",Scope.Files,catalog,new Dictionary<string,LibraryItem>(),now);
             Check(local.Hits.Count==0 && SearchEligibility.Files(local,Scope.Files,catalog,new Dictionary<string,LibraryItem>(),now).ContainsKey(image.Id));
         });
+        test("Opaque audio and video recordings remain semantically eligible",()=>
+        {
+            var now=DateTimeOffset.UtcNow;var audio=File("f01.wav",@"C:\Selected",now.AddMinutes(-1));var video=File("f02.mp4",@"C:\Selected",now.AddMinutes(-1));var document=File("f03.pdf",@"C:\Selected",now.AddMinutes(-1));
+            var catalog=new SearchCatalog([audio,video,document]);var library=new Dictionary<string,LibraryItem>();
+            var local=SearchEngine.Search("Find a recording of a dog.",Scope.Files,catalog,library,now);
+            var eligible=SearchEligibility.Files(local,Scope.Files,catalog,library,now);
+            Check(local.Hits.Count==0 && eligible.Count==2 && eligible.ContainsKey(audio.Id) && eligible.ContainsKey(video.Id));
+            local=SearchEngine.Search("audio recording of a dog",Scope.Files,catalog,library,now);
+            Check(SearchEligibility.Files(local,Scope.Files,catalog,library,now).Keys.SequenceEqual([audio.Id]));
+            local=SearchEngine.Search("video recording of a dog",Scope.Files,catalog,library,now);
+            Check(SearchEligibility.Files(local,Scope.Files,catalog,library,now).Keys.SequenceEqual([video.Id]));
+        });
         test("Fusion preserves exact names, explicit date order, actions and count limits",()=>
         {
             var now=DateTimeOffset.UtcNow;var named=File("invoice.pdf",@"C:\Selected",now.AddHours(-4));var recent=File("f001.pdf",@"C:\Selected",now.AddMinutes(-2));

@@ -66,6 +66,25 @@ dimension. Inspection found that the query parser maps the generic word
 ranking. Preserve this failure as a parser regression; it is not a measurement
 of the audio model's ranking. Do not change these frozen queries to hide the bug.
 
+Generic recording requests now use the union of audio and video file extensions.
+Explicit audio, video and concrete file formats retain their narrower constraints.
+Both ordinary metadata search and semantic eligibility share this vocabulary,
+including Windows Search extension expansion. Document descriptions using
+"recording" as a verb retain their existing behavior.
+
+The unchanged frozen diagnostic was rerun after the parser fix. An acceptable
+first file was returned for 7/10 class queries at 768, 512 and 256 dimensions;
+native production-adapter replay agreed with fusion at 768. All twenty files
+were admitted for every query, making the 10/10 recall-at-twenty result trivial.
+The three incorrect leading classes were rooster → chainsaw, rain → sea waves,
+and crackling fire → rain. Keyword search returned no files with these opaque
+names. Nineteen sources completed without a partial flag; one retained the
+visible `audio_peak_clipped` flag. All twenty were indexed, with no required
+source missing. No query was advertised as ready/confident by the ranking policy.
+The admission floor stayed at 0.35. These results expose ranking and selectivity
+limitations; they do not clear the release-quality gate or the earlier negative
+admission failure. The full 336 regression checks and 24 package contracts pass.
+
 ## Open release evidence
 
 Natural images, video, joint audiovisual events, multilingual and complex Office

@@ -3,7 +3,7 @@
 Date: 2026-10-15. Branch: `feature/multimodal-semantic-search`.
 Status: implementation active; resumed on 2026-10-15 from checkpoint `909bb60`.
 Retrieval, previews, OCR and format coverage are committed. The frozen evaluation
-foundation passes 333 Release checks; independent quality and release gates remain open.
+foundation passes 336 Release checks; independent quality and release gates remain open.
 This plan is the implementation checklist; the add-on remains a
 preview until the release gates below pass. The full-model runtime and content smoke probe
 are implemented and verified on CPU and CUDA. On 2026-10-14 the user directed
@@ -655,7 +655,12 @@ identities and derivatives out of the future holdout. Physical 16 GB validation
 is pending the user's later run; do not ask for that hardware again.
 The first actual CPU run indexed all twenty sources but returned no files for
 all ten queries at every dimension. There were no adapter disagreements. The
-parser treats generic "recording" as video and excludes all audio candidates
-before scoring. Retain the frozen queries and failed report, correct the media
-eligibility bug, then rerun this same development regression without changing
-the admission floor. This is not an opened release holdout.
+parser treated generic "recording" as video and excluded all audio candidates
+before scoring. That scope bug is corrected: generic recordings include audio
+and video, while explicit types retain their constraints. The unchanged frozen
+development rerun returns an acceptable first file for 7/10 class queries at all
+three dimensions, with no production-adapter disagreement. All twenty files are
+admitted for every query, so recall at twenty does not establish selectivity.
+Keep both reports, the unchanged 0.35 floor and the remaining quality failures.
+This is not an opened release holdout. All 336 regression checks and 24 package
+contracts pass after the correction.
