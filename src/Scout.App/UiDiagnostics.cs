@@ -13,6 +13,7 @@ public partial class MainWindow
     // Runs only in the isolated --ui-smoke-test flow; no user settings are saved.
     private async Task CaptureUiChecks()
     {
+        if(App.PreviewSmokeExtension is {} extension){await CaptureMediaPreviews(extension=="all"?null:extension);return;}
         async Task SearchView(string text, Scope filter, string name, int pixelScale = 1)
         {
             scope = filter; UpdateScopes(); Query.Text = text; RefreshLocal(); await WaitForSearch();
@@ -170,9 +171,37 @@ public partial class MainWindow
             {
                 scanWindow.Show();await scanWindow.CheckAsync();
                 if(scanWindow.RenderedPdfPage!=2)throw new InvalidOperationException("Scanned PDF did not navigate to its actual matched page.");
+                await scanWindow.CheckPdfNavigationAsync();
                 await UiDiagnostics.Snapshot(scanWindow,"semantic-scanned-pdf-page-two");
             }
             finally{scanWindow.Close();}
+            using(var cancel=new CancellationTokenSource())
+            {
+                System.Diagnostics.Process? renderer=null;
+                try
+                {
+                    try
+                    {
+                        _=await PdfPreviewRenderer.RenderAsync(scanPath,0,cancel.Token,pid=>{renderer=System.Diagnostics.Process.GetProcessById(pid);_=renderer.Handle;cancel.Cancel();});
+                        throw new IOException("Cancelled PDF rendering unexpectedly succeeded.");
+                    }
+                    catch(OperationCanceledException)when(cancel.IsCancellationRequested){}
+                    if(renderer==null || !renderer.HasExited)throw new IOException("Closing a PDF render left its worker alive.");
+                }
+                finally{renderer?.Dispose();}
+            }
+            var malformed=Path.Combine(App.DataDirectory,"Malformed preview.pdf");
+            await File.WriteAllTextAsync(malformed,"Authored non-PDF input");
+            var unavailable=new PreviewWindow(new("ui:bad-pdf",ItemKind.File,"Malformed preview.pdf",malformed)){Owner=this};
+            try
+            {
+                unavailable.Show();
+                try{await unavailable.CheckAsync();throw new IOException("Malformed PDF preview unexpectedly succeeded.");}
+                catch(InvalidOperationException error)when(error.Message.StartsWith("PDF preview unavailable:",StringComparison.Ordinal)){}
+            }
+            finally{unavailable.Close();}
+            var sessions=Path.Combine(App.DataDirectory,"pdf-previews","sessions");
+            if(Directory.Exists(sessions) && Directory.EnumerateDirectories(sessions).Any())throw new IOException("PDF preview left temporary source/raster data behind.");
         }
         await SearchView("preview benefits",Scope.Files,"semantic-before-arrival");
         var manualItem=new Candidate("ui:manual",ItemKind.File,"Benefits notes.txt",previewPath);
@@ -185,6 +214,10 @@ public partial class MainWindow
         try{ValidateSemanticAction(matchedItem);throw new InvalidOperationException("An out-of-scope content action was admitted.");}
         catch(IOException){}
         manualSelection=false;RefreshLocal();await WaitForSearch();
+        await CaptureMediaPreviews();
+    }
+    private async Task CaptureMediaPreviews(string? extension=null)
+    {
         var mediaPack=Path.GetFullPath("artifacts/diagnostics/multimodal/media-fixtures-v1");
         if(Directory.Exists(mediaPack))
         {
@@ -194,6 +227,7 @@ public partial class MainWindow
             var mediaScope=new SemanticScope(true,[mediaPack],[],["audio","video"],installation.Revision,"preview-test");
             foreach(var name in new[]{"tone.wav","tone.mp3","tone.m4a","tone.flac","scene.mp4","scene.mov","scene.mkv","scene.webm"})
             {
+                if(extension!=null && Path.GetExtension(name)!="."+extension)continue;
                 var path=Path.Combine(mediaPack,name);var candidate=new Candidate(Candidate.Key(ItemKind.File,path),ItemKind.File,name,path);
                 var source=SemanticSourceReader.Read(path,mediaScope)??throw new IOException("Missing authored media source.");
                 var proof=new SemanticEvidence("authored-media",candidate.Id,source.Revision,path,SemanticFormats.Family(path)=="video"?"video":"audio",new("time"){StartSeconds=.5,EndSeconds=2.5},"Authored media window",[]);

@@ -39,8 +39,9 @@ function Invoke-ScoutCheck([string]$Phase,[string]$Arguments,[string]$Profile,[s
         }
         $scoutResult = Join-Path $scoutProfile $Result
         $scoutRuns.Add([pscustomobject]@{ phase=$Phase; exitCode=$scoutChild.ExitCode; elapsedMs=$scoutClock.Elapsed.TotalMilliseconds; result=$scoutResult })
+        $scoutRuns.ToArray() | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $scoutEvidence 'phases.json') -Encoding UTF8
         if (Test-Path -LiteralPath $scoutResult) { Get-Content -LiteralPath $scoutResult | Write-Output }
-        if ($scoutChild.ExitCode -ne 0 -or -not (Test-Path -LiteralPath $scoutResult)) { throw "App E2E $Phase failed. Keep $scoutProfile." }
+        if ($scoutChild.ExitCode -ne 0 -or -not (Test-Path -LiteralPath $scoutResult)) { throw "App E2E $Phase failed with exit code $($scoutChild.ExitCode). Keep $scoutProfile." }
     } finally { $scoutChild.Dispose() }
 }
 try {

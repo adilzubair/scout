@@ -27,6 +27,8 @@ were saved and indexing needs attention.
   workspace naming, content coverage/revocation and evidence previews. Actual
   sandboxed DOCX/ODT/PPTX/ODP/XLSX/ODS reads retain their evidence locators. PDF
   page navigation and WAV/MP3/M4A/FLAC/MP4/MOV/MKV/WebM playback pass.
+  PDF checks also cover cancellation after its worker starts, malformed-input
+  recovery and removal of temporary snapshots/rasters.
 - The separate real-model production scheduler smoke indexes all seven families,
   queries code/image contents, validates current evidence, handles watched arrival/
   rename, pauses/resumes and revokes removed scope. Office screenshot checks use
@@ -39,6 +41,30 @@ results. The Windows desktop-control helper failed to initialize; these tests us
 the app's real WPF controls, modal dialogs and production save path through its
 isolated integration harness. Representative generated screenshots were inspected.
 No personal folders/settings were changed, and the user's running Scout was kept.
+
+## Native PDF shutdown failure found during testing
+
+The first broad UI runs completed their assertions but exited with native status
+`0xc0000409`. Their success text alone was insufficient. A controlled native
+debugger captured Windows PDF/D3D11/DXGI process-detach frames; a cleanup trial
+also identified the Intel graphics driver and still failed. Those failures and
+their private native stack/dump remain retained. Earlier COM-unload/GC cleanup
+experiments were not retained in the shipping path.
+
+PDF rendering now runs in an owned process from the same self-contained app,
+without an add-on dependency. The UI receives a hashed raster receipt and never
+loads the Windows PDF renderer. Each page uses a private input copy, at most
+100 MiB input, 4 million decoded pixels and 32 MiB encoded output. The worker has
+1 GiB process/2 GiB job memory limits, four processes and a 30-second render
+deadline. Its owner validates output before ending the worker job; cancellation
+and parent death also terminate the job. This keeps faulty native DLL detach out
+of the UI process. It is process isolation, not an AppContainer security claim.
+
+The corrected worker version completes the entire preview sequence with a clean
+UI-process exit. The runner now retains phase exit codes even on failure and
+requires a clean exit in addition to result text. A separately observed cold FLAC
+startup failure exposed a brittle fixed 800 ms playback assertion; it now waits
+up to three seconds for actual position advancement, with the failure retained.
 
 ## Reproduce
 

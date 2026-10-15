@@ -4,9 +4,6 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using Scout.Core;
-using Windows.Data.Pdf;
-using Windows.Storage;
-using Windows.Storage.Streams;
 using FileAttributes = System.IO.FileAttributes;
 using Image = System.Windows.Controls.Image;
 using FontFamily = System.Windows.Media.FontFamily;
@@ -19,7 +16,7 @@ internal sealed class PreviewWindow : Window
     private readonly ContentControl preview = new();
     private readonly TextBlock status = new() { Text = "Loading preview…", Margin = new Thickness(0, 8, 0, 8) };
     private readonly CancellationTokenSource lifetime = new();
-    private PdfDocument? pdf;
+    private uint pdfPages;
     private uint page;
     private MediaElement? media;
     private bool rendering;
@@ -32,7 +29,7 @@ internal sealed class PreviewWindow : Window
     private readonly Func<SemanticEvidence,bool>? validate;
     private readonly System.Windows.Threading.DispatcherTimer evidenceTimer=new(){Interval=TimeSpan.FromMilliseconds(250)};
     internal ContentLocator? MatchedLocator=>evidence?.Locator;
-    internal uint? RenderedPdfPage=>pdf==null?null:page+1;
+    internal uint? RenderedPdfPage=>pdfPages==0?null:page+1;
     public PreviewWindow(Candidate item,SemanticEvidence? evidence=null,Func<SemanticEvidence,bool>? validate=null,
         Func<SemanticEvidence,CancellationToken,Task<PreparedPlayback>>? preparePlayback=null)
     {
@@ -49,7 +46,7 @@ internal sealed class PreviewWindow : Window
         if (Path.GetExtension(item.Target).Equals(".pdf", StringComparison.OrdinalIgnoreCase))
         {
             Button("Previous page", () => { if (!rendering && page > 0) { page--; _ = RenderPdf(); } });
-            Button("Next page", () => { if (!rendering && pdf != null && page + 1 < pdf.PageCount) { page++; _ = RenderPdf(); } });
+            Button("Next page", () => { if (!rendering && page + 1 < pdfPages) { page++; _ = RenderPdf(); } });
         }
         if (FileTypes.Matches(Path.GetExtension(item.Target).ToLowerInvariant(), "video") || FileTypes.Matches(Path.GetExtension(item.Target).ToLowerInvariant(), "audio"))
         { Button("Play", () => media?.Play()); Button("Pause", () => media?.Pause()); }
@@ -57,7 +54,7 @@ internal sealed class PreviewWindow : Window
         dock.Children.Add(new Border { Child = preview, Background = WindowVisuals.Brush("Surface"), BorderBrush = WindowVisuals.Brush("Line"), BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(9), Padding = new Thickness(12), Margin = new Thickness(24, 0, 24, 0) }); Content = WindowVisuals.Frame(dock);
         Loaded += async (_, _) => await EnsureLoaded();
         evidenceTimer.Tick+=(_,_)=>CheckEvidence();if(evidence!=null)evidenceTimer.Start();
-        Closed += (_, _) => { evidenceTimer.Stop();lifetime.Cancel();CloseMedia();evidence=null; };
+        Closed += (_, _) => { evidenceTimer.Stop();lifetime.Cancel();CloseMedia();pdfPages=0;preview.Content=null;evidence=null; };
     }
     private Task EnsureLoaded()=>loading??=LoadPreview();
     private void CloseMedia()
@@ -71,7 +68,7 @@ internal sealed class PreviewWindow : Window
     {
         if(evidence==null)return !status.Text.StartsWith("Matched content is no longer",StringComparison.Ordinal);
         if(evidence.CandidateId==item.Id && evidence.Path.Equals(item.Target,StringComparison.OrdinalIgnoreCase) && (validate?.Invoke(evidence)??true))return true;
-        evidenceTimer.Stop();evidence=null;lifetime.Cancel();CloseMedia();pdf=null;preview.Content=null;
+        evidenceTimer.Stop();evidence=null;lifetime.Cancel();CloseMedia();pdfPages=0;preview.Content=null;
         status.Text="Matched content is no longer current or enabled. Search again.";return false;
     }
     private void ShowEvidence()
@@ -104,10 +101,8 @@ internal sealed class PreviewWindow : Window
             if (extension == ".pdf")
             {
                 if (info.Length > 100 * 1024 * 1024) throw new IOException("This PDF exceeds the 100 MB preview limit.");
-                pdf = await PdfDocument.LoadFromFileAsync(await StorageFile.GetFileFromPathAsync(item.Target));
                 if(evidence?.Locator.Kind=="page")
                 {
-                    if(evidence.Locator.Page>pdf.PageCount)throw new IOException("The matched PDF page is no longer available. Reindex the file.");
                     page=(uint)(evidence.Locator.Page!.Value-1);
                 }
                 if (!lifetime.IsCancellationRequested) await RenderPdf(); return;
@@ -149,6 +144,17 @@ internal sealed class PreviewWindow : Window
         await EnsureLoaded();
         if (preview.Content == null || status.Text.StartsWith("Preview unavailable", StringComparison.Ordinal) || status.Text.StartsWith("PDF preview unavailable", StringComparison.Ordinal)) throw new InvalidOperationException(status.Text);
     }
+    internal async Task CheckPdfNavigationAsync()
+    {
+        if(pdfPages<2 || page!=1)throw new IOException("The authored PDF navigation check needs page two.");
+        foreach(var (label,expected) in new[]{("Previous page",0u),("Next page",1u)})
+        {
+            UiDiagnostics.Descendants<Button>(this).Single(button=>button.Content as string==label).RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));
+            var deadline=System.Diagnostics.Stopwatch.StartNew();
+            while(rendering){if(deadline.Elapsed>TimeSpan.FromSeconds(35))throw new IOException("PDF navigation timed out.");await Task.Delay(25);}
+            if(page!=expected || !status.Text.StartsWith($"Page {expected+1} of ",StringComparison.Ordinal))throw new IOException("PDF navigation did not render the requested page.");
+        }
+    }
     private void OpenMedia(string path,double seek)
     {
         var player=new MediaElement{Source=new Uri(path),LoadedBehavior=MediaState.Manual,UnloadedBehavior=MediaState.Close,Stretch=Stretch.Uniform};
@@ -181,27 +187,29 @@ internal sealed class PreviewWindow : Window
         // Opening a codec alone does not prove playback. Advance the authored
         // smoke clip silently and leave normal previews paused until Play.
         var player=media??throw new IOException("Media preview closed.");
-        player.IsMuted=true;var before=player.Position;player.Play();await Task.Delay(800,lifetime.Token);player.Pause();
+        player.IsMuted=true;var before=player.Position;player.Play();
+        var startup=System.Diagnostics.Stopwatch.StartNew();
+        while(player.Position<=before+TimeSpan.FromMilliseconds(100) && startup.Elapsed<TimeSpan.FromSeconds(3))
+            await Task.Delay(50,lifetime.Token);
+        player.Pause();
         if(player.Position<=before+TimeSpan.FromMilliseconds(100))throw new IOException("Media playback did not advance.");
         player.IsMuted=false;
     }
     private async Task RenderPdf()
     {
-        if (pdf == null || rendering || lifetime.IsCancellationRequested) return;
-        var document=pdf;
+        if (rendering || lifetime.IsCancellationRequested) return;
         rendering = true;
         try
         {
-            using var pdfPage = document.GetPage(page);
-            using var stream = new InMemoryRandomAccessStream();
-            await pdfPage.RenderToStreamAsync(stream, new PdfPageRenderOptions { DestinationWidth = 1200 });
+            var rendered=await PdfPreviewRenderer.RenderAsync(item.Target,page,lifetime.Token);
             if (lifetime.IsCancellationRequested || !CheckEvidence()) return;
-            stream.Seek(0);
-            using var input = stream.AsStreamForRead();
+            pdfPages=rendered.Pages;
+            using var input = new MemoryStream(rendered.Png);
             var image = new BitmapImage(); image.BeginInit(); image.CacheOption = BitmapCacheOption.OnLoad; image.StreamSource = input; image.EndInit(); image.Freeze();
             preview.Content = new ScrollViewer { Content = new Image { Source = image, Stretch = Stretch.Uniform }, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
-            status.Text = $"Page {page + 1} of {document.PageCount}"+(evidence!=null?" · Content match":"");
+            status.Text = $"Page {page + 1} of {pdfPages}"+(evidence!=null?" · Content match":"");
         }
+        catch(OperationCanceledException)when(lifetime.IsCancellationRequested){}
         catch (Exception e) when (e is System.Runtime.InteropServices.COMException or IOException) { status.Text = "PDF preview unavailable: " + e.Message; }
         finally { rendering = false; }
     }

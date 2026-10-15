@@ -19,7 +19,7 @@ internal sealed class OwnedProcess : IDisposable
     private Task? stopped;
     private OwnedProcess(Process process,ProcessJob job,StreamReader output,StreamReader error)
     {Process=process;Job=job;Output=output;Error=error;}
-    public static OwnedProcess Start(ProcessStartInfo start,CancellationToken token=default)
+    public static OwnedProcess Start(ProcessStartInfo start,CancellationToken token=default,long processMemoryBytes=0,long jobMemoryBytes=0,uint activeProcesses=0)
     {
         token.ThrowIfCancellationRequested();
         if(start.UseShellExecute || !start.CreateNoWindow || !start.RedirectStandardOutput || !start.RedirectStandardError || start.RedirectStandardInput ||
@@ -36,7 +36,7 @@ internal sealed class OwnedProcess : IDisposable
         var block=string.Join('\0',variables.Select(pair=>pair.Key+"="+pair.Value))+"\0\0";
         if(block.Length>1024*1024)throw new ArgumentException("Process environment exceeds limit.");
         var directory=Path.GetFullPath(string.IsNullOrEmpty(start.WorkingDirectory)?Environment.CurrentDirectory:start.WorkingDirectory);
-        var job=new ProcessJob();
+        var job=new ProcessJob(processMemoryBytes,jobMemoryBytes,activeProcesses);
         AnonymousPipeServerStream? stdout=null,stderr=null,stdin=null;
         var attributes=IntPtr.Zero;var jobList=IntPtr.Zero;var handles=IntPtr.Zero;var environment=IntPtr.Zero;
         var initialized=false;var transferred=false;Process? process=null;StreamReader? output=null,error=null;ProcessInfo info=default;
