@@ -41,7 +41,7 @@ static class MultimodalLifecycleChecks
         var stderr=Task.Run(async()=>await File.WriteAllTextAsync(log+".stderr.txt",await child.StandardError.ReadToEndAsync()));
         return(child,Task.WhenAll(stdout,stderr));
     }
-    private static void CopyTree(string source,string destination)
+    internal static void CopyTree(string source,string destination)
     {
         var pending=new Stack<(string Source,string Target)>();pending.Push((source,destination));
         while(pending.TryPop(out var next))
@@ -54,6 +54,19 @@ static class MultimodalLifecycleChecks
                 if((attributes&FileAttributes.Directory)!=0)pending.Push((item,target));else File.Copy(item,target);
             }
         }
+    }
+    internal static void CreateProbe(string package,string probe)
+    {
+        CopyTree(package,probe);
+        foreach(var name in new[]{"Scout.Tests.exe","Scout.Tests.dll"})File.Copy(Path.Combine(AppContext.BaseDirectory,name),Path.Combine(probe,name));
+        File.Copy(Path.Combine(probe,"Scout.runtimeconfig.json"),Path.Combine(probe,"Scout.Tests.runtimeconfig.json"));
+        var deps=JsonNode.Parse(File.ReadAllText(Path.Combine(probe,"Scout.deps.json")))!;
+        var target=deps["targets"]![deps["runtimeTarget"]!["name"]!.GetValue<string>()]!;
+        var app=target.AsObject().Single(item=>item.Key.StartsWith("Scout/",StringComparison.Ordinal)).Key.Split('/');
+        target["Scout.Tests/1.0.0"]=new JsonObject{["dependencies"]=new JsonObject{[app[0]]=app[1]},["runtime"]=new JsonObject{["Scout.Tests.dll"]=new JsonObject()}};
+        deps["libraries"]!["Scout.Tests/1.0.0"]=new JsonObject{["type"]="project",["serviceable"]=false,["sha512"]=""};
+        File.WriteAllText(Path.Combine(probe,"Scout.Tests.deps.json"),deps.ToJsonString());
+        foreach(var file in Directory.EnumerateFiles(package,"*",SearchOption.AllDirectories))Check(Hash(file)==Hash(Path.Combine(probe,Path.GetRelativePath(package,file))),"Published bytes changed in lifecycle copy.");
     }
     private static (int Running,int Files,int Segments) ReadIndex(string data)
     {
@@ -73,18 +86,8 @@ static class MultimodalLifecycleChecks
         try
         {
             var installed=MultimodalSetup.Find(addon)??throw new IOException("Missing verified development add-on.");
-            CopyTree(package,probe);
-            foreach(var name in new[]{"Scout.Tests.exe","Scout.Tests.dll"})File.Copy(Path.Combine(AppContext.BaseDirectory,name),Path.Combine(probe,name));
-            // The probe uses the published self-contained desktop CLR, not a global SDK/runtime.
-            File.Copy(Path.Combine(probe,"Scout.runtimeconfig.json"),Path.Combine(probe,"Scout.Tests.runtimeconfig.json"));
-            var deps=JsonNode.Parse(File.ReadAllText(Path.Combine(probe,"Scout.deps.json")))!;
-            var target=deps["targets"]![deps["runtimeTarget"]!["name"]!.GetValue<string>()]!;
-            var app=target.AsObject().Single(item=>item.Key.StartsWith("Scout/",StringComparison.Ordinal)).Key.Split('/');
-            target["Scout.Tests/1.0.0"]=new JsonObject{["dependencies"]=new JsonObject{[app[0]]=app[1]},["runtime"]=new JsonObject{["Scout.Tests.dll"]=new JsonObject()}};
-            deps["libraries"]!["Scout.Tests/1.0.0"]=new JsonObject{["type"]="project",["serviceable"]=false,["sha512"]=""};
-            File.WriteAllText(Path.Combine(probe,"Scout.Tests.deps.json"),deps.ToJsonString());
+            CreateProbe(package,probe);
             var packageFiles=Directory.GetFiles(package,"*",SearchOption.AllDirectories);
-            foreach(var file in packageFiles)Check(Hash(file)==Hash(Path.Combine(probe,Path.GetRelativePath(package,file))),"Published bytes changed in lifecycle copy.");
             foreach(var name in new[]{"notes.docx","notes.odt","growth.pptx","growth.odp","sales.xlsx","sales.ods"})
                 File.Copy(Path.GetFullPath("artifacts/diagnostics/multimodal/office-fixtures-v2/"+name),Path.Combine(selected,name));
             foreach(var name in new[]{"tone.wav","tone.mp3","tone.m4a","tone.flac","scene.mp4","scene.mov","scene.mkv","scene.webm"})

@@ -3,7 +3,7 @@
 Date: 2026-10-15. Branch: `feature/multimodal-semantic-search`.
 Status: implementation active; restart verification on 2026-10-15 follows checkpoint `fc3f8ea`.
 Retrieval, previews, OCR and format coverage are committed. The frozen evaluation
-foundation passes 311 Release checks; independent quality and release gates remain open.
+foundation passes 323 Release checks; independent quality and release gates remain open.
 This plan is the implementation checklist; the add-on remains a
 preview until the release gates below pass. The full-model runtime and content smoke probe
 are implemented and verified on CPU and CUDA. On 2026-10-14 the user directed
@@ -435,8 +435,28 @@ The final published WPF smoke checks also pass. These checks reuse the existing
 development add-on and explicit private interpreter override, so they do not
 establish clean-account setup or minimum hardware support.
 
-Next, continue packaged add-on install/update/interruption/removal, live parser
-death and generation/cache cleanup checks, followed by the independent
+Installer process ownership is now assigned by Windows during creation, before
+its thread runs. Seven native launch contracts cover inherited handles, immediate
+descendants, parent death, cancellation, Unicode/large output, failed-start
+cleanup and Windows PowerShell module resolution. Two readiness-reader contracts
+cover atomic-publication sharing, cancellation and size bounds. Three removal
+contracts exercise real managed-Python junctions, dangling aliases and rejection
+of an external target before deletion.
+
+The published-library seeded CPU flow passes with a non-admin token and its own
+private interpreter, without a development home override: interrupt actual model
+verification, observe four setup processes exit, preserve both ready markers,
+query the previous generation, retry verification/notices offline and remove the
+private add-on while preserving ordinary database bytes. The initial failures
+exposed inherited PowerShell 7 module paths and uv's internal minor-version
+junction. Both production paths are corrected. The base runtime remains unchanged
+by setup; Python bytecode writes into the application directory are disabled.
+This does not establish a fresh internet install or a new-generation update.
+
+Next, apply job-at-creation ownership to model/parser startup and verify live
+parser owner death. Continue fresh-download/new-generation update and rollback,
+interruption/disk-full and generation/cache cleanup checks, including generated
+cache links, followed by the independent
 content-grounded evaluation corpus. The first
 full run timed out waiting for quota pause/resume (306/307); targeted scheduler
 checks (16/16) and the complete rerun (307/307) passed. Preserve this unresolved

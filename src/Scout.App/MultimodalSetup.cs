@@ -55,54 +55,86 @@ internal static partial class MultimodalSetup
         if (File.Exists(target) && (File.GetAttributes(target) & FileAttributes.ReparsePoint) != 0) throw new IOException("Add-on paths cannot use linked files.");
         return target;
     }
-    public static async Task InstallAsync(string device, IProgress<string> progress, CancellationToken token)
+    public static async Task InstallAsync(string device, IProgress<string> progress, CancellationToken token,string? addonRoot=null)
     {
         if (device is not ("cpu" or "cuda")) throw new ArgumentException("Unsupported processing device.");
         var script = Path.Combine(AppContext.BaseDirectory, "scripts", "setup-multimodal.ps1");
         if (!File.Exists(script)) throw new IOException("This build is missing the multimodal setup script.");
-        _ = OwnedPath(Root, "installed.json");
-        var start = new ProcessStartInfo("powershell.exe") { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true };
-        foreach (var arg in new[] { "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", script, "-AddonRoot", Root, "-Device", device }) start.ArgumentList.Add(arg);
-        using var process = Process.Start(start) ?? throw new IOException("Could not start add-on setup.");
-        ProcessJob? job = null;
-        try
+        addonRoot=Path.GetFullPath(addonRoot??Root);
+        _ = OwnedPath(addonRoot, "installed.json");
+        var start=CreateStartInfo(script,addonRoot,device);
+        using var owned=OwnedProcess.Start(start,token);
+        using var stop=token.Register(owned.Kill);
+        async Task Read(StreamReader reader)
         {
-            job = new ProcessJob(process);
-            using var stop = token.Register(() => { try { if (!process.HasExited) process.Kill(true); } catch (Exception error) when (error is InvalidOperationException or System.ComponentModel.Win32Exception) { } });
-            async Task Read(StreamReader reader)
+            try
             {
                 while (await reader.ReadLineAsync(token) is { } line)
                     if (!string.IsNullOrWhiteSpace(line)) progress.Report(line.Length > 300 ? line[..300] : line);
             }
-            await Task.WhenAll(Read(process.StandardOutput), Read(process.StandardError), process.WaitForExitAsync(token));
-            if (process.ExitCode != 0 || Find()?.Device != device) throw new IOException("Add-on setup did not finish. Retry to reuse completed downloads.");
+            catch{owned.Kill();throw;}
         }
-        finally
+        async Task Finish()
         {
-            job?.Dispose();
-            try { if (!process.HasExited) process.Kill(true); } catch (Exception error) when (error is InvalidOperationException or System.ComponentModel.Win32Exception) { }
+            try{await owned.Process.WaitForExitAsync(token);}
+            finally{owned.Kill();}
         }
+        await Task.WhenAll(Read(owned.Output),Read(owned.Error),Finish());
+        token.ThrowIfCancellationRequested();
+        if(owned.Process.ExitCode!=0 || Find(addonRoot)?.Device!=device)throw new IOException("Add-on setup did not finish. Retry to reuse completed downloads.");
+    }
+    internal static ProcessStartInfo CreateStartInfo(string script,string addonRoot,string device)
+    {
+        var executable=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System),"WindowsPowerShell/v1.0/powershell.exe");
+        var start=new ProcessStartInfo(executable){UseShellExecute=false,CreateNoWindow=true,RedirectStandardOutput=true,RedirectStandardError=true,WorkingDirectory=AppContext.BaseDirectory};
+        // A launcher started from PowerShell 7 inherits incompatible module paths.
+        // Let Windows PowerShell construct its own defaults, without changing the parent.
+        start.Environment.Remove("PSModulePath");
+        foreach(var arg in new[]{"-NoProfile","-ExecutionPolicy","Bypass","-File",script,"-AddonRoot",Path.GetFullPath(addonRoot),"-Device",device})start.ArgumentList.Add(arg);
+        return start;
     }
     public static void Remove(string? root = null)
     {
-        root ??= Root;
+        root=Path.GetFullPath(root??Root);
         _ = OwnedPath(root, "installed.json");
         if (!Directory.Exists(root)) return;
         using var bootstrapLock = new FileStream(Path.Combine(root, "bootstrap.lock"), FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.ReadWrite | FileShare.Delete);
         bootstrapLock.Lock(0, 1);
         using var setupLock = new FileStream(Path.Combine(root, "setup.lock"), FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.ReadWrite | FileShare.Delete);
         setupLock.Lock(0, 1); // Conflicts with the installer lock before any deletion starts.
-        // Descendant links are refused before a recursive delete; unrelated add-ons stay outside root.
+        // uv creates a minor-version junction beside its managed patch directory.
+        // Validate all entries before unlinking only those owned aliases.
+        var aliases=new List<string>();
         var pending = new Stack<string>(); pending.Push(root);
         while (pending.TryPop(out var directory))
             foreach (var item in Directory.EnumerateFileSystemEntries(directory))
             {
                 var attributes = File.GetAttributes(item);
-                if ((attributes & FileAttributes.ReparsePoint) != 0) throw new IOException("Remove linked paths from the add-on directory before removing it.");
+                if ((attributes & FileAttributes.ReparsePoint) != 0)
+                {
+                    if(IsManagedPythonAlias(root,item,attributes)){aliases.Add(item);continue;}
+                    throw new IOException("Remove linked paths from the add-on directory before removing it.");
+                }
                 if ((attributes & FileAttributes.Directory) != 0) pending.Push(item);
             }
-        Directory.Delete(Path.GetFullPath(root), true);
+        foreach(var alias in aliases)Directory.Delete(alias,false); // Unlink; never recurse into its target.
+        Directory.Delete(root, true);
     }
+    private static bool IsManagedPythonAlias(string root,string path,FileAttributes attributes)
+    {
+        if((attributes&FileAttributes.Directory)==0)return false;
+        var parent=Path.Combine(root,"python");
+        if(!Path.GetDirectoryName(Path.GetFullPath(path))!.Equals(parent,StringComparison.OrdinalIgnoreCase))return false;
+        var match=PythonAliasPattern().Match(Path.GetFileName(path));if(!match.Success)return false;
+        var target=new DirectoryInfo(path).ResolveLinkTarget(false);if(target==null)return false;
+        var full=Path.GetFullPath(target.FullName);
+        if(!Path.GetDirectoryName(full)!.Equals(parent,StringComparison.OrdinalIgnoreCase) ||
+            !Regex.IsMatch(Path.GetFileName(full),"^cpython-"+Regex.Escape(match.Groups[1].Value)+@"\.\d+-windows-x86_64-none$",RegexOptions.CultureInvariant))return false;
+        _=OwnedPath(full,"alias-target-check"); // Include the patch directory itself in the link check.
+        return true;
+    }
+    [GeneratedRegex(@"^cpython-(\d+\.\d+)-windows-x86_64-none$",RegexOptions.CultureInvariant)]
+    private static partial Regex PythonAliasPattern();
     [GeneratedRegex("^(cpu|cuda)-[0-9a-f]{24}$")]
     private static partial Regex GenerationPattern();
 }

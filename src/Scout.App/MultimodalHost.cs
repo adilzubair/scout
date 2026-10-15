@@ -191,8 +191,7 @@ internal sealed class MultimodalHost : IDisposable
                 if (process.HasExited) throw new IOException("Multimodal worker startup failed.");
                 await Task.Delay(100, deadline.Token);
             }
-            if (new FileInfo(readyFile).Length > 16384) throw new IOException("Invalid worker readiness.");
-            using var ready = JsonDocument.Parse(await File.ReadAllTextAsync(readyFile, deadline.Token));
+            using var ready = await ReadReadyAsync(readyFile,process,deadline.Token);
             var info = ready.RootElement;
             var port = info.GetProperty("port").GetInt32();
             var reportedPid = info.GetProperty("pid").GetInt32();
@@ -217,6 +216,24 @@ internal sealed class MultimodalHost : IDisposable
         catch (Exception error) when (error is JsonException or KeyNotFoundException or ArgumentException or InvalidOperationException or FormatException)
         { Stop(); throw new IOException("Invalid multimodal worker startup response.", error); }
         catch { Stop(); throw; }
+    }
+    internal static async Task<JsonDocument> ReadReadyAsync(string path,Process process,CancellationToken token)
+    {
+        while(true)
+        {
+            token.ThrowIfCancellationRequested();FileStream file;
+            try{file=new(path,FileMode.Open,FileAccess.Read,FileShare.Read|FileShare.Delete,4096,FileOptions.Asynchronous);}
+            catch(IOException)
+            {
+                if(process.HasExited)throw new IOException("Multimodal worker startup failed.");
+                await Task.Delay(25,token).ConfigureAwait(false);continue;
+            }
+            await using(file)
+            {
+                if(file.Length is < 2 or > 16384)throw new IOException("Invalid worker readiness.");
+                return await JsonDocument.ParseAsync(file,new JsonDocumentOptions{MaxDepth=8},token).ConfigureAwait(false);
+            }
+        }
     }
     private async Task UnloadIfIdleAsync()
     {

@@ -5,6 +5,10 @@ using Scout.Core;
 
 if (args.Length == 3 && args[0] == "--profile") return SearchProfiler.Run(args[1], args[2]);
 if (args.Length == 2 && args[0] == "--job-parent") return MultimodalChecks.JobParent(args[1]);
+if (args.Length >= 3 && args[0] == "--owned-child") return OwnedProcessChecks.Child(args.Skip(1).ToArray());
+if (args.Length == 2 && args[0] == "--owned-parent") return OwnedProcessChecks.Parent(args[1]);
+if (args.Length == 6 && args[0] == "--multimodal-setup-lifecycle") return await MultimodalSetupLifecycleChecks.Run(args[1],args[2],args[3],args[4],args[5]);
+if (args.Length == 3 && args[0] == "--setup-lifecycle-child") return await MultimodalSetupLifecycleChecks.Child(args[1],args[2]);
 if (args.Length == 3 && args[0] == "--session-owner") return MultimodalSessionChecks.Owner(args[1],args[2]);
 if (args.Length == 5 && args[0] == "--multimodal-lifecycle") return await MultimodalLifecycleChecks.Run(args[1],args[2],args[3],args[4]);
 if (args.Length == 5 && args[0] == "--lifecycle-child") return await MultimodalLifecycleChecks.Child(args[1],args[2],args[3],args[4]);
@@ -46,6 +50,10 @@ if (args is ["--semantic-service-checks"])
     Console.WriteLine($"{total-failures.Count}/{total} scheduler checks passed.");
     return failures.Count==0?0:1;
 }
+if (args is ["--owned-process-checks"])
+{
+    OwnedProcessChecks.Run(Test);Console.WriteLine($"{total-failures.Count}/{total} owned-process checks passed.");return failures.Count==0?0:1;
+}
 var now = new DateTimeOffset(2026, 9, 23, 12, 0, 0, TimeSpan.Zero);
 var empty = new Dictionary<string, LibraryItem>();
 ParityChecks.Run(Test);
@@ -57,6 +65,9 @@ IndexRaceChecks.Run(Test);
 SettingsUiChecks.Run(Test);
 MultimodalChecks.Run(Test);
 MultimodalSessionChecks.Run(Test);
+OwnedProcessChecks.Run(Test);
+WorkerReadinessChecks.Run(Test);
+ManagedPythonRemovalChecks.Run(Test);
 SemanticIndexChecks.Run(Test);
 SemanticSourceChecks.Run(Test);
 ExtractionSandboxChecks.Run(Test);

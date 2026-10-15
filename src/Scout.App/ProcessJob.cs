@@ -9,7 +9,9 @@ namespace Scout.App;
 internal sealed class ProcessJob : IDisposable
 {
     private readonly SafeFileHandle handle;
-    public ProcessJob(Process process, long processMemoryBytes = 0, long jobMemoryBytes = 0, uint activeProcesses = 0)
+    internal SafeFileHandle Handle=>handle;
+    internal ProcessJob():this(0,0,0) { }
+    private ProcessJob(long processMemoryBytes,long jobMemoryBytes,uint activeProcesses)
     {
         if (processMemoryBytes < 0 || jobMemoryBytes < 0) throw new ArgumentOutOfRangeException(nameof(processMemoryBytes));
         handle = CreateJobObject(IntPtr.Zero, null);
@@ -20,32 +22,39 @@ internal sealed class ProcessJob : IDisposable
         if (activeProcesses != 0) { limits.Basic.Flags |= 8; limits.Basic.ActiveProcesses = activeProcesses; }
         try
         {
-            if (!SetInformationJobObject(handle, 9, ref limits, Marshal.SizeOf<ExtendedLimits>()) ||
-                !AssignProcessToJobObject(handle, process.Handle)) throw new Win32Exception(Marshal.GetLastWin32Error());
+            if (!SetInformationJobObject(handle, 9, ref limits, Marshal.SizeOf<ExtendedLimits>())) throw new Win32Exception(Marshal.GetLastWin32Error());
         }
         catch { handle.Dispose(); throw; }
+    }
+    public ProcessJob(Process process,long processMemoryBytes=0,long jobMemoryBytes=0,uint activeProcesses=0):this(processMemoryBytes,jobMemoryBytes,activeProcesses)
+    {
+        try{if(!AssignProcessToJobObject(handle,process.Handle))throw new Win32Exception(Marshal.GetLastWin32Error());}
+        catch{handle.Dispose();throw;}
     }
     public void Dispose() => handle.Dispose();
     public async Task StopAsync()
     {
         // Capture owned handles before closing the job; kill completion is asynchronous.
         var processes = new List<Process>();
-        var buffer = Marshal.AllocHGlobal(4096);
         try
         {
-            if (!QueryInformationJobObject(handle, 3, buffer, 4096, out _)) throw new Win32Exception(Marshal.GetLastWin32Error());
-            var count = Marshal.ReadInt32(buffer, 4);
-            if (count is < 0 or > 128) throw new IOException("Unexpected worker process count.");
-            for (var i = 0; i < count; i++)
+            var buffer=IntPtr.Zero;
+            try
             {
-                var pid = checked((int)(IntPtr.Size == 8 ? Marshal.ReadInt64(buffer, 8 + i*8) : Marshal.ReadInt32(buffer, 8 + i*4)));
-                try { var process = Process.GetProcessById(pid); if (Contains(pid)) processes.Add(process); else process.Dispose(); }
-                catch (ArgumentException) { }
+                buffer=Marshal.AllocHGlobal(4096);
+                if (!QueryInformationJobObject(handle, 3, buffer, 4096, out _)) throw new Win32Exception(Marshal.GetLastWin32Error());
+                var count = Marshal.ReadInt32(buffer, 4);
+                if (count is < 0 or > 128) throw new IOException("Unexpected worker process count.");
+                for (var i = 0; i < count; i++)
+                {
+                    var pid = checked((int)(IntPtr.Size == 8 ? Marshal.ReadInt64(buffer, 8 + i*8) : Marshal.ReadInt32(buffer, 8 + i*4)));
+                    Process? process=null;
+                    try { process = Process.GetProcessById(pid); if (Contains(pid)){processes.Add(process);process=null;} }
+                    catch (ArgumentException) { }
+                    finally{process?.Dispose();}
+                }
             }
-        }
-        finally { Marshal.FreeHGlobal(buffer); Dispose(); }
-        try
-        {
+            finally { if(buffer!=IntPtr.Zero)Marshal.FreeHGlobal(buffer);Dispose(); }
             using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(10));
             await Task.WhenAll(processes.Select(process => process.WaitForExitAsync(deadline.Token))).ConfigureAwait(false);
         }

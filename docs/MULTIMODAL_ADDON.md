@@ -126,13 +126,13 @@ Windows venv directories are not renamed because launchers may contain absolute
 paths. Model downloads resume through Hugging Face's cache. The small bootstrap ZIP
 restarts after an interrupted transfer. Setup publishes an atomic installation
 marker only after full model integrity and actual text,
-image, audio and video embedding checks pass. Reverification does not modify a
+image, audio, video and joint audiovisual embedding checks pass. Reverification does not modify a
 completed generation's dependency environment. A failed new generation leaves
 the prior installation marker in place.
 
 Cancel setup or close Settings to stop the owned setup process tree. Installation
 and removal are immediate actions. Removal first stops Scout's worker, refuses
-linked paths/running setup, and deletes only the dedicated add-on directory;
+unexpected linked paths/running setup, and deletes only the dedicated add-on directory;
 it also saves disabled enablement. Laya and the ordinary file library stay
 outside that directory. Old completed generations are retained for switching
 devices; automatic generation/cache reclamation is still release work.
@@ -649,4 +649,62 @@ physical 16 GB resource validation; those gates remain open.
 
 ```powershell
 dotnet run --project tests/Scout.Tests -c Release --no-build -- --multimodal-lifecycle artifacts/Scout artifacts/diagnostics/multimodal/addon-no-office .runtime/python/cpython-3.12.13-windows-x86_64-none artifacts/diagnostics/multimodal/packaged-lifecycle
+```
+
+Installer startup now attaches its Windows job during process creation, before
+resuming the first thread. Only standard I/O pipe handles are inherited; closing
+the owner's job terminates its process tree. Cancellation captures owned process
+handles and waits for termination, and normal root exit also closes descendants
+that might otherwise retain an output pipe. Failed native starts close both ends
+of all pipes. The launcher uses an absolute Windows PowerShell path and canonical
+add-on root. See Microsoft's
+[job-list and handle-list attributes](https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-updateprocthreadattribute).
+
+The real offline setup flow exposed inherited PowerShell 7 module paths preventing
+Windows PowerShell from loading `Get-FileHash`. The child now reconstructs its own
+module defaults; the parent's environment is unchanged. A contract starts with an
+invalid module path and resolves the actual hash/archive cmdlets through the
+production launcher. This follows
+[Microsoft's intermediate-process guidance](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_psmodulepath?view=powershell-7.3).
+The setup script also disables Python bytecode writes into the base application.
+Worker readiness readers permit the delete-access sharing used by atomic rename,
+with cancellation and a 16 KiB bound. A native sharing-conflict control verifies
+the reader behavior rather than assuming filename visibility means a readable file.
+
+The same flow found uv's private `python/cpython-3.12-windows-x86_64-none` junction
+pointing to its patch-version directory. Removal accepts only that managed naming
+shape when the immediate target is a matching, unlinked patch directory in the
+same private Python folder. It validates the complete tree before unlinking the
+alias without recursion. Dangling owned aliases are supported; unknown/external
+links still block deletion. Three contracts exercise actual Windows junctions.
+
+The final published-library CPU flow uses copied, verified local artifacts and a
+private managed interpreter, with no development interpreter override. Under a
+non-admin token it interrupts actual native model verification, observes all four
+setup processes exit, checks unchanged ready/configuration markers and released
+locks, performs a real query using the previous generation, retries all encoder
+and notice verification offline, and removes the private add-on. The ordinary
+SQLite database remains byte-identical. In the retained-copy run, all 33 published
+runtime files remained unchanged and no bytecode appeared in that directory.
+The seeded installed tree contained 28,612 files and about 5.04 GiB of logical
+file contents before final retry; this excludes download/cache/temporary peaks
+and establishes no minimum disk requirement. The harness now measures source
+copy bytes and requires an additional 1 GiB reserve rather than assuming a fixed
+copy size.
+
+After those fixes, the complete documented command also passed from a fresh
+private copy. Its measured input copy was 5,545,187,240 bytes plus the reserve;
+successful completion removed both its private add-on and copied test payload.
+
+Release checks pass 323/323, including seven native launch checks, two readiness
+checks and three managed-alias checks. The 24 package contracts, 532-file package
+integrity checks, real AppContainer parent/child isolation probe and isolated
+published WPF checks pass. Fresh internet installation, a genuinely clean account,
+new-generation update/rollback, disk-full recovery, cache reclamation, live parser
+death, physical 16 GB validation and independent quality remain open. This seeded
+existing-generation test does not discharge those gates.
+
+```powershell
+dotnet run --project tests/Scout.Tests -c Release --no-build -- --owned-process-checks
+dotnet run --project tests/Scout.Tests -c Release --no-build -- --multimodal-setup-lifecycle artifacts/Scout artifacts/diagnostics/multimodal/addon-no-office .runtime/python/cpython-3.12.13-windows-x86_64-none artifacts/diagnostics/multimodal/addon-host-slice/bootstrap/uv-0.11.27/uv.zip artifacts/diagnostics/multimodal/packaged-setup
 ```

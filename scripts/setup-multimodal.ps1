@@ -1,6 +1,7 @@
 param([Parameter(Mandatory)][string]$AddonRoot, [ValidateSet('cpu','cuda')][string]$Device = 'cpu')
 $ErrorActionPreference = 'Stop'
 $env:PYTHONUTF8 = '1'
+$env:PYTHONDONTWRITEBYTECODE = '1'
 $scoutRoot = Split-Path -Parent $PSScriptRoot
 $spec = Get-Content -LiteralPath (Join-Path $scoutRoot 'runtime/multimodal_setup.json') -Raw | ConvertFrom-Json
 $addonPath = [System.IO.Path]::GetFullPath($AddonRoot)
