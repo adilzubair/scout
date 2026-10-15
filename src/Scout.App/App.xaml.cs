@@ -17,11 +17,12 @@ public partial class App : Application
     {
         base.OnStartup(e);
         var uiSmoke = e.Args.Contains("--ui-smoke-test");
-        var smoke = uiSmoke || e.Args.Contains("--smoke-test");
+        var folderPickerSmoke = e.Args.Contains("--folder-picker-smoke-test");
+        var smoke = uiSmoke || folderPickerSmoke || e.Args.Contains("--smoke-test");
         var diagnose = e.Args.Contains("--diagnose");
         var realworld = e.Args.Contains("--realworld-diagnose");
         var bluetooth = e.Args.Contains("--bluetooth-diagnose");
-        if ((uiSmoke || realworld || bluetooth) && string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("SCOUT_DATA_DIR"))) { Shutdown(1); return; }
+        if ((uiSmoke || folderPickerSmoke || realworld || bluetooth) && string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("SCOUT_DATA_DIR"))) { Shutdown(1); return; }
         instance = new Mutex(true, smoke || diagnose || realworld || bluetooth ? "Local\\Scout.Test" : "Local\\Scout.Launcher", out var first);
         if (!first)
         {
@@ -100,10 +101,13 @@ public partial class App : Application
                     try
                     {
                         await indexReady;
-                        await main.SmokeCheck(uiSmoke);
+                        if (folderPickerSmoke) await main.CheckFolderPickerAsync();
+                        else await main.SmokeCheck(uiSmoke);
                         // Keep offscreen WPF captures separate from the WinRT PDF renderer.
                         if (uiSmoke) await UiDiagnostics.Snapshot(main, "launcher");
-                        File.WriteAllText(Path.Combine(DataDirectory, "smoke-result.txt"), uiSmoke
+                        File.WriteAllText(Path.Combine(DataDirectory, "smoke-result.txt"), folderPickerSmoke
+                            ? "Folder picker checks passed: actual native select and cancel, repeated settings browsing, duplicate prevention and recoverable picker failures."
+                            : uiSmoke
                             ? "UI checks passed: rendering, scopes, manual selection, arrival selection, editable Open all, calculator, web fallback, settings navigation and validation focus, workspace naming, UI screenshots."
                             : "Desktop checks passed: rendering, scopes, manual selection, arrival selection, editable Open all, calculator, web fallback, PDF/image/Office/text previews, model host (when configured).");
                     }

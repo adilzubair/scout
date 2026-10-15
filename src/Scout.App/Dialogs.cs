@@ -66,7 +66,7 @@ internal sealed class GroupWindow : Window
 internal sealed class SettingsWindow : Window
 {
     public ScoutSettings Value { get; private set; }
-    public SettingsWindow(ScoutSettings settings, Func<string, bool> applyHotkey, Action clearHistory, MultimodalHost? multimodalHost = null, Action? addonRemoved = null, SemanticService? semantic = null)
+    public SettingsWindow(ScoutSettings settings, Func<string, bool> applyHotkey, Action clearHistory, MultimodalHost? multimodalHost = null, Action? addonRemoved = null, SemanticService? semantic = null, Func<Window,string?>? pickFolder = null)
     {
         Value = settings;
         Title = "Scout settings"; Width = 800; Height = 654; MinWidth = 680; MinHeight = 460; WindowStartupLocation = WindowStartupLocation.CenterOwner;
@@ -130,7 +130,20 @@ internal sealed class SettingsWindow : Window
         {
             var browse = new Button { Content = "Browse…", HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 8, 0, 6) };
             AutomationProperties.SetName(browse, name); panel.Children.Add(browse);
-            browse.Click += (_, _) => { var picked = FolderPicker.Pick(this); if (picked != null) field.Text = FolderList.Append(field.Text, picked); };
+            browse.Click += (_, _) =>
+            {
+                try
+                {
+                    var picked = pickFolder == null ? FolderPicker.Pick(this) : pickFolder(this);
+                    if (picked != null) field.Text = FolderList.Append(field.Text, picked);
+                }
+                catch (Exception error) when (error is System.Runtime.InteropServices.COMException or System.ComponentModel.Win32Exception or InvalidOperationException)
+                {
+                    feedback.Text = "The folder browser couldn't open. Enter the full folder path in the box above, one folder per line.";
+                    feedback.Visibility = Visibility.Visible;
+                    field.Focus();
+                }
+            };
             return browse;
         }
         var general = Page("General", "\uE713", "Make Scout fit the way you work.");
