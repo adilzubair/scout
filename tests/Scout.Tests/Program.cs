@@ -18,6 +18,7 @@ if (args.Length == 3 && args[0] == "--fresh-setup-environment-retry") return awa
 if (args.Length is 3 or 4 && args[0] == "--hardware-bundle") return MultimodalHardwareChecks.Bundle(args[1],args[2],args.Length==4?args[3]:null);
 if (args.Length == 4 && args[0] == "--multimodal-startup") return await MultimodalStartupChecks.Run(args[1],args[2],args[3]);
 if (args.Length == 4 && args[0] == "--multimodal-python-profile") return await MultimodalStartupChecks.PythonProfile(args[1],args[2],args[3]);
+if (args.Length == 6 && args[0] == "--multimodal-bytecode-trial") return await MultimodalBytecodeChecks.Run(args[1],args[2],args[3],args[4],args[5]);
 if (args.Length == 5 && args[0] == "--python-profile-child") return await MultimodalStartupChecks.PythonProfileChild(args[2],args[3],args[4]);
 if (args.Length == 5 && args[0] == "--startup-child") return await MultimodalStartupChecks.Child(args[1],args[2],args[4]);
 if (args.Length is 3 or 4 && args[0] == "--hardware-run") return await MultimodalHardwareChecks.Run(args[1],args[2],args.Length==4?args[3]:null);

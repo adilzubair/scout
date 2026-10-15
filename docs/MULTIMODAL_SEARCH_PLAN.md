@@ -991,3 +991,24 @@ modality coverage. They do not diagnose or waive the earlier 30.863 s miss.
 The profiling process retains all 2,977,485,952 FP32 parameter bytes and remains
 below 6 GiB whole-job commit on this development host. Its small authored inputs
 and diagnostic overhead are separate from the published worker/resource gates.
+
+A disposable copy of the fresh no-bytecode CPU environment now passes an offline
+bytecode trial using pinned uv 0.11.27. The existing 71-package set checks without
+downloads, and 12,350 bytecode files compile in 6.27 s. Every pre-existing cloned
+venv file remains unchanged; only bytecode files are added. Independent capture
+also confirms all 3,320 copied base-interpreter files remain byte-identical.
+Three process-cold queries before preparation take 17,855.9540, 15,492.4147 and
+17,008.1363 ms; afterward they take 10,610.5059, 10,333.6169 and 10,641.2525 ms.
+Constructor source compilation drops from 3,529 files/5.0112 s to 175 files/0.3319 s.
+All six authored vector hashes remain identical with every FP32 parameter loaded.
+
+The compiled copy passes the pinned 21 files, all seven families and video preview,
+with whole-job peak commit 6,245,781,504 bytes, below 6 GiB. Original venv, model,
+interpreter, ready marker, ordinary database and selected source hashes remain
+unchanged. The disposable runtime is removed. An older failed lifecycle runtime
+was first recovered and removed through the verified cancellation/query/parser/
+offline-retry path to reclaim space; its original failure logs remain retained.
+This ordered current-host comparison does not identify the earlier 30.863 s miss
+or establish physical 16 GB, quality or concurrency approval. Shipping setup must
+compile only a new generation and retain immutable old generations for rollback;
+that integration and exact packaged replays follow this experiment.

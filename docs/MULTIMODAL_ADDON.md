@@ -78,6 +78,7 @@ dotnet run --project tests/Scout.Tests -c Release --no-build -- --hardware-bundl
 dotnet run --project tests/Scout.Tests -c Release --no-build -- --multimodal-startup artifacts/Scout <verified-addon> <output-folder>
 dotnet run --project tests/Scout.Tests -c Release --no-build -- --multimodal-device-upgrade artifacts/Scout <passed-retained-fresh-case> <resource-bundle/fixtures> <output-parent>
 dotnet run --project tests/Scout.Tests -c Release --no-build -- --multimodal-python-profile scripts/profile-multimodal-memory.py <verified-cpu-addon> <output-parent>
+dotnet run --project tests/Scout.Tests -c Release --no-build -- --multimodal-bytecode-trial artifacts/Scout <retained-fresh-cpu-addon> scripts/profile-multimodal-memory.py <resource-bundle/fixtures> <output-parent>
 ```
 
 The resource builder verifies the baseline hashes and pinned tokenizer, exact
@@ -102,6 +103,14 @@ compilation and unmodified Windows platform-query timings. Hooks preserve return
 values and exceptions. This is a developer diagnostic with overhead; its SDK
 driver and small authored inputs do not establish end-to-end worker latency,
 production-window resource use or retrieval quality.
+
+The bytecode trial clones an owned fresh CPU environment with no existing bytecode,
+records three cold startups and a constructor profile, compiles with the pinned
+offline installer, then repeats the measurements and checks all seven families.
+It compares authored vector hashes, preserves the original environment/interpreter/
+model and ordinary test data, and removes the disposable runtime after success.
+Its measured copy budget plus 1 GiB reserve is for this developer trial. It does
+not establish shipping setup migration or minimum-hardware approval.
 
 Scout now has an independent setup entry point, authenticated embedding worker,
 Windows process lifetime, and Multimodal settings page. The preview installs and
