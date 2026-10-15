@@ -11,13 +11,19 @@ static class FreshSetupChecks
     private static string Hash(string path){using var file=File.OpenRead(path);return Convert.ToHexString(SHA256.HashData(file)).ToLowerInvariant();}
     private sealed class Progress(string path):IProgress<string>
     {
+        private readonly object gate=new();
         public void Report(string line)
         {
-            Console.WriteLine(line);
-            File.AppendAllText(path,DateTimeOffset.UtcNow.ToString("O")+" "+line+Environment.NewLine);
+            // Setup drains stdout and stderr concurrently. Keep this diagnostic
+            // writer from turning overlapping progress into an install failure.
+            lock(gate)
+            {
+                Console.WriteLine(line);
+                File.AppendAllText(path,DateTimeOffset.UtcNow.ToString("O")+" "+line+Environment.NewLine);
+            }
         }
     }
-    public static async Task<int> Run(string package,string output,bool retry=false,bool remove=false)
+    public static async Task<int> Run(string package,string output,bool retry=false,bool remove=false,bool contaminated=false)
     {
         package=Path.GetFullPath(package);var root=retry?Path.GetFullPath(output):MultimodalSetup.OwnedPath(Path.GetFullPath(output),"fresh-"+Guid.NewGuid().ToString("N"));Directory.CreateDirectory(root);
         var probe=Path.Combine(root,retry?"probe-retry-"+Guid.NewGuid().ToString("N"):"probe");var addon=Path.Combine(root,"addon");var passed=false;
@@ -30,7 +36,7 @@ static class FreshSetupChecks
                 Check(Path.GetFileName(root).StartsWith("fresh-",StringComparison.Ordinal) && initial.RootElement.GetProperty("addonInitiallyAbsent").GetBoolean() &&
                     !File.Exists(Path.Combine(root,"report.json")) && !File.Exists(Path.Combine(addon,"installed.json")),"Retry requires an unpublished failed fresh-install case.");
                 var archive="previous-attempt-"+Guid.NewGuid().ToString("N")+"-";
-                foreach(var name in new[]{"retry-child.stdout.txt","retry-child.stderr.txt","retry-progress.txt","running.json","failure.txt"})
+                foreach(var name in new[]{"retry-child.stdout.txt","retry-child.stderr.txt","retry-progress.txt","running.json","failure.txt","environment-inputs.json","environment-report.json"})
                     if(File.Exists(Path.Combine(root,name)))File.Move(Path.Combine(root,name),Path.Combine(root,archive+name));
             }
             else Check(new DriveInfo(Path.GetPathRoot(root)!).AvailableFreeSpace>12L*1024*1024*1024,"Fresh download test requires a 12 GiB workspace reserve; this is not a product minimum.");
@@ -39,6 +45,7 @@ static class FreshSetupChecks
             var start=new ProcessStartInfo(Path.Combine(probe,"Scout.Tests.exe")){UseShellExecute=false,CreateNoWindow=true,WorkingDirectory=probe,RedirectStandardOutput=true,RedirectStandardError=true};
             foreach(var value in new[]{"--fresh-setup-child",addon,Path.Combine(root,"report.json"),retry?"retry":remove?"fresh-remove":"fresh"})start.ArgumentList.Add(value);
             foreach(var name in new[]{"UV_OFFLINE","HF_HUB_OFFLINE","TRANSFORMERS_OFFLINE"})start.Environment.Remove(name);
+            if(contaminated)MultimodalEnvironmentChecks.PoisonChild(start,root,probe);
             using var child=Process.Start(start)??throw new IOException("Could not start fresh installer probe.");
             async Task Pump(StreamReader reader,string name)
             {
@@ -53,6 +60,7 @@ static class FreshSetupChecks
             using var report=JsonDocument.Parse(File.ReadAllText(Path.Combine(root,"report.json")));
             Check(report.RootElement.GetProperty("appSha256").GetString()==Hash(Path.Combine(package,"Scout.dll")) && report.RootElement.GetProperty("bundledClr").GetBoolean(),"Fresh probe did not use the published app and bundled CLR.");
             if(remove)Check(report.RootElement.GetProperty("addonRemoved").GetBoolean() && !Directory.Exists(addon),"Fresh cache/runtime removal was incomplete.");
+            if(contaminated)MultimodalEnvironmentChecks.VerifyChild(root);
             passed=true;Console.WriteLine("PASS fresh upstream CPU installation, private interpreter, notices and actual query: "+root);return 0;
         }
         catch(Exception error){File.WriteAllText(Path.Combine(root,"failure.txt"),error.ToString());Console.Error.WriteLine(error);return 1;}

@@ -31,6 +31,16 @@ static class OwnedProcessChecks
     }
     public static void Run(Action<string,Action> test)
     {
+        test("Isolated installer PowerShell executes native EXE arguments and preserves their exit status",()=>With(root=>
+        {
+            var script=Path.Combine(root,"native-probe.ps1");
+            File.WriteAllText(script,"param([string]$AddonRoot,[string]$Device)\n& $env:COMSPEC /d /c 'exit 7'\nif ($LASTEXITCODE -ne 7) { throw 'Native executable did not run with its arguments.' }\nWrite-Output 'native-exit-7'\nexit 0\n");
+            using var child=OwnedProcess.Start(MultimodalSetup.CreateStartInfo(script,root,"cpu"));
+            var output=child.Output.ReadToEndAsync();var errors=child.Error.ReadToEndAsync();
+            Check(child.Process.WaitForExit(15000),"Isolated PowerShell native probe timed out.");
+            Check(child.Process.ExitCode==0,errors.GetAwaiter().GetResult());
+            Check(output.GetAwaiter().GetResult().Trim()=="native-exit-7","PowerShell lost native process arguments or exit status.");
+        }));
         test("Installer startup resolves Windows PowerShell hash and archive cmdlets from an intermediate launcher",()=>With(root=>
         {
             var script=Path.Combine(root,"probe.ps1");File.WriteAllText(script,"param([string]$AddonRoot,[string]$Device)\nGet-Command Get-FileHash,Expand-Archive | ForEach-Object Name\n");

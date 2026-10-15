@@ -95,6 +95,16 @@ cells, chart data and embedded images, without exact Office page/slide rendering
 
 ## Settings and installation
 
+Setup and the model worker now build a child-only environment with private
+profiles, temporary files and model caches. Python starts in isolated mode with
+user-site imports and bytecode writes disabled; uv ignores discovered configuration.
+Inherited Python/venv paths, package indexes, model endpoints and unrelated
+credentials cannot redirect these processes. Setup retains explicit Hugging Face
+authentication, proxy/certificate settings and requested offline mode. The offline
+worker retains intentional CUDA device visibility and receives its thread limits
+from Scout. Parent environment variables remain unchanged. The parser keeps its
+existing separate AppContainer environment and trusted interpreter activation.
+
 Open Settings → Multimodal. Install or verify the add-on for CPU or CUDA, then
 use Test add-on to check offline startup and a query embedding. Installing does
 not enable Laya or change its Python environment. Enabling the preview requires

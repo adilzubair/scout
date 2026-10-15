@@ -26,12 +26,12 @@ try {
     $env:UV_PYTHON_INSTALL_DIR = Join-Path $addonPath 'python'
     $env:UV_CACHE_DIR = Join-Path $addonPath 'cache'
     Write-Output 'Preparing the dedicated Python runtime...'
-    & $uv python install --no-bin --no-registry $spec.pythonVersion
+    & $uv --no-config python install --no-bin --no-registry $spec.pythonVersion
     if ($LASTEXITCODE -ne 0) { throw 'Python setup failed. Completed downloads are kept for retry.' }
-    $python = & $uv python find --managed-python --system $spec.pythonVersion
+    $python = & $uv --no-config python find --managed-python --system $spec.pythonVersion
     if ($LASTEXITCODE -ne 0) { throw 'Dedicated Python runtime was not found.' }
     $privatePythonRoot = [System.IO.Path]::GetFullPath($env:UV_PYTHON_INSTALL_DIR).TrimEnd('\') + '\'
     if (-not [System.IO.Path]::GetFullPath($python).StartsWith($privatePythonRoot, [System.StringComparison]::OrdinalIgnoreCase)) { throw 'Setup selected a Python interpreter outside the private add-on.' }
-    & $python (Join-Path $scoutRoot 'runtime/semantic_search/setup.py') --root $addonPath --uv $uv --device $Device
+    & $python -I -B -X utf8 (Join-Path $scoutRoot 'runtime/semantic_search/setup.py') --root $addonPath --uv $uv --device $Device
     if ($LASTEXITCODE -ne 0) { throw 'Multimodal setup failed. Retry to reuse completed downloads.' }
 } finally { $bootstrapLock.Dispose() }

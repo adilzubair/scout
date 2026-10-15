@@ -3,7 +3,7 @@
 Date: 2026-10-15. Branch: `feature/multimodal-semantic-search`.
 Status: implementation active; independent quality and release validation in progress.
 Retrieval, previews, OCR and format coverage are committed. The frozen evaluation
-foundation passes 348 Release checks; independent quality and release gates remain open.
+foundation passes 351 Release checks; independent quality and release gates remain open.
 This plan is the implementation checklist; the add-on remains a
 preview until the release gates below pass. The full-model runtime and content smoke probe
 are implemented and verified on CPU and CUDA. On 2026-10-14 the user directed
@@ -878,3 +878,39 @@ No model predictions were opened on this pool. Next complete auditory content an
 cross-corpus rights/group review, supported negatives and the independent 400-task
 holdout; keep the physical 16 GB, WPF/Laya/concurrency, lifecycle and distribution
 gates open. Production code and the tested `bcfec8d` hardware ZIP are unchanged.
+
+The inherited-environment gate now has a reproduced baseline: the prior published
+model worker executes an injected `PYTHONPATH` startup module before readiness.
+Setup and the worker now construct private child environments, use isolated Python
+arguments and disable discovered uv configuration. Explicit setup authentication,
+proxy/certificate settings and offline requests remain supported; worker inference
+stays offline. The separate parser environment is unchanged. Two environment
+contracts and a real PowerShell native-command/exit-status contract bring the
+native suite to 351; seventeen Python setup/model-reuse contracts pass.
+
+An actual empty-root upstream CPU installation under seventeen controlled parent
+overrides now passes all encoder readiness, real query, sandbox parsing/embedding,
+notice integrity and ordinary-database preservation. Its foreign startup/cache
+directory remains byte-identical. The successful case resumed two unpublished
+attempts: a missing trusted `PATHEXT` in the first guard implementation prevented
+PowerShell native dispatch, then concurrent diagnostic appends failed the test
+logger. Both failures are retained; trusted native extensions and serialized
+diagnostic writes address those observed causes. A later build hit the active
+driver's executable lock; it was deferred until the validation exited. This is
+current-account installation evidence, not a clean-account or physical 16 GB pass.
+Changed-dependency/device upgrade, broader lifecycle, independent quality and
+distribution requirements remain open. No dependency pins or quality thresholds
+changed.
+
+The contaminated existing-generation lifecycle also passes real verification
+interruption, observed-process exit, ready-marker/configuration preservation,
+fallback CPU query and sandbox parsing/embedding, offline retry, notice checks and
+private add-on removal while preserving the ordinary database. All seventeen
+foreign overrides remain contained. The first lifecycle attempt failed an
+immediate bootstrap-lock acquisition after the observed processes exited; later
+inspection found both locks available and no surviving installer. The harness
+now measures lock acquisition with a ten-second bound, retrying only Windows
+lock-violation 33. The successful separate run reacquired both locks in 0.6576 ms
+with zero retries; it does not establish the cause of that earlier transient.
+All 24 package contracts pass. Exact committed-package resource replay and
+validation-bundle refresh follow this implementation milestone.

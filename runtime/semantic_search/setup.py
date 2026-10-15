@@ -35,6 +35,10 @@ def run(command, env):
                    creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
 
 
+def python_command(python,*arguments):
+    return [python,'-I','-B','-X','utf8',*arguments]
+
+
 def copy_model(source, destination):
     manifest = load_manifest()
     for name in manifest['files']:unlinked(Path(source)/name)
@@ -127,8 +131,8 @@ def main():
             env['UV_OFFLINE'] = '1'
         if (generation / 'installed.json').is_file():
             # Never modify an environment that an existing host may be using.
-            run([python, Path(__file__), '--verify', str(generation), '--device', args.device], env)
-            run([python, Path(__file__).with_name('notices.py'), '--generation', generation], env)
+            run(python_command(python, Path(__file__), '--verify', str(generation), '--device', args.device), env)
+            run(python_command(python, Path(__file__).with_name('notices.py'), '--generation', generation), env)
             atomic_json(base / 'installed.json', json.loads((generation / 'installed.json').read_text(encoding='utf-8')))
             print('Existing add-on generation verified.', flush=True)
             return
@@ -137,9 +141,9 @@ def main():
         # uv's Windows launcher embeds a mutable minor-version junction even
         # with an explicit patch path. CPython's launcher honors its pinned home.
         # Refresh only unpublished environments, preserving packages/downloads.
-        run([interpreter,'-m','venv','--without-pip','--copies',generation/'venv'],env)
+        run(python_command(interpreter,'-m','venv','--without-pip','--copies',generation/'venv'),env)
         verify_venv_home(python,interpreter)
-        run([args.uv, 'pip', 'sync', '--python', python, '--require-hashes', '--link-mode', 'hardlink', '--index-strategy',
+        run([args.uv, '--no-config', 'pip', 'sync', '--python', python, '--require-hashes', '--link-mode', 'hardlink', '--index-strategy',
              'unsafe-best-match', ROOT / f'runtime/semantic_search/requirements.{args.device}.lock.txt'], env)
         model = generation / 'model'
         print('Preparing the full multimodal model...', flush=True)
@@ -153,11 +157,11 @@ def main():
             elif args.offline:
                 raise ValueError('Offline setup needs a verified local model')
             else:
-                run([python, ROOT / 'scripts/fetch-embeddinggemma2.py', '--output', model], env)
+                run(python_command(python, ROOT / 'scripts/fetch-embeddinggemma2.py', '--output', model), env)
         print('Verifying the offline model and all modality encoders...', flush=True)
-        run([python, Path(__file__), '--verify', str(generation), '--device', args.device],
+        run(python_command(python, Path(__file__), '--verify', str(generation), '--device', args.device),
             {**env, 'HF_HUB_OFFLINE': '1', 'TRANSFORMERS_OFFLINE': '1'})
-        run([python, Path(__file__).with_name('notices.py'), '--generation', generation], env)
+        run(python_command(python, Path(__file__).with_name('notices.py'), '--generation', generation), env)
         # No venv rename: Windows launchers can contain absolute interpreter paths.
         marker = dict(schemaVersion=2, generation=generation.name, device=args.device,
             revision=load_manifest()['revision'], modelManifestSha256=sha256(MANIFEST),

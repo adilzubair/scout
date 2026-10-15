@@ -34,7 +34,7 @@ class SetupContracts(unittest.TestCase):
             commands = []
             def run(command, env):
                 commands.append(command)
-                if command[1:3] == ['-m','venv']:
+                if command[5:7] == ['-m','venv']:
                     self.venv(root)
             with patch.object(sys, 'argv', ['setup.py', '--root', str(root), '--uv', 'uv.exe', '--existing-model', str(root/'model'), '--offline']), patch.object(setup, 'run', side_effect=run), patch.object(setup, 'copy_model'):
                 setup.main()
@@ -43,6 +43,9 @@ class SetupContracts(unittest.TestCase):
             self.assertNotIn('office', marker)
             self.assertNotIn('officeManifestSha256', marker)
             self.assertFalse(any('office' in str(command).casefold() for command in commands))
+            for command in commands:
+                if Path(command[0]).name=='uv.exe':self.assertEqual(command[1],'--no-config')
+                else:self.assertEqual(command[1:5],['-I','-B','-X','utf8'])
             self.assertEqual(marker, json.loads((root/'generations'/marker['generation']/'installed.json').read_text()))
 
     def test_readiness_checks_every_encoder_without_a_renderer(self):
@@ -52,6 +55,18 @@ class SetupContracts(unittest.TestCase):
             self.assertEqual(len(calls), 5)
             self.assertTrue(calls[0].kwargs['query'])
             self.assertEqual([set(call.args[0]) for call in calls[1:]], [{'image'}, {'audio'}, {'video'},{'video','audio'}])
+
+    def test_real_nested_python_ignores_foreign_home_startup_and_bytecode_overrides(self):
+        with tempfile.TemporaryDirectory(dir=TEST_ROOT) as directory:
+            root=Path(directory);poison=root/'poison';poison.mkdir();marker=poison/'executed.txt'
+            (poison/'sitecustomize.py').write_text("from pathlib import Path\nPath(__file__).with_name('executed.txt').write_text('foreign startup')\n")
+            code="import json,sys;print(json.dumps(dict(isolated=sys.flags.isolated,noUserSite=sys.flags.no_user_site,noBytecode=sys.dont_write_bytecode,utf8=sys.flags.utf8_mode)))"
+            env={**os.environ,'PYTHONPATH':str(poison),'PYTHONHOME':str(root/'nonexistent-home'),'PYTHONDONTWRITEBYTECODE':'0'}
+            result=subprocess.run(setup.python_command(sys.executable,'-c',code),env=env,capture_output=True,text=True,timeout=15,
+                creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
+            self.assertEqual(result.returncode,0,result.stderr)
+            self.assertEqual(json.loads(result.stdout),dict(isolated=1,noUserSite=1,noBytecode=True,utf8=1))
+            self.assertFalse(marker.exists());self.assertFalse(any(poison.rglob('*.pyc')))
 
     def test_nested_setup_output_reaches_controller_pipes_on_failure(self):
         code="import os,sys;sys.path.insert(0,"+repr(str(ROOT/'runtime'))+");from semantic_search.setup import run;run([sys.executable,'-c',\"import sys;print('nested-stdout-canary',flush=True);print('nested-stderr-canary',file=sys.stderr,flush=True);sys.exit(7)\"],os.environ)"
@@ -69,7 +84,7 @@ class SetupContracts(unittest.TestCase):
             setup.atomic_json(root / 'installed.json', previous)
             argv = ['setup.py', '--root', str(root), '--uv', 'uv.exe', '--offline']
             def fail(command, env):
-                if command[1:3] == ['-m','venv']:
+                if command[5:7] == ['-m','venv']:
                     self.venv(root)
                     return
                 raise subprocess.CalledProcessError(1, command)
@@ -92,7 +107,7 @@ class SetupContracts(unittest.TestCase):
                 setup.main()
             self.assertEqual(len(commands), 2)
             self.assertIn('--verify', commands[0])
-            self.assertTrue(str(commands[1][1]).endswith('notices.py'))
+            self.assertTrue(str(commands[1][5]).endswith('notices.py'))
             self.assertEqual(json.loads((root / 'installed.json').read_text()), marker)
 
     def test_retry_refreshes_only_unpublished_launcher_without_clearing_downloads_or_packages(self):
@@ -104,7 +119,7 @@ class SetupContracts(unittest.TestCase):
             with patch.object(sys,'argv',['setup.py','--root',str(root),'--uv','uv.exe','--existing-model',str(root/'model'),'--offline']),patch.object(setup,'run',side_effect=lambda command,env:commands.append(command)),patch.object(setup,'copy_model'),patch.object(setup,'verify_venv_home',wraps=setup.verify_venv_home) as pin:
                 setup.main()
             pin.assert_called_once_with(python,resolved)
-            self.assertEqual(commands[0],[resolved,'-m','venv','--without-pip','--copies',generation/'venv'])
+            self.assertEqual(commands[0],[resolved,'-I','-B','-X','utf8','-m','venv','--without-pip','--copies',generation/'venv'])
             self.assertEqual(canary.read_bytes(),b'keep')
             self.assertEqual(python.read_bytes(),b'fixture')
 
@@ -130,9 +145,9 @@ class SetupContracts(unittest.TestCase):
         with tempfile.TemporaryDirectory(dir=TEST_ROOT) as directory:
             root=Path(directory);previous={'previous':'installation'};setup.atomic_json(root/'installed.json',previous)
             def run(command,env):
-                if command[1:3]==['-m','venv']:
+                if command[5:7]==['-m','venv']:
                     self.venv(root)
-                elif str(command[1]).endswith('notices.py'):raise subprocess.CalledProcessError(1,command)
+                elif len(command)>5 and str(command[5]).endswith('notices.py'):raise subprocess.CalledProcessError(1,command)
             with patch.object(sys,'argv',['setup.py','--root',str(root),'--uv','uv.exe','--existing-model',str(root/'model'),'--offline']),patch.object(setup,'run',side_effect=run),patch.object(setup,'copy_model'):
                 with self.assertRaises(subprocess.CalledProcessError):setup.main()
             self.assertEqual(json.loads((root/'installed.json').read_text()),previous)

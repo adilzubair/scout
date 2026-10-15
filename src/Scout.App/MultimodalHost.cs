@@ -177,6 +177,8 @@ internal sealed class MultimodalHost : IDisposable
         TraceStartup(timings,"owned-session");
         var secret = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
         var start = new ProcessStartInfo(installed.Python) { UseShellExecute = false, CreateNoWindow = true, WorkingDirectory = sessionDirectory, RedirectStandardOutput = true, RedirectStandardError = true };
+        MultimodalProcessEnvironment.Configure(start,root,sessionDirectory,setup:false);
+        MultimodalProcessEnvironment.PythonArguments(start);
         start.ArgumentList.Add(Path.Combine(AppContext.BaseDirectory, "runtime", "semantic_search", "worker.py"));
         start.Environment["SCOUT_EMBEDDING_TOKEN"] = secret;
         start.Environment["SCOUT_EMBEDDING_READY"] = readyFile;

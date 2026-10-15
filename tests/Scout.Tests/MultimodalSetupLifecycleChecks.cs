@@ -24,7 +24,7 @@ static class MultimodalSetupLifecycleChecks
         }
         return bytes;
     }
-    public static async Task<int> Run(string package,string seedAddon,string seedHome,string uvArchive,string output)
+    public static async Task<int> Run(string package,string seedAddon,string seedHome,string uvArchive,string output,bool contaminated=false)
     {
         package=Path.GetFullPath(package);seedAddon=Path.GetFullPath(seedAddon);seedHome=Path.GetFullPath(seedHome);uvArchive=Path.GetFullPath(uvArchive);
         var root=MultimodalSetup.OwnedPath(Path.GetFullPath(output),"setup-"+Guid.NewGuid().ToString("N"));Directory.CreateDirectory(root);
@@ -59,6 +59,7 @@ static class MultimodalSetupLifecycleChecks
             var start=new ProcessStartInfo(Path.Combine(probe,"Scout.Tests.exe")){UseShellExecute=false,CreateNoWindow=true,WorkingDirectory=probe,RedirectStandardOutput=true,RedirectStandardError=true};
             foreach(var arg in new[]{"--setup-lifecycle-child",addon,receipt})start.ArgumentList.Add(arg);
             start.Environment["UV_OFFLINE"]="1";start.Environment["HF_HUB_OFFLINE"]="1";start.Environment["TRANSFORMERS_OFFLINE"]="1";
+            if(contaminated)MultimodalEnvironmentChecks.PoisonChild(start,root,probe);
             using var child=Process.Start(start)??throw new IOException("Could not launch setup lifecycle child.");
             var stdout=Task.Run(async()=>await File.WriteAllTextAsync(Path.Combine(root,"child.stdout.txt"),await child.StandardOutput.ReadToEndAsync()));
             var stderr=Task.Run(async()=>await File.WriteAllTextAsync(Path.Combine(root,"child.stderr.txt"),await child.StandardError.ReadToEndAsync()));
@@ -68,6 +69,7 @@ static class MultimodalSetupLifecycleChecks
             using var result=JsonDocument.Parse(File.ReadAllText(receipt));
             Check(result.RootElement.GetProperty("appSha256").GetString()==Hash(Path.Combine(package,"Scout.dll")) && result.RootElement.GetProperty("bundledClr").GetBoolean(),"Setup probe did not load the published app and CLR.");
             Check(Hash(seedCfg)==seedHash && !Directory.Exists(addon),"Seed was modified or the private test add-on was not removed.");
+            if(contaminated)MultimodalEnvironmentChecks.VerifyChild(root);
             passed=true;Console.WriteLine("PASS real offline setup cancellation, previous generation query, retry, notices and removal: "+root);return 0;
         }
         catch(Exception error){File.WriteAllText(Path.Combine(root,"failure.txt"),error.ToString());Console.Error.WriteLine(error);return 1;}
@@ -122,12 +124,36 @@ static class MultimodalSetupLifecycleChecks
             }
             finally{foreach(var process in captured)process.Dispose();}
             Check(Hash(Path.Combine(addon,"installed.json"))==marker && Hash(Path.Combine(generation,"installed.json"))==generationMarker && Hash(Path.Combine(generation,"venv/pyvenv.cfg"))==configuration,"Canceled setup changed the ready generation.");
-            foreach(var name in new[]{"bootstrap.lock","setup.lock"})using(var file=new FileStream(Path.Combine(addon,name),FileMode.Open,FileAccess.ReadWrite,FileShare.ReadWrite|FileShare.Delete)){file.Lock(0,1);}
+            // Windows can signal process exit while native file cleanup is still
+            // completing. Require both locks within a fixed bound; never retry
+            // other I/O failures or treat a surviving lock as a passing result.
+            var lockTimer=Stopwatch.StartNew();var lockRetries=0;
+            foreach(var name in new[]{"bootstrap.lock","setup.lock"})
+            {
+                while(true)
+                {
+                    try
+                    {
+                        using var file=new FileStream(Path.Combine(addon,name),FileMode.Open,FileAccess.ReadWrite,FileShare.ReadWrite|FileShare.Delete);
+                        file.Lock(0,1);break;
+                    }
+                    catch(IOException error)when((error.HResult&0xffff)==33 && lockTimer.Elapsed<TimeSpan.FromSeconds(10))
+                    {lockRetries++;await Task.Delay(25);}
+                }
+            }
+            var lockReleaseMilliseconds=lockTimer.Elapsed.TotalMilliseconds;
             using(var host=new MultimodalHost(addon))
             {
                 await host.ConfigureAsync(new(){Enabled=true,Device="cpu"});
                 using var deadline=new CancellationTokenSource(TimeSpan.FromMinutes(2));var query=await host.QueryAsync("existing generation after interrupted setup",deadline.Token);
                 Check(query.Vector.Length==768 && host.ProcessId.HasValue,"Previous generation was unusable after cancellation.");
+                var selected=Path.Combine(root,"selected");Directory.CreateDirectory(selected);var path=Path.Combine(selected,"source.py");
+                File.WriteAllText(path,"def environment_total():\n    return 42000\n");var sourceHash=Hash(path);
+                var scope=new SemanticScope(true,[selected],[],MultimodalSettings.ContentTypes,installed.Revision,"environment-reader").Normalize();
+                await using var extractor=new SemanticExtractor(addon,installed,()=>scope,host.DocumentAsync);
+                var source=SemanticSourceReader.Read(path,scope)??throw new IOException("Cannot acquire environment test source.");
+                var extraction=await extractor.ExtractAsync(source,deadline.Token);
+                Check(extraction.Segments.Count>0 && extraction.Segments.All(segment=>segment.Vector.Length==768) && Hash(path)==sourceHash,"Private parser failed or changed its source.");
             }
             Console.WriteLine("PASS previous generation answers an actual CPU query after canceled setup; retrying offline.");
             using(var deadline=new CancellationTokenSource(TimeSpan.FromMinutes(3)))await MultimodalSetup.InstallAsync("cpu",progress,deadline.Token,addon);
@@ -143,7 +169,7 @@ static class MultimodalSetupLifecycleChecks
             var result=new{schemaVersion=1,scope="Seeded offline existing-generation lifecycle under current Windows account; not fresh download, clean-account, new-generation update or quality approval",passed=true,
                 appSha256=Hash(typeof(MultimodalSetup).Assembly.Location),bundledClr=Path.GetDirectoryName(typeof(object).Assembly.Location)==AppContext.BaseDirectory.TrimEnd(Path.DirectorySeparatorChar),
                 administratorToken=new WindowsPrincipal(identity).IsInRole(WindowsBuiltInRole.Administrator),privateInterpreter=true,developmentInterpreterOverride=false,verificationInterrupted=true,observedSetupPids=pids,
-                observedProcessesExited=true,readyMarkersPreserved=true,locksReleased=true,previousGenerationQueryPassed=true,offlineRetryPassed=true,noticesVerified=true,privateAddonRemoved=true,ordinaryDatabasePreserved=true,releaseReady=false};
+                observedProcessesExited=true,readyMarkersPreserved=true,locksReleased=true,lockReleaseMilliseconds,lockRetries,lockReleaseDeadlineMilliseconds=10000,previousGenerationQueryPassed=true,privateParserAndEmbeddingPassed=true,offlineRetryPassed=true,noticesVerified=true,privateAddonRemoved=true,ordinaryDatabasePreserved=true,releaseReady=false};
             File.WriteAllText(receipt,JsonSerializer.Serialize(result,new JsonSerializerOptions{WriteIndented=true}));return 0;
         }
         catch(Exception error){Console.Error.WriteLine(error);return 1;}

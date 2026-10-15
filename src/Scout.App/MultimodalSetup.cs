@@ -62,6 +62,7 @@ internal static partial class MultimodalSetup
         if (!File.Exists(script)) throw new IOException("This build is missing the multimodal setup script.");
         addonRoot=Path.GetFullPath(addonRoot??Root);
         _ = OwnedPath(addonRoot, "installed.json");
+        Directory.CreateDirectory(addonRoot);
         var start=CreateStartInfo(script,addonRoot,device);
         using var owned=OwnedProcess.Start(start,token);
         using var stop=token.Register(owned.Kill);
@@ -91,9 +92,7 @@ internal static partial class MultimodalSetup
     {
         var executable=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System),"WindowsPowerShell/v1.0/powershell.exe");
         var start=new ProcessStartInfo(executable){UseShellExecute=false,CreateNoWindow=true,RedirectStandardOutput=true,RedirectStandardError=true,WorkingDirectory=AppContext.BaseDirectory};
-        // A launcher started from PowerShell 7 inherits incompatible module paths.
-        // Let Windows PowerShell construct its own defaults, without changing the parent.
-        start.Environment.Remove("PSModulePath");
+        MultimodalProcessEnvironment.Configure(start,addonRoot,addonRoot,setup:true);
         foreach(var arg in new[]{"-NoProfile","-ExecutionPolicy","Bypass","-File",script,"-AddonRoot",Path.GetFullPath(addonRoot),"-Device",device})start.ArgumentList.Add(arg);
         return start;
     }
