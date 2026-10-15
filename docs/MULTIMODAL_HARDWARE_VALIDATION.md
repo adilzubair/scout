@@ -30,13 +30,20 @@ runs locally. Expect setup plus several minutes of CPU work. Keep failed runs
 and logs rather than deleting them. A rerun creates a separate run and repeats
 downloads; a failed run can be investigated before retrying.
 
-The workload records a new model process's first-query time, actual extraction
+The workload records three independent model-process first-query times, actual extraction
 and 768-dimensional embeddings across seven families (including six Office
 formats, PDF, image, code, audio/video containers), and a bounded video preview.
 Office layout limitations are reported. It then measures 24 uncached warm
 queries through the production retrieval adapter against 100,000 synthetic
 segments, with Laya off. Synthetic vectors are performance fixtures, never
 retrieval-quality labels.
+
+When marked as included at the end of this README, the expanded delivery adds
+four stress files: an exactly
+2048-token reader text window, a 1 MP image, twelve seconds of mono audio and
+eight 250K-pixel video frames with eight seconds of aligned PCM. The separate
+`resource-windows.json` records their hashes and verified sizes. These are
+authored engineering inputs, not independent quality labels.
 
 Windows job accounting records peak committed memory for each phase's entire
 process tree, including nested model/parser processes and the test app. This is
@@ -61,11 +68,13 @@ regression, Laya-on resource use, representative throughput/battery/disk growth,
 independent retrieval quality and native distribution obligations remain open.
 No public distribution approval is asserted.
 
-The initial 32 GB rehearsal exceeded the memory budget. After limiting native
-pools before imports (four model threads, one parser thread), the published
-replay's whole-job peaks were 5.68 GiB for all-family validation and 5.28 GiB for
-100K scale; the full FP32 model and all encoders remain loaded. Warm semantic p95
-was 928.34 ms. Its process-cold first query was 20.0023 s and missed the 20 s
-target. That miss remains recorded. Physical minimum hardware, maximum-window
-resources and other release gates remain open. This is a validation bundle,
-not a release candidate or minimum-hardware approval.
+The initial 32 GB rehearsal exceeded memory and recorded a 20.0023 s startup
+miss; those results remain retained. The updated full-window pipeline keeps
+four Torch/OpenMP threads, one preprocessing BLAS thread and one parser thread,
+and returns unused Windows CPU allocator pages between windows. All FP32 model
+parameters and encoders remain loaded. The integrated 21-file replay peaked at
+5.83 GiB for validation and 5.06 GiB for 100K retrieval; warm semantic p95 was
+634.88 ms. Its three process-cold trials were 10.72/10.46/10.05 seconds.
+These are development-machine engineering measurements; the OS file cache was not flushed.
+Physical minimum hardware, broader concurrency and other release gates remain
+open. This is a validation bundle, not release or minimum-hardware approval.

@@ -1,6 +1,7 @@
 """Opt-in CPU FP32 memory profile on authored in-memory inputs; never a quality gate."""
 
 import argparse
+import builtins
 from collections import Counter
 import hashlib
 import json
@@ -19,8 +20,12 @@ def main():
     parser.add_argument('--after-load-gc', action='store_true')
     parser.add_argument('--serial-load', action='store_true')
     parser.add_argument('--lazy-commit', action='store_true')
-    parser.add_argument('--native-threads', type=int, choices=range(1, 33), default=4,
-                        help='Native pools before diagnostic imports (default: 4); model Torch threads stay at 4.')
+    parser.add_argument('--native-threads', type=int, choices=range(1, 33),
+                        help='Override native pools at the first Torch import; default follows the production constructor.')
+    parser.add_argument('--maximum-windows', action='store_true',
+                        help='Use production 2048-token text, 1 MP image, 12 s audio and eight-frame AV window sizes.')
+    parser.add_argument('--blas-threads', type=int, choices=range(1, 33))
+    parser.add_argument('--immediate-purge', action='store_true')
     args = parser.parse_args()
     output = args.output.resolve()
     output.mkdir(parents=True, exist_ok=False)
@@ -36,6 +41,11 @@ def main():
     if args.native_threads:
         for name in ('OMP_NUM_THREADS', 'MKL_NUM_THREADS', 'OPENBLAS_NUM_THREADS'):
             os.environ[name] = str(args.native_threads)
+    if args.blas_threads:
+        os.environ['OPENBLAS_NUM_THREADS'] = str(args.blas_threads)
+    if args.immediate_purge:
+        os.environ['MIMALLOC_PURGE_DELAY'] = '0'
+        os.environ['MIMALLOC_PURGE_DECOMMITS'] = '1'
     import psutil
     process = psutil.Process()
     stage = 'python'
@@ -73,15 +83,37 @@ def main():
                            runtime=str(args.runtime.resolve()), model=str(args.model.resolve()),
                            scriptSha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest()))
     try:
-        mark('import-torch')
+        from semantic_search.embedding import FullEmbedder
+        original_import = builtins.__import__
+        observed = set()
+        def timed_import(name, *values, **options):
+            first = name in ('torch', 'sentence_transformers') and name not in observed
+            if first:
+                observed.add(name)
+                # The production constructor sets its own limits before this
+                # boundary. Apply an explicitly requested diagnostic override
+                # here so the experiment measures the requested native pools.
+                if name == 'torch':
+                    if args.native_threads:
+                        for key in ('OMP_NUM_THREADS', 'MKL_NUM_THREADS', 'OPENBLAS_NUM_THREADS'):
+                            os.environ[key] = str(args.native_threads)
+                    if args.blas_threads:
+                        os.environ['OPENBLAS_NUM_THREADS'] = str(args.blas_threads)
+                mark('import-' + name)
+            result = original_import(name, *values, **options)
+            if first:
+                mark('after-import-' + name)
+            return result
+        mark('verify-and-load-full-fp32-model')
+        builtins.__import__ = timed_import
+        try:
+            embedder = FullEmbedder(args.model, device='cpu', threads=4)
+        finally:
+            builtins.__import__ = original_import
         import torch
-        mark('import-sentence-transformers')
         import sentence_transformers
         from threadpoolctl import threadpool_info
         pools = threadpool_info()
-        mark('load-full-fp32-model')
-        from semantic_search.embedding import FullEmbedder
-        embedder = FullEmbedder(args.model, device='cpu', threads=4)
         weights = Counter()
         storages = {}
         for parameter in embedder.model.parameters():
@@ -99,18 +131,32 @@ def main():
                     if row.path.lower().endswith(('.safetensors', '.bin'))]
         import numpy as np
         from PIL import Image
-        tone = (np.sin(np.arange(48_000, dtype=np.float32) * (2 * np.pi * 440 / 16_000)) * .1).astype(np.float32)
-        frames = np.zeros((3, 64, 64, 3), dtype=np.uint8)
+        tone_samples = 192_000 if args.maximum_windows else 48_000
+        frame_count = 8 if args.maximum_windows else 3
+        frame_side = 500 if args.maximum_windows else 64
+        tone = (np.sin(np.arange(tone_samples, dtype=np.float32) * (2 * np.pi * 440 / 16_000)) * .1).astype(np.float32)
+        frames = np.zeros((frame_count, frame_side, frame_side, 3), dtype=np.uint8)
         frames[:, :, :, 2] = 255
+        text = 'Authored calibration document about a blue square.'
+        if args.maximum_windows:
+            text = ' x' * 2048
+            tokenizer = embedder.model[0].tokenizer
+            while len(tokenizer.encode(text)) > 2048:
+                text = text[:-2]
+            if len(tokenizer.encode(text)) != 2048:
+                raise ValueError('Profile text does not match the production reader token budget.')
+        video_processing = {'video': {'do_sample_frames': False, 'video_metadata': dict(
+            total_num_frames=frame_count, fps=1, duration=frame_count, frames_indices=list(range(frame_count)), video_backend='scout-profile')}}
         trials = [('query', 'authored memory calibration', True),
-                  ('text', 'Authored calibration document about a blue square.', False),
-                  ('image', {'image': Image.new('RGB', (64, 64), 'blue')}, False),
+                  ('text', text, False),
+                  ('image', {'image': Image.new('RGB', (1000, 1000) if args.maximum_windows else (64, 64), 'blue')}, False),
                   ('audio', {'audio': tone}, False), ('video', {'video': frames}, False),
-                  ('joint-av', {'video': frames, 'audio': tone}, False)]
+                  ('joint-av', {'video': frames, 'audio': tone[:frame_count * 16_000]}, False)]
         vectors = []
         for name, content, query in trials:
             mark('embed-' + name)
-            vector, tokens = embedder.embed(content, query=query)
+            vector, tokens = embedder.embed(content, query=query,
+                processing_kwargs=video_processing if isinstance(content, dict) and 'video' in content else None)
             assert vector.shape == (768,) and np.isfinite(vector).all()
             assert abs(float(np.linalg.norm(vector)) - 1) < .001
             vectors.append(dict(input=name, tokens=tokens, vectorSha256=hashlib.sha256(vector.tobytes()).hexdigest()))
@@ -123,6 +169,12 @@ def main():
                                  serialLoad=args.serial_load, uniqueParameterStorageBytes=sum(storages.values()),
                                  lazyCommit=args.lazy_commit,
                                  nativeThreads=args.native_threads, nativePools=pools,
+                                 maximumProductionWindows=args.maximum_windows,
+                                 blasThreads=args.blas_threads, immediatePurge=args.immediate_purge,
+                                 actualAllocatorEnvironment={key:os.environ.get(key) for key in
+                                     ('MIMALLOC_PURGE_DELAY','MIMALLOC_PURGE_DECOMMITS')},
+                                 integritySeconds=embedder.integrity_seconds, modelLoadSeconds=embedder.load_seconds,
+                                 importOrder='Observed from production FullEmbedder constructor; imports are not preloaded',
                                  events=events, vectors=vectors, torch=torch.__version__,
                                  sentenceTransformers=sentence_transformers.__version__,
                                  scope='Single Python process, CPU FP32, authored in-memory inputs; no parser/index, quality or physical-minimum approval',

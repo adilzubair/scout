@@ -59,6 +59,30 @@ Its process-cold first query was 20.0023 s and missed the 20 s target; retain th
 result rather than rounding it into a pass. Physical minimum hardware, broader
 content-window resource cases, cold startup and other release gates remain open.
 
+The subsequent full-window test found a 6.27 GiB combined peak. Serial
+preprocessing BLAS and immediate release of unused Windows CPU allocator pages
+address that measured gap while retaining four Torch threads, full FP32 weights,
+all encoders and unchanged input-window budgets. Six paired full-window outputs
+were byte-identical. The updated 21-file packaged workflow peaks at 5.83 GiB for
+content/preview validation and 5.06 GiB at 100K segments; warm semantic p95 is
+634.88 ms. Its three independent process-cold queries take 10.72/10.46/10.05 s.
+An opt-in, body-free startup observer records lookup, process launch, readiness
+and health timings only for the private validation harness. Physical 16 GB,
+broader concurrent/complex workloads, quality and distribution gates remain open.
+
+Developer validation commands (outputs and generated media stay ignored):
+
+```powershell
+python scripts/build-multimodal-resource-fixtures.py --baseline <baseline-bundle/fixtures> --tokenizer <verified-model/tokenizer.json> --output <new-resource-fixture-folder>
+dotnet run --project tests/Scout.Tests -c Release --no-build -- --hardware-bundle artifacts/Scout <new-bundle-folder> <resource-fixture-folder>
+dotnet run --project tests/Scout.Tests -c Release --no-build -- --multimodal-startup artifacts/Scout <verified-addon> <output-folder>
+```
+
+The resource builder verifies the baseline hashes and pinned tokenizer, exact
+reader token budget and decoded frame/sample counts. Bundle creation verifies
+the additional files against that manifest. The portable workflow runs three
+cold hosts before extraction and scale; it preserves failed target flags as data.
+
 Scout now has an independent setup entry point, authenticated embedding worker,
 Windows process lifetime, and Multimodal settings page. The preview installs and
 tests the full EmbeddingGemma 2 model and indexes explicitly selected folders in

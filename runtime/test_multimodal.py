@@ -24,7 +24,10 @@ class MultimodalContracts(unittest.TestCase):
         names = ('OMP_NUM_THREADS', 'MKL_NUM_THREADS', 'OPENBLAS_NUM_THREADS')
         def import_probe(name, *args, **kwargs):
             if name == 'torch':
-                self.assertEqual([os.environ[key] for key in names], ['3'] * 3)
+                self.assertEqual([os.environ[key] for key in names], ['3', '3', '1'])
+                if os.name == 'nt':
+                    self.assertEqual(os.environ['MIMALLOC_PURGE_DELAY'], '0')
+                    self.assertEqual(os.environ['MIMALLOC_PURGE_DECOMMITS'], '1')
                 raise FirstTorchImport()
             return original_import(name, *args, **kwargs)
         with patch.dict(os.environ, {key: '32' for key in names}), patch('semantic_search.embedding.verify_model', return_value={}), patch('builtins.__import__', side_effect=import_probe):

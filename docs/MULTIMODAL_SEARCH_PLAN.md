@@ -388,6 +388,17 @@ Proceed in this order, committing each verified unit:
    query is 20.0023 s, above the 20 s target. Preserve that miss; investigate cold
    startup and representative maximum-window resource cases before closing these
    gates. The physical 16 GB result and broader Laya/battery/UI work remain open.
+   Full-window testing then exposed a 6.27 GiB combined peak with the earlier
+   policy. The updated policy uses one preprocessing BLAS thread and immediate
+   decommit of unused Windows CPU allocator pages. The actual 21-file delivery
+   replay, including 2048-token text, 1 MP imagery, 12 s audio and 8-frame joint AV,
+   passes at 5.83 GiB (validation) and 5.06 GiB (100K); p95 is 634.88 ms. All six
+   paired full-window embeddings stayed byte-identical. Three independent
+   published-CLR cold-start trials pass, and the integrated portable workflow's
+   trials are 10.72/10.46/10.05 s. Keep historical misses and the prior p95 sample
+   taken with concurrent profiling; do not use that sample as isolated latency
+   evidence. The physical 16 GB, concurrent UI/index/preview, Laya-on, battery,
+   larger source distributions and independent quality/distribution gates remain.
 10. Finish distribution obligations and clean standard-account install/update/removal
    checks, rebuild the package and run packaged WPF checks. Physical 16 GB CPU
    hardware validation is still outstanding; a memory cap on the available 32 GB

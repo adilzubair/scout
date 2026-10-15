@@ -13,7 +13,7 @@ static class MultimodalHardwareChecks
     private static void Check(bool value,string message){if(!value)throw new IOException(message);}
     private static string Hash(string path){using var file=File.OpenRead(path);return Convert.ToHexString(SHA256.HashData(file)).ToLowerInvariant();}
     private static void Write(string path,object value)=>File.WriteAllText(path,JsonSerializer.Serialize(value,Json));
-    public static int Bundle(string package,string destination)
+    public static int Bundle(string package,string destination,string? resourceFixtures=null)
     {
         destination=Path.GetFullPath(destination);
         Check(!Directory.Exists(destination) && !File.Exists(destination+".zip"),"Use a new bundle destination.");
@@ -31,9 +31,29 @@ static class MultimodalHardwareChecks
             using(var canvas=System.Drawing.Graphics.FromImage(image))canvas.Clear(System.Drawing.Color.Blue);
             image.Save(Path.Combine(fixtures,"picture.png"),System.Drawing.Imaging.ImageFormat.Png);
         }
+        if(resourceFixtures!=null)
+        {
+            resourceFixtures=Path.GetFullPath(resourceFixtures);
+            var manifest=MultimodalSetup.OwnedPath(Path.GetDirectoryName(resourceFixtures)!,Path.GetFileName(resourceFixtures)+".manifest.json");
+            Check(new FileInfo(manifest).Length<=262144,"Resource fixture manifest exceeds its budget.");
+            using var resource=JsonDocument.Parse(File.ReadAllText(manifest));var data=resource.RootElement;
+            Check(data.GetProperty("schemaVersion").GetInt32()==1 && data.GetProperty("textReaderTokens").GetInt32()==2048 &&
+                data.GetProperty("imagePixels").GetInt32()==1000000 && data.GetProperty("audioSamples").GetInt32()==192000 &&
+                data.GetProperty("videoFrames").GetInt32()==8 && data.GetProperty("videoFramePixels").GetInt32()==250000 &&
+                data.GetProperty("jointAudioSamples").GetInt32()==128000,"Resource fixture windows differ from the production budgets.");
+            foreach(var file in Directory.GetFiles(fixtures))Check(Hash(file)==data.GetProperty("files").GetProperty(Path.GetFileName(file)).GetProperty("sha256").GetString(),"Resource pack has a different authored baseline.");
+            foreach(var name in new[]{"window-text.txt","window-image.png","window-audio.wav","window-video.mkv"})
+            {
+                var source=MultimodalSetup.OwnedPath(resourceFixtures,name);var expected=data.GetProperty("files").GetProperty(name);
+                Check(new FileInfo(source).Length==expected.GetProperty("bytes").GetInt64() && Hash(source)==expected.GetProperty("sha256").GetString(),"Resource fixture checksum mismatch.");
+                File.Copy(source,Path.Combine(fixtures,name));
+            }
+            File.Copy(manifest,Path.Combine(destination,"resource-windows.json"));
+        }
         File.Copy(Path.GetFullPath("scripts/run-multimodal-hardware.ps1"),Path.Combine(destination,"run.ps1"));
         File.Copy(Path.GetFullPath("scripts/collect-multimodal-hardware.ps1"),Path.Combine(destination,"collect-results.ps1"));
         File.Copy(Path.GetFullPath("docs/MULTIMODAL_HARDWARE_VALIDATION.md"),Path.Combine(destination,"README.md"));
+        File.AppendAllText(Path.Combine(destination,"README.md"),"\nThis exact bundle contains "+Directory.GetFiles(fixtures).Length+" authored files. Full production-window fixtures included: "+(resourceFixtures!=null?"yes":"no")+".\n");
         Write(Path.Combine(destination,"inventory.json"),Directory.GetFiles(destination,"*",SearchOption.AllDirectories)
             .Order(StringComparer.Ordinal).ToDictionary(path=>Path.GetRelativePath(destination,path).Replace('\\','/'),Hash));
         ZipFile.CreateFromDirectory(destination,destination+".zip",CompressionLevel.Optimal,false);
@@ -55,20 +75,23 @@ static class MultimodalHardwareChecks
             if(existingAddon==null)Check(new DriveInfo(Path.GetPathRoot(root)!).AvailableFreeSpace>=12L*1024*1024*1024,"Hardware installation workload requires a 12 GiB disk reserve; not a measured product minimum.");
             Check(Path.Combine(addon,"generations/cpu-"+new string('0',24)+"/venv").Length<=200,"Extract the validation bundle into a shorter local folder before installation.");
             if(existingAddon==null)await Phase("install",addon,fixtures,root,TimeSpan.FromMinutes(35));
+            var coldTrials=new List<object>();
+            for(var i=1;i<=3;i++)coldTrials.Add(await Phase("cold-"+i,addon,"",root,TimeSpan.FromMinutes(3),command:"--startup-child"));
             var validation=await Phase("validate",addon,fixtures,root,TimeSpan.FromMinutes(25));
             var scale=await Phase("scale",addon,fixtures,root,TimeSpan.FromMinutes(20));
             Write(Path.Combine(root,"report.json"),new{schemaVersion=1,engineeringWorkloadPassed=true,
-                installedInThisRun=existingAddon==null,validation,scale,laya="off",device="cpu",releaseReady=false,
+                installedInThisRun=existingAddon==null,coldTrials,validation,scale,laya="off",device="cpu",releaseReady=false,
+                fixtureCount=Directory.GetFiles(fixtures).Length,resourceWindowsIncluded=File.Exists(Path.Combine(Path.GetDirectoryName(fixtures)!,"resource-windows.json")),
                 physicalMinimumGate="requires physical-PC confirmation and review of raw measurements; not inferred from RAM size",
                 remaining="ordinary WPF search regression, Laya on, representative throughput/battery/disk growth, quality and distribution gates"});
             Console.WriteLine("PASS hardware engineering workload; review measurements: "+root);return 0;
         }
         catch(Exception error){File.WriteAllText(Path.Combine(root,"failure.txt"),error.ToString());Console.Error.WriteLine(error);return 1;}
     }
-    private static async Task<object> Phase(string phase,string addon,string fixtures,string root,TimeSpan timeout)
+    internal static async Task<object> Phase(string phase,string addon,string fixtures,string root,TimeSpan timeout,string? executable=null,string command="--hardware-child")
     {
-        var start=new ProcessStartInfo(Environment.ProcessPath!){UseShellExecute=false,CreateNoWindow=true,WorkingDirectory=AppContext.BaseDirectory,RedirectStandardOutput=true,RedirectStandardError=true};
-        foreach(var arg in new[]{"--hardware-child",phase,addon,fixtures,root})start.ArgumentList.Add(arg);
+        var start=new ProcessStartInfo(executable??Environment.ProcessPath!){UseShellExecute=false,CreateNoWindow=true,WorkingDirectory=executable==null?AppContext.BaseDirectory:Path.GetDirectoryName(executable)!,RedirectStandardOutput=true,RedirectStandardError=true};
+        foreach(var arg in new[]{command,phase,addon,fixtures,root})start.ArgumentList.Add(arg);
         using var child=OwnedProcess.Start(start);
         async Task Pump(StreamReader reader,string suffix)
         {

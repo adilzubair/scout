@@ -59,8 +59,14 @@ class FullEmbedder:
             raise ValueError('Unsupported embedding dimension')
         # NumPy/SciPy/OpenMP initialize their own pools during imports. Setting
         # only torch.set_num_threads later leaves those pools at host defaults.
-        for name in ('OMP_NUM_THREADS', 'MKL_NUM_THREADS', 'OPENBLAS_NUM_THREADS'):
+        for name in ('OMP_NUM_THREADS', 'MKL_NUM_THREADS'):
             os.environ[name] = str(threads)
+        # BLAS here serves NumPy/SciPy preprocessing, not Torch's model matmuls.
+        os.environ['OPENBLAS_NUM_THREADS'] = '1'
+        if os.name == 'nt' and device == 'cpu':
+            # Return unused Windows CPU allocator pages between large windows.
+            os.environ['MIMALLOC_PURGE_DELAY'] = '0'
+            os.environ['MIMALLOC_PURGE_DECOMMITS'] = '1'
         os.environ['HF_HUB_OFFLINE'] = '1'
         os.environ['TRANSFORMERS_OFFLINE'] = '1'
         os.environ['USE_TF'] = '0'

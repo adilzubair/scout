@@ -44,6 +44,9 @@ internal sealed class MultimodalHost : IDisposable
     private readonly System.Threading.Timer idle;
     public MultimodalState State { get; private set; } = MultimodalState.NotInstalled;
     internal bool IsDisposed => disposed;
+    // Optional body-free timing observer for the private validation harness.
+    // Ordinary application instances neither collect nor persist these stages.
+    internal Action<string,double>? StartupObserver { get; init; }
     public string Status { get; private set; } = "Add-on not installed";
     internal int? ProcessId
     {
@@ -159,7 +162,10 @@ internal sealed class MultimodalHost : IDisposable
     }
     private async Task StartAsync(CancellationToken token)
     {
+        var timings=StartupObserver==null?null:Stopwatch.StartNew();
+        TraceStartup(timings,"lookup-start");
         var installed = MultimodalSetup.Find(root) ?? throw new IOException("Add-on is not installed or needs an update.");
+        TraceStartup(timings,"lookup-complete");
         if (options.Device != installed.Device || options.CpuThreads is < 1 or > 32) throw new IOException("Install the add-on for the selected device.");
         var key = installed.Generation + "|" + options.CpuThreads;
         if (configuration == key && process is { HasExited: false } && client != null) return;
@@ -168,6 +174,7 @@ internal sealed class MultimodalHost : IDisposable
         workerSession = MultimodalSession.Create(root);
         var sessionDirectory = workerSession.DirectoryPath;
         var readyFile = Path.Combine(sessionDirectory, "ready.json");
+        TraceStartup(timings,"owned-session");
         var secret = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
         var start = new ProcessStartInfo(installed.Python) { UseShellExecute = false, CreateNoWindow = true, WorkingDirectory = sessionDirectory, RedirectStandardOutput = true, RedirectStandardError = true };
         start.ArgumentList.Add(Path.Combine(AppContext.BaseDirectory, "runtime", "semantic_search", "worker.py"));
@@ -176,13 +183,20 @@ internal sealed class MultimodalHost : IDisposable
         start.Environment["SCOUT_EMBEDDING_MODEL"] = installed.Model;
         start.Environment["SCOUT_EMBEDDING_DEVICE"] = options.Device;
         start.Environment["SCOUT_EMBEDDING_THREADS"] = options.CpuThreads.ToString();
-        foreach(var name in new[]{"OMP_NUM_THREADS","MKL_NUM_THREADS","OPENBLAS_NUM_THREADS"})start.Environment[name]=options.CpuThreads.ToString();
+        foreach(var name in new[]{"OMP_NUM_THREADS","MKL_NUM_THREADS"})start.Environment[name]=options.CpuThreads.ToString();
+        start.Environment["OPENBLAS_NUM_THREADS"]="1";
+        if(options.Device=="cpu")
+        {
+            start.Environment["MIMALLOC_PURGE_DELAY"]="0";
+            start.Environment["MIMALLOC_PURGE_DECOMMITS"]="1";
+        }
         start.Environment["SCOUT_PARENT_PID"] = Environment.ProcessId.ToString();
         start.Environment["HF_HUB_OFFLINE"] = "1"; start.Environment["TRANSFORMERS_OFFLINE"] = "1";
         start.Environment["PYTHONDONTWRITEBYTECODE"] = "1";
         try
         {
             ownedWorker=OwnedProcess.Start(start,token);process=ownedWorker.Process;
+            TraceStartup(timings,"process-started");
             job=ownedWorker.Job;configuration=key;
             // Drain and discard framework output. Extracted content never becomes a log.
             workerOutput=Task.WhenAll(DrainAsync(ownedWorker.Output),DrainAsync(ownedWorker.Error));
@@ -193,6 +207,7 @@ internal sealed class MultimodalHost : IDisposable
                 if (process.HasExited) throw new IOException("Multimodal worker startup failed.");
                 await Task.Delay(100, deadline.Token);
             }
+            TraceStartup(timings,"ready-observed");
             using var ready = await ReadReadyAsync(readyFile,process,deadline.Token);
             var info = ready.RootElement;
             var port = info.GetProperty("port").GetInt32();
@@ -200,6 +215,7 @@ internal sealed class MultimodalHost : IDisposable
             if (info.GetProperty("schemaVersion").GetInt32() != 1 || port is < 1 or > 65535 ||
                 !job.Contains(reportedPid) || info.GetProperty("revision").GetString() != installed.Revision) throw new IOException("Worker readiness identity mismatch.");
             workerPid = reportedPid;
+            TraceStartup(timings,"ready-validated");
             client = new HttpClient(new SocketsHttpHandler { UseProxy = false, AllowAutoRedirect = false })
                 { BaseAddress = new Uri($"http://127.0.0.1:{port}/"), Timeout = TimeSpan.FromMinutes(2), MaxResponseContentBufferSize = 65536 };
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", secret);
@@ -210,6 +226,7 @@ internal sealed class MultimodalHost : IDisposable
                 h.GetProperty("revision").GetString() != installed.Revision || h.GetProperty("device").GetString() != options.Device ||
                 h.GetProperty("dimensions").GetInt32() != 768 || !h.GetProperty("modalities").EnumerateArray().Select(value => value.GetString()).SequenceEqual(new[] { "text", "image", "audio", "video" })) throw new IOException("Incomplete multimodal worker.");
             State = options.Paused ? MultimodalState.Paused : MultimodalState.Ready;
+            TraceStartup(timings,"health-ready");
             lastUsed = DateTime.UtcNow;
             Status = options.Paused ? "Content indexing paused · queries ready" : "Multimodal worker ready";
         }
@@ -218,6 +235,10 @@ internal sealed class MultimodalHost : IDisposable
         catch (Exception error) when (error is JsonException or KeyNotFoundException or ArgumentException or InvalidOperationException or FormatException)
         { Stop(); throw new IOException("Invalid multimodal worker startup response.", error); }
         catch { Stop(); throw; }
+    }
+    private void TraceStartup(Stopwatch? timer,string stage)
+    {
+        if(timer!=null)StartupObserver?.Invoke(stage,timer.Elapsed.TotalMilliseconds);
     }
     private static async Task DrainAsync(StreamReader reader)
     {
