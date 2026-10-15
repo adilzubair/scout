@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -51,6 +52,15 @@ class SetupContracts(unittest.TestCase):
             self.assertEqual(len(calls), 5)
             self.assertTrue(calls[0].kwargs['query'])
             self.assertEqual([set(call.args[0]) for call in calls[1:]], [{'image'}, {'audio'}, {'video'},{'video','audio'}])
+
+    def test_nested_setup_output_reaches_controller_pipes_on_failure(self):
+        code="import os,sys;sys.path.insert(0,"+repr(str(ROOT/'runtime'))+");from semantic_search.setup import run;run([sys.executable,'-c',\"import sys;print('nested-stdout-canary',flush=True);print('nested-stderr-canary',file=sys.stderr,flush=True);sys.exit(7)\"],os.environ)"
+        result=subprocess.run([sys.executable,'-c',code],capture_output=True,text=True,timeout=15,
+            env={**os.environ,'PYTHONDONTWRITEBYTECODE':'1'},creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
+        self.assertNotEqual(result.returncode,0)
+        self.assertIn('nested-stdout-canary',result.stdout)
+        self.assertIn('nested-stderr-canary',result.stderr)
+        self.assertIn('exit status 7',result.stderr)
 
     def test_failed_dependency_setup_preserves_previous_marker_and_retry_generation(self):
         with tempfile.TemporaryDirectory(dir=TEST_ROOT) as directory:

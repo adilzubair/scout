@@ -291,7 +291,7 @@ results as end-to-end release evidence.
 | Area | Verified checkpoint | Remaining work |
 | --- | --- | --- |
 | Runtime | Full-model CPU/CUDA and all-encoder prepared-input probes; pinned artifacts (`c9febee`) | Exact shipped-resource, codec distribution and minimum-hardware validation |
-| Add-on lifecycle | Independent host/settings/setup; atomic process ownership; seeded offline cancellation/retry/removal; real empty-root upstream install, failed-install recovery, private parser/query and full runtime/cache removal | Clean-account setup, new-generation update/rollback, disk-full recovery and obsolete-generation reclamation |
+| Add-on lifecycle | Atomic process ownership; seeded cancellation/retry/removal; real upstream install/removal; published-package offline environment-revision failure/retry/rollback/reactivation with private query/parser and prior-file hash preservation | Changed-dependency/device upgrades, clean-account setup, real volume exhaustion and obsolete-generation reclamation |
 | Durable index | SQLite queue and scheduler; published-library CPU owner-death/resume across 16 files, seven families and 27 segments (`909bb60`) | Broader source distributions, UI/ordinary-search timing and resource/quality gates |
 | Source acquisition | Native identity checks and hashed owned snapshots (`f87fb8b`) | Revalidate source and scope across extraction, embedding, display and launch |
 | Extractor bridge | Receipt/hash/payload validation, source rechecks, resource guards and progress; parser job assigned at creation and live native decoder owner-death/recovery (`909bb60`) | Upgrade/failure scenarios and full resource/quality evaluation |
@@ -331,8 +331,12 @@ Proceed in this order, committing each verified unit:
    launcher now pins the patch interpreter, preserving unpublished retry caches.
    Its actual query and sandboxed parser/embedding checks pass. This current-account
    test does not discharge clean-account installation or minimum hardware gates.
-6. Current slice: new-generation update/rollback, disk-full recovery and obsolete
-   generation reclamation. The separate first-attempt empty-root install/removal
+6. Current slice: obsolete-generation/cache reclamation, changed-dependency/device
+   upgrades and real disk-full recovery. Environment revision 2 now pins the
+   standard venv backend; a real offline upgrade between the archived prior and
+   current published packages passes native-audit rejection, prior-package query,
+   retry, exact-marker rollback and current-generation reactivation. Every prior
+   venv/model file hash is preserved. The separate first-attempt empty-root install/removal
    run now passes with the actual generated cache, all encoder readiness paths,
    CPU query and sandboxed parsing. Preserve a usable prior
    generation and ordinary search; reject links escaping the owned add-on tree.
@@ -515,6 +519,19 @@ runtime/cache removal also passes under a non-admin token, without seeded artifa
 or inherited cache/interpreter overrides. Eight setup and eight notice contracts
 pass. Continue the remaining new-generation/failure and obsolete-generation checks;
 this result does not discharge clean-account, hardware, quality or distribution gates.
+
+The actual environment-revision upgrade now passes with both published packages
+and their bundled CLR. The deliberately rejected private audit policy leaves the
+prior marker intact; the prior package remains query/parser capable. Offline retry
+reuses only the fully verified pinned model, activates a distinct generation, then
+supports exact-marker rollback and current reactivation. Every prior venv/model
+file hash and ordinary/source bytes remain unchanged. Nine setup and seven reuse
+contracts pass, including nested Windows process diagnostics and injected disk-full
+copy/publication failures. Those injected errors are not real-volume exhaustion.
+Explicit Git line endings preserve all four runtime identity files with autocrlf
+on and off. Continue obsolete-generation/cache reclamation and changed-dependency/
+device upgrades; retain the clean-account, physical hardware, quality and native
+distribution gates.
 
 Distribution audit now retains 71 installed package notice inventories, interpreter
 terms and pinned supplemental OCR/tokenizer/model license texts. Eight notice and

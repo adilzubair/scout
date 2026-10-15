@@ -4,6 +4,7 @@ import argparse
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import sys
@@ -30,17 +31,51 @@ def generation_id(device):
 
 def run(command, env):
     subprocess.run([str(value) for value in command], env=env, check=True,
+                   stdin=subprocess.DEVNULL,stdout=sys.stdout,stderr=sys.stderr,
                    creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
 
 
 def copy_model(source, destination):
-    manifest = verify_model(source)
+    manifest = load_manifest()
+    for name in manifest['files']:unlinked(Path(source)/name)
+    verify_model(source,manifest)
     destination.mkdir(parents=True, exist_ok=True)
-    for name in manifest['files']:
+    for name,spec in manifest['files'].items():
         target = destination / name
+        unlinked(target)
         target.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(Path(source) / name, target)
-    verify_model(destination)
+        # Setup's exclusive lock owns this exact temporary name. A killed copy
+        # leaves at most one partial per artifact; retry unlinks it before writing.
+        temporary=target.with_name(target.name+'.scout-copy.partial')
+        unlinked(temporary);temporary.unlink(missing_ok=True)
+        if target.is_file() and target.stat().st_size==spec['bytes'] and sha256(target)==spec['sha256']:continue
+        try:
+            with (Path(source)/name).open('rb') as reader,temporary.open('xb') as writer:
+                shutil.copyfileobj(reader,writer,1024*1024);writer.flush();os.fsync(writer.fileno())
+            if temporary.stat().st_size!=spec['bytes'] or sha256(temporary)!=spec['sha256']:raise ValueError('copied_model_checksum_mismatch')
+            temporary.replace(target)
+        finally:temporary.unlink(missing_ok=True)
+    verify_model(destination,manifest)
+
+
+def unlinked(path):
+    for entry in (path,*path.parents):
+        if entry.is_symlink() or entry.is_junction():raise ValueError('linked_model_reuse_path')
+
+
+def previous_model(base,generation):
+    """Only reuse the selected prior generation, after full pinned verification."""
+    try:
+        marker=base/'installed.json';unlinked(marker)
+        with marker.open('rb') as stream:raw=stream.read(16385)
+        if len(raw)>16384:return None
+        name=json.loads(raw)['generation']
+        if not isinstance(name,str) or not re.fullmatch(r'(cpu|cuda)-[0-9a-f]{24}',name) or name==generation.name:return None
+        source=base/'generations'/name/'model'
+        for entry in load_manifest()['files']:unlinked(source/entry)
+        verify_model(source)
+        return source
+    except (OSError,ValueError,KeyError,TypeError):return None
 
 
 def verify_venv_home(python, interpreter):
@@ -111,9 +146,14 @@ def main():
         if args.existing_model:
             copy_model(args.existing_model, model)
         else:
-            if args.offline:
+            source=previous_model(base,generation)
+            if source is not None:
+                print('Reusing the verified model from the previous generation...',flush=True)
+                copy_model(source,model)
+            elif args.offline:
                 raise ValueError('Offline setup needs a verified local model')
-            run([python, ROOT / 'scripts/fetch-embeddinggemma2.py', '--output', model], env)
+            else:
+                run([python, ROOT / 'scripts/fetch-embeddinggemma2.py', '--output', model], env)
         print('Verifying the offline model and all modality encoders...', flush=True)
         run([python, Path(__file__), '--verify', str(generation), '--device', args.device],
             {**env, 'HF_HUB_OFFLINE': '1', 'TRANSFORMERS_OFFLINE': '1'})

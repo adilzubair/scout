@@ -130,6 +130,49 @@ image, audio, video and joint audiovisual embedding checks pass. Reverification 
 completed generation's dependency environment. A failed new generation leaves
 the prior installation marker in place.
 
+Environment revision 2 pins the standard CPython venv backend in the setup
+manifest. Its hash changes the generation identity, so an existing environment
+created under the earlier identity requires setup rather than an in-place edit.
+When the selected prior generation contains the exact current model artifacts,
+setup verifies all pinned hashes and copies them into the new generation without
+downloading those weights again. Corrupt, missing or linked prior paths are not
+reused. Each copied artifact is flushed, hash-checked and atomically replaced;
+retry keeps completed files and reclaims only its exact abandoned copy temporary.
+Previous model/environment files remain in place for a compatible package rollback.
+Different package manifests remain isolated; a package does not load an incompatible
+generation merely because its root marker survived a failed update.
+
+Nested hidden setup processes explicitly forward stdout/stderr to the controller
+and use closed input. A real nested-process contract verifies both output streams
+and child failure reporting. Seven model-reuse contracts cover corruption, path
+boundaries, completed-copy retry, abandoned partial cleanup, injected disk-full
+failure and preservation of the prior ready marker. These injected write failures
+do not establish behavior on a genuinely exhausted Windows volume.
+
+The published-package environment-revision upgrade passed offline on 2026-10-15.
+It used the archived prior package and current package, each with its own bundled
+CLR, against the retained real upstream-installed add-on. A private test copy's
+native audit was deliberately made to reject its pinned DLLs after model reuse
+and encoder verification. Setup preserved the prior ready marker, and the prior
+package still answered an actual CPU query and parsed/embedded authored content.
+Restoring the exact audit policy allowed offline retry to activate the new
+generation. Running the prior package's setup restored the exact prior marker;
+reactivating the current package selected its completed generation again. Queries
+and private sandboxed parsing passed at each successful phase. Every original
+venv/model file hash matched after the full cycle, as did ordinary database and
+original source bytes. Test copies retain their actual logs and package identities;
+the audit fault is absent from the base payload.
+
+This covers an environment revision with identical pinned dependency/model
+versions. Changed-dependency/device upgrades, clean-account installation, real
+volume exhaustion and obsolete-generation reclamation remain separate checks.
+Runtime model/setup/lock line endings are explicit Git attributes; checks with
+`core.autocrlf` enabled and disabled reproduce the exact tested identity bytes.
+
+```powershell
+dotnet run --project tests/Scout.Tests -c Release --no-build -- --multimodal-upgrade <prior-published-directory> artifacts/Scout <retained-fresh-case> artifacts/diagnostics/multimodal/generation-upgrade
+```
+
 Cancel setup or close Settings to stop the owned setup process tree. Installation
 and removal are immediate actions. Removal first stops Scout's worker, refuses
 unexpected linked paths/running setup, and deletes only the dedicated add-on directory;

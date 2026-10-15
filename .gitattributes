@@ -1,3 +1,8 @@
 # Evaluation freezes bind exact protocol bytes across Windows checkouts.
 evaluation/multimodal/protocol.json text eol=lf
 runtime/notices/*.txt text eol=lf
+# Ready markers bind exact runtime manifest/lock bytes across checkouts.
+# Preserve the existing model manifest's Windows bytes; locks/setup use LF.
+runtime/embeddinggemma2_model.json text eol=crlf
+runtime/multimodal_setup.json text eol=lf
+runtime/semantic_search/requirements.*.lock.txt text eol=lf

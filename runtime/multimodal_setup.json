@@ -1,5 +1,7 @@
 {
   "schemaVersion": 1,
+  "environmentRevision": 2,
+  "venvBackend": "cpython-stdlib",
   "pythonVersion": "3.12.13",
   "uv": {
     "version": "0.11.27",
