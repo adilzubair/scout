@@ -12,6 +12,9 @@ if (args.Length == 3 && args[0] == "--setup-lifecycle-child") return await Multi
 if (args.Length == 5 && args[0] == "--parser-lifecycle") return await LiveParserChecks.Run(args[1],args[2],args[3],args[4]);
 if (args.Length == 5 && args[0] == "--parser-owner") return await LiveParserChecks.Owner(args[1],args[2],args[3],int.Parse(args[4]));
 if (args.Length == 3 && args[0] == "--fresh-setup") return await FreshSetupChecks.Run(args[1],args[2]);
+if (args.Length == 3 && args[0] == "--hardware-bundle") return MultimodalHardwareChecks.Bundle(args[1],args[2]);
+if (args.Length is 3 or 4 && args[0] == "--hardware-run") return await MultimodalHardwareChecks.Run(args[1],args[2],args.Length==4?args[3]:null);
+if (args.Length == 5 && args[0] == "--hardware-child") return await MultimodalHardwareChecks.Child(args[1],args[2],args[3],args[4]);
 if (args.Length == 5 && args[0] == "--multimodal-maintenance") return await MultimodalMaintenanceLifecycleChecks.Run(args[1],args[2],args[3],args[4]);
 if (args.Length == 4 && args[0] == "--maintenance-child") return await MultimodalMaintenanceLifecycleChecks.Child(args[1],args[2],args[3]);
 if (args.Length == 5 && args[0] == "--multimodal-upgrade") return await MultimodalUpgradeChecks.Run(args[1],args[2],args[3],args[4]);

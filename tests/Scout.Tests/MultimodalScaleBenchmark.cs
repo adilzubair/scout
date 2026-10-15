@@ -52,7 +52,7 @@ static class MultimodalScaleBenchmark
         for(var i=0;i<result.Length;i++)result[i]=(float)(cosine*query[i]+scale*result[i]);
         return result;
     }
-    public static async Task<int> Run(string addon,string outputParent)
+    public static async Task<int> Run(string addon,string outputParent,int[]? segmentCounts=null,long freeDiskReserveBytes=12L*1024*1024*1024)
     {
         addon=Path.GetFullPath(addon);Directory.CreateDirectory(outputParent);
         var root=MultimodalSetup.OwnedPath(Path.GetFullPath(outputParent),"scale-"+Guid.NewGuid().ToString("N"));Directory.CreateDirectory(root);
@@ -63,9 +63,9 @@ static class MultimodalScaleBenchmark
         using var active=host.KeepIndexingActive();
         var cold=Stopwatch.StartNew();var seed=await host.QueryAsync(Query,default);cold.Stop();
         var reports=new List<object>();var now=DateTimeOffset.UtcNow;
-        foreach(var count in new[]{25000,100000,500000})
+        foreach(var count in segmentCounts??[25000,100000,500000])
         {
-            if(new DriveInfo(Path.GetPathRoot(root)!).AvailableFreeSpace<12L*1024*1024*1024)throw new IOException("Scale benchmark requires 12 GiB free disk reserve.");
+            if(new DriveInfo(Path.GetPathRoot(root)!).AvailableFreeSpace<freeDiskReserveBytes)throw new IOException("Scale benchmark requires its configured free disk reserve.");
             var work=MultimodalSetup.OwnedPath(root,"segments-"+count);Directory.CreateDirectory(work);
             var selected=MultimodalSetup.OwnedPath(work,"sources");Directory.CreateDirectory(selected);
             Candidate[] candidates=[];var queryTimes=new List<double>();var queryCalls=0;

@@ -368,6 +368,18 @@ Proceed in this order, committing each verified unit:
 9. Extend the completed development-machine 25K/100K/500K baseline with CPU/GPU, ordinary-search regression,
    throughput, memory, battery, disk and lifecycle benchmarks. Validate the physical
    16 GB CPU laptop separately from the available 32 GB development machine.
+   The user confirmed a physical Windows 11 16 GB PC is available and will run
+   validation later. The portable validation bundle described
+   in `MULTIMODAL_HARDWARE_VALIDATION.md` has passed its authored all-family,
+   preview and 100K engineering workload on the 32 GB development machine. Retain the hardware gate until actual
+   results are returned and reviewed. No further availability confirmation is needed.
+   The development baseline's process-cold first query is 17.57 s and 100K
+   semantic p95 is 545.98 ms. Windows whole-job peak commit is 7.37 GiB for
+   all-family validation and 6.54 GiB for scale, including the test app and nested
+   model/parser processes. These conservative totals do not establish the <6 GiB
+   worker/extractor gate. Profile process contributions and reduce memory before
+   declaring the resource budget met. Keep raw measurements and the known failed
+   long-path/disk-reserve rehearsals; an engineering exit code is not release approval.
 10. Finish distribution obligations and clean standard-account install/update/removal
    checks, rebuild the package and run packaged WPF checks. Physical 16 GB CPU
    hardware validation is still outstanding; a memory cap on the available 32 GB

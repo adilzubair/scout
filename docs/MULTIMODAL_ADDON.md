@@ -33,6 +33,21 @@ directly with trusted venv activation, matching content extraction. Ten maintena
 guards, 333 full regression checks, 24 package contracts and the published WPF
 smoke pass. Clean-account, real exhausted-volume and distribution gates remain open.
 
+The user has a physical Windows 11 16 GB PC and will run validation later. The
+portable procedure is in [hardware validation](MULTIMODAL_HARDWARE_VALIDATION.md).
+Keep the minimum-hardware gate open until those results are reviewed; development
+machine timings do not establish it.
+
+The portable workload completed a fresh CPU install, seventeen authored files
+across seven families, video preview and a 100K-segment performance run here.
+On this 32 GB machine, process-cold first query was 17.57 s and warm semantic p95
+was 545.98 ms. Whole-job peak committed memory was 7.37 GiB for all-family
+validation and 6.54 GiB for scale, including the test harness and all nested
+processes. This does not establish the planned <6 GiB worker/extractor budget.
+Memory profiling/reduction and the physical 16 GB run remain open. The runner
+records hardware and raw measurements and exports only diagnostic text/JSON,
+excluding weights, private runtimes, download caches and generated indexes.
+
 Scout now has an independent setup entry point, authenticated embedding worker,
 Windows process lifetime, and Multimodal settings page. The preview installs and
 tests the full EmbeddingGemma 2 model and indexes explicitly selected folders in
