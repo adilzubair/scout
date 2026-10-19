@@ -161,3 +161,13 @@ and preservation contracts in a disposable repository.
 The retired hard-coded prompt experiment and failed portable LibreOffice
 download spike have been removed. Their history remains in Git; the documented
 MSI renderer experiment remains available for reproducing its research results.
+
+For a separate preview of retired research storage, run
+`pwsh -File scripts/clean.ps1 -RetiredResearch`; add `-Apply` to delete it.
+This removes the obsolete Qwen 1.7B weights, downloaded LibreOffice renderer,
+and diagnostic database copies, generated search-index binaries and ZIP archives.
+Directories named for fixtures, diagnostic reports, current release packages,
+current build output and active AI models/environments are retained. Old database
+snapshots cannot be replayed after removal, and archived inputs require rebuilding
+or downloading again. The documented LibreOffice research setup can reinstall
+that optional renderer.

@@ -25,6 +25,13 @@ try {
     & git -C $testRoot init -q
     if ($LASTEXITCODE -ne 0) { throw 'Test repository initialization failed.' }
     $obsolete = @('artifacts/Scout-UI-v2/Scout.exe', 'src/Scout.App/obj/cache', 'tests/Scout.Benchmark/obj/cache', 'runtime/__pycache__/old.pyc')
+    $research = @(
+        '.runtime/models/semantic-qwen3-1.7b/weights.safetensors',
+        '.runtime/semantic-search/office/retired.msi',
+        'artifacts/diagnostics/old/scout.db', 'artifacts/diagnostics/old/scout.db-wal',
+        'artifacts/diagnostics/old/scout.db.search/index-old.bin',
+        'artifacts/diagnostics/old/package.zip'
+    )
     $retained = @(
         'artifacts/Scout/Scout.exe', 'artifacts/Scout-win-x64.zip', 'artifacts/Scout-Setup.exe',
         'artifacts/Scout-multimodal-preview-e2e-fixed/Scout.exe',
@@ -33,16 +40,43 @@ try {
         'artifacts/diagnostics/multimodal/office-fixtures-v2/fixtures.json',
         'artifacts/diagnostics/multimodal/app-e2e-current/report.json',
         'artifacts/evaluation/frozen.json', '.runtime/models/weights.bin',
-        '.runtime/semantic-search/.venv/Scripts/python.exe', 'website/dist/index.html'
+        '.runtime/semantic-search/.venv/Scripts/python.exe',
+        '.runtime/semantic-search/cpu-venv/Scripts/python.exe',
+        '.runtime/semantic-search/model/model.safetensors', '.runtime/.venv/Scripts/python.exe',
+        'artifacts/diagnostics/multimodal/format-fixtures-v1/bundle.zip',
+        'artifacts/diagnostics/ui/coverage-fixtures/semantic.db',
+        'artifacts/diagnostics/old/report.json', 'artifacts/diagnostics/old/other.bin',
+        'artifacts/current-profile/scout.db', 'website/dist/index.html'
     )
-    foreach ($name in ($obsolete + $retained)) { Write-Fixture $name }
+    foreach ($name in ($obsolete + $research + $retained)) { Write-Fixture $name }
     [IO.File]::WriteAllText((Join-Path $testRoot 'src/Scout.App/obj/.git'), '')
+    # A source checkout nested in diagnostics is not disposable research output.
+    Write-Fixture 'artifacts/diagnostics/checkout/.git'
+    Write-Fixture 'artifacts/diagnostics/checkout/archive.zip'
     & $clean | Out-Null
     foreach ($name in $obsolete) { Assert (Test-Path -LiteralPath (Join-Path $testRoot $name)) "Preview removed $name" }
     & $clean -Apply -WhatIf | Out-Null
     foreach ($name in $obsolete) { Assert (Test-Path -LiteralPath (Join-Path $testRoot $name)) "WhatIf removed $name" }
     & $clean -Apply -Confirm:$false | Out-Null
     foreach ($name in $obsolete) { Assert (-not (Test-Path -LiteralPath (Join-Path $testRoot $name))) "Cleanup missed $name" }
+    foreach ($name in $research) { Assert (Test-Path -LiteralPath (Join-Path $testRoot $name)) "Default cleanup removed research data: $name" }
+
+    & $clean -RetiredResearch | Out-Null
+    foreach ($name in $research) { Assert (Test-Path -LiteralPath (Join-Path $testRoot $name)) "Research preview removed $name" }
+    & $clean -RetiredResearch -Apply -WhatIf | Out-Null
+    foreach ($name in $research) { Assert (Test-Path -LiteralPath (Join-Path $testRoot $name)) "Research WhatIf removed $name" }
+    Write-Fixture 'src/Scout.App/obj/cache'
+    $locked = [IO.File]::Open((Join-Path $testRoot 'artifacts/diagnostics/old/scout.db'), 'Open', 'Read', 'None')
+    try {
+        $caught = $false
+        try { & $clean -RetiredResearch -Apply | Out-Null } catch { $caught = $true }
+        Assert $caught 'Cleanup accepted an open database.'
+        foreach ($name in $research) { Assert (Test-Path -LiteralPath (Join-Path $testRoot $name)) "Locked-file preflight deleted $name" }
+    } finally { $locked.Dispose() }
+    & $clean -RetiredResearch -Apply -Confirm:$false | Out-Null
+    foreach ($name in $research) { Assert (-not (Test-Path -LiteralPath (Join-Path $testRoot $name))) "Research cleanup missed $name" }
+    Assert (Test-Path -LiteralPath (Join-Path $testRoot 'src/Scout.App/obj/cache')) 'Research cleanup removed the current build.'
+    Assert (Test-Path -LiteralPath (Join-Path $testRoot 'artifacts/diagnostics/checkout/archive.zip')) 'Research cleanup entered a nested checkout.'
     foreach ($name in $retained) { Assert ([IO.File]::ReadAllText((Join-Path $testRoot $name)) -eq 'fixture') "Cleanup changed $name" }
 
     Write-Fixture 'artifacts/Scout-UI-v2/Scout.exe'
