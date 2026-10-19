@@ -21,7 +21,8 @@ unmeasured accuracy, performance or minimum hardware targets into passes.
 | Laya CPU limitation | Heavy shortlists reach the two-second fallback. A separate four-thread probe succeeds for one candidate but only one of three eight-candidate trials and none of three 32-candidate trials. Leave AI opt-in and retain local fallback. |
 | Independent quality study | Deferred for this experimental beta by the user. Preserve the 400-task/seven-family protocol, negative/abstention work, corpus rights review and existing thresholds for later completion. |
 | Physical 16 GB PC | Post-release follow-up at the user's direction; minimum hardware support remains provisional. |
-| Packaging | Blocked. Bitdefender reports `CMD:Heur.BZC.ZFV.Boxter.974.9492EC4D` while the unchanged packaging contracts run. Source review has not established vendor clearance. |
+| Packaging | Locally blocked by Bitdefender's `CMD:Heur.BZC.ZFV.Boxter.974.9492EC4D`. The user declined vendor submission. A protected independent Windows CI job is prepared to run the normal build and unchanged contracts; it has not run and does not claim Bitdefender clearance. |
+| Published beta 2 integration | 21 published-beta commits are absent from this branch's history; a trial merge has 14 conflicting files. Reconcile these changes and validate the combined behavior before replacing the published beta. |
 | Installer/portable lifecycle | Still requires a complete normal build and clean standard-account install, first launch, interruption/retry, update and removal checks. Inno Setup 7.1.0 is present; compiler availability is not installation evidence. |
 | Native distribution | Exact PyAV/codec source and notice review remains open. `runtime/semantic_search/distribution.json` retains `distributionApproved: false`; optional private installs and old package passes do not clear it. Model weights/private runtimes stay outside the base package. |
 | Version | Public prereleases beta 1 and beta 2 already exist. Beta 3 builds as product version `0.1.0-beta.3`, file version `0.1.0.3`. Inno 7.1.0 preprocessing verifies project-supplied values, defaults and override propagation without producing an installer. |
@@ -38,10 +39,13 @@ packaging phase. The blocked test and validator retain their original hashes.
 
 ## Remaining steps
 
-1. Resolve the packaging detection through security review. Do not disable
-   protection, add exclusions, rewrite blocked code to evade detection, or run
-   release packaging through a substitute route. The private review packet is
-   `artifacts/diagnostics/release-20261019/antivirus-review.txt`.
+1. Run the normal build and unchanged packaging contracts on a protected
+   independent Windows runner. The user declined vendor reporting; the prepared
+   CI route and comparison with earlier releases are in
+   [the packaging comparison](PACKAGING_RELEASE_COMPARISON.md). Do not disable
+   protection, add exclusions, or alter/reroute blocked tests to evade scanning.
+   Keep the local Bitdefender compatibility finding open and distinguish it from
+   independent build/scan evidence.
 2. From the reviewed committed source, run the normal
    `./scripts/build.ps1 -Publish -Installer`. Require native/package checks,
    source-to-payload and ZIP inventory checks, installer compilation and final
@@ -50,7 +54,9 @@ packaging phase. The blocked test and validator retain their original hashes.
    account. Preserve the existing user's install registration, Scout profile and
    model installations. An alternate install directory under the same installer
    AppId is insufficient isolation. Finish applicable distribution obligations.
-4. Recheck remote main, review the complete outgoing branch and the resulting
+4. Integrate the published beta 2 changes, resolving the trial merge's 14
+   conflicts and validating the combined search/index/UI behavior. Recheck
+   remote main, review the complete outgoing branch and the resulting
    diff, and record any CI/reviewer outcome before merging. No remote CI result
    exists for these unpushed commits. Keep the unrelated local interactive-demo
    edits outside this change. Merge and push only the reviewed committed state.

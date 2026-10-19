@@ -21,7 +21,7 @@ try {
         Copy-Item -LiteralPath README.md -Destination (Join-Path $publishDir 'README.md')
         $docsDir = Join-Path $publishDir 'docs'
         New-Item -ItemType Directory -Path $docsDir -Force | Out-Null
-        foreach ($doc in @('VALIDATION', 'THIRD_PARTY', 'PARITY', 'UI', 'SEARCH_EVALUATION', 'SEMANTIC_SEARCH', 'LOCAL_SEMANTIC_HELPER', 'LIGHTWEIGHT_BASELINE', 'OFFLINE_EVALUATION', 'MULTIMODAL_ADDON', 'MULTIMODAL_RUNTIME_SCREEN', 'MULTIMODAL_SEARCH_PLAN', 'MULTIMODAL_QUALITY_EVALUATION', 'BETA_MERGE_READINESS', 'E2E_TESTING_2026_10_19')) {
+        foreach ($doc in @('VALIDATION', 'THIRD_PARTY', 'PARITY', 'UI', 'SEARCH_EVALUATION', 'SEMANTIC_SEARCH', 'LOCAL_SEMANTIC_HELPER', 'LIGHTWEIGHT_BASELINE', 'OFFLINE_EVALUATION', 'MULTIMODAL_ADDON', 'MULTIMODAL_RUNTIME_SCREEN', 'MULTIMODAL_SEARCH_PLAN', 'MULTIMODAL_QUALITY_EVALUATION', 'BETA_MERGE_READINESS', 'E2E_TESTING_2026_10_19', 'PACKAGING_RELEASE_COMPARISON')) {
             Copy-Item -LiteralPath "docs/$doc.md" -Destination (Join-Path $docsDir "$doc.md")
         }
         $scriptsDir = Join-Path $publishDir 'scripts'

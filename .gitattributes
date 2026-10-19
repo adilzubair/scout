@@ -6,3 +6,6 @@ runtime/notices/*.txt text eol=lf
 runtime/embeddinggemma2_model.json text eol=crlf
 runtime/multimodal_setup.json text eol=lf
 runtime/semantic_search/requirements.*.lock.txt text eol=lf
+# CI verifies these unchanged packaging scripts against their reviewed Git bytes.
+scripts/test-package.ps1 text eol=lf
+scripts/verify-package.ps1 text eol=lf

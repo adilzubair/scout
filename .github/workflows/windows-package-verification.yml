@@ -1,0 +1,160 @@
+name: Windows package verification
+
+on:
+  push:
+    branches: [ci/beta-package-verification]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-package-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  package:
+    runs-on: windows-2025
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+      DOTNET_NOLOGO: '1'
+
+    steps:
+      # The hosted image disables Defender and excludes C:/D: by default.
+      # Strengthen the disposable runner before checking out Scout sources.
+      - name: Require active Defender without scan exclusions
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $policy = 'HKLM:\SOFTWARE\Policies\Microsoft\Windows Advanced Threat Protection'
+          if (Test-Path -LiteralPath $policy) {
+            $passive = Get-ItemPropertyValue -LiteralPath $policy -Name ForceDefenderPassiveMode -ErrorAction SilentlyContinue
+            if ($passive -eq 1) { Set-ItemProperty -LiteralPath $policy -Name ForceDefenderPassiveMode -Value 0 }
+          }
+          Start-Service WinDefend
+          Set-MpPreference -DisableRealtimeMonitoring $false -DisableScriptScanning $false -DisableBehaviorMonitoring $false -DisableIOAVProtection $false -DisableArchiveScanning $false -DisableAutoExclusions $true -SubmitSamplesConsent NeverSend
+          foreach ($name in @('ExclusionPath', 'ExclusionProcess', 'ExclusionExtension')) {
+            $values = @((Get-MpPreference).$name | Where-Object { $_ })
+            if ($values.Count) {
+              $removeParameters = @{$name = $values}
+              Remove-MpPreference @removeParameters
+            }
+          }
+          Update-MpSignature
+          for ($attempt = 0; $attempt -lt 20; $attempt++) {
+            $status = Get-MpComputerStatus
+            if ($status.AMServiceEnabled -and $status.AntivirusEnabled -and $status.RealTimeProtectionEnabled -and $status.AMRunningMode -eq 'Normal') { break }
+            Start-Sleep -Seconds 1
+          }
+          $preference = Get-MpPreference
+          if (-not $status.AMServiceEnabled -or -not $status.AntivirusEnabled -or -not $status.RealTimeProtectionEnabled -or $status.AMRunningMode -ne 'Normal') {
+            throw 'Runner protection is not active; packaging will not run.'
+          }
+          if ($preference.DisableScriptScanning -or $preference.DisableArchiveScanning -or $preference.DisableBehaviorMonitoring -or $preference.DisableIOAVProtection) {
+            throw 'Required runner scan protections are disabled.'
+          }
+          $remainingExclusions = @($preference.ExclusionPath; $preference.ExclusionProcess; $preference.ExclusionExtension) | Where-Object { $_ }
+          if ($remainingExclusions) {
+            throw 'Runner scan exclusions remain.'
+          }
+          if ([int]$preference.SubmitSamplesConsent -ne 2) { throw 'Automatic sample submission must remain disabled.' }
+          $status | Select-Object AMServiceEnabled, AntivirusEnabled, RealTimeProtectionEnabled, AMRunningMode, AntivirusSignatureVersion, AntivirusSignatureLastUpdated | ConvertTo-Json | Set-Content (Join-Path $env:RUNNER_TEMP 'scout-defender-before.json')
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+
+      - name: Record unchanged packaging checks and release ancestry
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Path artifacts/ci -Force | Out-Null
+          Copy-Item -LiteralPath (Join-Path $env:RUNNER_TEMP 'scout-defender-before.json') -Destination artifacts/ci/defender-before.json
+          $pins = @{
+            'scripts/test-package.ps1' = 'b1190da2cd7c13804ceaa46711ddb860d0805a5a4bd6d905c7d2a8cfc19ab114'
+            'scripts/verify-package.ps1' = 'db03d65a0cfe9a37f25363e2f604c489e4cc11d2a44d38464f1e0bd290fa743f'
+          }
+          foreach ($file in $pins.Keys) {
+            if ((Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash.ToLowerInvariant() -ne $pins[$file]) {
+              throw "Reviewed packaging source changed: $file"
+            }
+          }
+          & git merge-base --is-ancestor v0.1.0-beta.2 HEAD
+          $baselineIncluded = $LASTEXITCODE -eq 0
+          $global:LASTEXITCODE = 0
+          [ordered]@{commit=$env:GITHUB_SHA;publishedBeta2Included=$baselineIncluded;packagingSourceSha256=$pins;releaseApproved=$false} | ConvertTo-Json -Depth 4 | Set-Content artifacts/ci/source.json
+          'Verification artifacts only. This job does not approve release, resolve local Bitdefender compatibility, or establish clean Windows 11 installation.' | Set-Content artifacts/ci/DEVELOPMENT-ONLY.txt
+          if (-not $baselineIncluded) { Write-Output '::warning::Published beta 2 commits are not integrated; these artifacts must not replace the published beta.' }
+
+      - name: Install the pinned official Inno Setup compiler
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $installer = Join-Path $env:RUNNER_TEMP 'innosetup-7.1.0-x64.exe'
+          Invoke-WebRequest -Uri 'https://github.com/jrsoftware/issrc/releases/download/is-7_1_0/innosetup-7.1.0-x64.exe' -OutFile $installer
+          if ((Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash.ToLowerInvariant() -ne '0362a383ed217d4c4239b5933866dd96d3eb2102737da92f80f6057a4b40df2f') { throw 'Compiler download hash mismatch.' }
+          if ((Get-AuthenticodeSignature -LiteralPath $installer).Status -ne 'Valid') { throw 'Compiler installer signature is not valid.' }
+          $compiler = Join-Path $env:RUNNER_TEMP 'Scout-Inno-7'
+          $arguments = @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/SP-', '/CURRENTUSER', "/DIR=`"$compiler`"")
+          $install = Start-Process -FilePath $installer -ArgumentList $arguments -WindowStyle Hidden -Wait -PassThru
+          if ($install.ExitCode -ne 0 -or -not (Test-Path -LiteralPath (Join-Path $compiler 'ISCC.exe') -PathType Leaf)) { throw 'Compiler installation failed.' }
+          $compiler | Out-File -LiteralPath $env:GITHUB_PATH -Append -Encoding utf8
+
+      - name: Run the normal build, native suite and unchanged packaging checks
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Start-Transcript -Path artifacts/ci/build.log
+          try { & ./scripts/build.ps1 -Publish -Installer }
+          finally { Stop-Transcript }
+
+      - name: Scan and reverify the complete package and installer
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $start = Get-Date
+          $files = @('artifacts/Scout-win-x64.zip', 'artifacts/Scout-Setup.exe')
+          $before = @($files | ForEach-Object { [ordered]@{file=$_;sha256=(Get-FileHash -LiteralPath $_ -Algorithm SHA256).Hash.ToLowerInvariant()} })
+          Start-MpScan -ScanType CustomScan -ScanPath (Join-Path $env:GITHUB_WORKSPACE 'artifacts')
+          $detections = @(Get-MpThreatDetection | Where-Object { $_.InitialDetectionTime -ge $start })
+          $status = Get-MpComputerStatus
+          [ordered]@{started=$start.ToUniversalTime().ToString('o');finished=(Get-Date).ToUniversalTime().ToString('o');antivirusEnabled=$status.AntivirusEnabled;realTimeProtectionEnabled=$status.RealTimeProtectionEnabled;signatureVersion=$status.AntivirusSignatureVersion;newDetections=$detections.Count;files=$before;releaseApproved=$false} | ConvertTo-Json -Depth 5 | Set-Content artifacts/ci/defender-scan.json
+          if ($detections.Count -or -not $status.AntivirusEnabled -or -not $status.RealTimeProtectionEnabled) { throw 'Package scan has detections or protection is inactive.' }
+          foreach ($file in $before) {
+            if ((Get-FileHash -LiteralPath $file.file -Algorithm SHA256).Hash.ToLowerInvariant() -ne $file.sha256) { throw 'Package changed during scan.' }
+          }
+          & ./scripts/verify-package.ps1 -PublishedDirectory artifacts/Scout -Archive artifacts/Scout-win-x64.zip -Inventory artifacts/Scout-win-x64.inventory.json
+          foreach ($file in $files) {
+            $expected = ((Get-Content -LiteralPath ($file + '.sha256') -Raw).Trim() -split '\s+')[0]
+            if ((Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash.ToLowerInvariant() -ne $expected) { throw 'Artifact checksum mismatch.' }
+          }
+
+      - name: Preserve verification diagnostics
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: windows-verification-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/ci/
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Preserve successfully checked development packages
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: development-packages-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            artifacts/Scout-win-x64.zip
+            artifacts/Scout-win-x64.zip.sha256
+            artifacts/Scout-win-x64.inventory.json
+            artifacts/Scout-Setup.exe
+            artifacts/Scout-Setup.exe.sha256
+            artifacts/ci/DEVELOPMENT-ONLY.txt
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
