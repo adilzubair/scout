@@ -216,6 +216,11 @@ static class SemanticServiceChecks
             await metadata.Semantic.ResumeAsync();await Wait(()=>metadata.Semantic.Activity.State=="ready");
             value.Multimodal.Enabled=false;await metadata.ConfigureAsync(value);
             Check(metadata.Semantic.Index!.Progress.Files==0 && metadata.Semantic.Index.Vectors().Length==0 && host.ProcessId==null);
+            // The published metadata index persists its checkpoint independently
+            // of semantic revocation. Finish that owned write before disposing
+            // the service and deleting this authored fixture's entire profile.
+            if(typeof(IndexService).GetField("compaction",System.Reflection.BindingFlags.Instance|System.Reflection.BindingFlags.NonPublic)?.GetValue(metadata) is Task checkpoint)
+                await checkpoint.WaitAsync(TimeSpan.FromSeconds(10));
             passed=true;Console.WriteLine("PASS real all-family background indexing, pause/resume, watched arrival/rename, maintenance and revocation");return 0;
         }
         catch(Exception error){Console.Error.WriteLine(error);return 1;}
