@@ -64,6 +64,21 @@ restored-metadata rewrite test: the snapshot content hash must reject the change
 bytes even when the metadata revision is identical. No production check or
 packaging script was weakened. The original failed log is retained.
 
+The combined integration at `af2cf904c7bae93d5cbe32d8dfca660da72b2503`
+then passed [run 39296885807](https://github.com/adilzubair/scout/actions/runs/39296885807):
+**431 native checks, 24 package contracts**, normal portable/installer build,
+source/ZIP/hash verification and protected Defender scan with **zero new
+detections**. Its source receipt confirms `publishedBeta2Included: true`.
+Settings durable save/restart, slow/failed indexing, validation/cancellation,
+actual native folder selection/cancel and repeated browsing all passed. TesterArmy
+0.21.2 also passed the expanded launcher/workspace/settings control interactions
+(run `4d1ad88d-2297-490f-a507-92d36be98fe3`). Downloaded receipts and packages are
+retained under `artifacts/diagnostics/release-20261019/ci-run-39296885807/`.
+Their checksums match locally:
+
+- ZIP (84,860,013 bytes): `1bab7297505b6adc986170c023f1e8f7a98f1b56a44c629f2504f5c0539929c7`
+- Installer (59,387,582 bytes): `5a6ae24fbcc64ff199f182ea59795fa98bcaa31313d37f8207cc0b6e3c1f4af3`
+
 The job uses the same `scripts/build.ps1 -Publish -Installer`, including the
 unchanged blocked contract script and validator. Their reviewed SHA-256 hashes
 are checked before execution. It pins official GitHub actions by full commit and
@@ -100,8 +115,8 @@ readiness UI and exclusion updates.
 A non-mutating `git merge-tree --write-tree HEAD v0.1.0-beta.2` trial records
 **14 conflicting files**, including indexing/search, settings, previews, the
 test dispatcher and build metadata. Its receipt is retained at
-`artifacts/diagnostics/release-20261019/beta2-merge-trial.txt`. The working index
-was used to prepare an isolated integration worktree. Its conflicts have now
+`artifacts/diagnostics/release-20261019/beta2-merge-trial.txt`. The trial informed
+an isolated integration worktree. Its conflicts have now
 been resolved, preserving beta 3's multimodal settings, durable save handling,
 PDF recovery and stricter package verification alongside beta 2's features.
 The combined source builds without warnings/errors and passes **431/431 native
@@ -109,11 +124,12 @@ checks**, including hard extension/size/time filters for semantic eligibility
 and rejection of semantic fusion for explicit grep/regex or invalid queries.
 Updated real-WPF settings/control checks cover the unified folder list, content
 opt-in, duplicate/add/remove handling and invalid-drive save ordering. The
-protected workflow will rerun packaging and these UI checks on the combined
-commit; these integration CI results are pending. Unrelated interactive-demo
+protected workflow passed packaging and these UI checks on the combined
+commit in run 39296885807. Unrelated interactive-demo
 edits remain outside the integration.
 
 Independent packaging verification has succeeded without waiting for a vendor
-report. The combined candidate still needs its CI/UI result and final installer
-lifecycle evidence before release approval; local Bitdefender compatibility and
+report. The combined candidate has passing engineering/package/UI evidence.
+Final installer lifecycle evidence remains required before release approval;
+local Bitdefender compatibility and
 optional native add-on distribution review remain explicit open items.

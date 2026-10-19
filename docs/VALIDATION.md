@@ -3,9 +3,10 @@
 Current experimental beta candidate: **0.1.0-beta.3**. The 2026-10-19 follow-up
 passes 431 native checks on the combined beta 2 integration. Earlier PDF
 contention/navigation recovery and background indexing/search/Laya isolation
-checks remain recorded below. Protected Windows CI passes 356 native checks,
+checks remain recorded below. Protected Windows CI passes 431 native checks,
 24 unchanged packaging contracts, installer compilation and a Defender scan
-with zero new detections at `7a84fbd`; combined integration CI/UI is pending.
+with zero new detections on the combined integration at `af2cf90` (run 39296885807).
+Combined settings/restart/native-picker and TesterArmy control CI also pass.
 The local Bitdefender compatibility finding, final installer lifecycle and
 optional native add-on distribution review remain open. The user
 deferred the independent 400-task quality study for this beta and physical

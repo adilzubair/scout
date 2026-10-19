@@ -1,3 +1,29 @@
+# Scout 0.1.0 beta 3 — experimental candidate, unreleased
+
+This candidate preserves beta 2's saved index, folder/type filters and explicit
+content queries while adding an optional local multimodal content index. The
+add-on searches selected documents, presentations, spreadsheets, code, images,
+audio and video, with matched evidence in previews. It is off by default and
+uses a separate private runtime/model download. Laya remains independent.
+
+Settings save durably before indexing finishes; folder-picker activation and
+failed PDF navigation/retry are fixed. Packaging now checks source membership,
+private-payload exclusions, ZIP inventory and hashes before producing artifacts.
+
+The combined source passes 431 native checks locally and in protected Windows
+CI at `af2cf90` (run 39296885807), alongside 24 unchanged package contracts,
+installer compilation and a Defender scan with zero new detections. Combined
+settings/restart/native-picker and TesterArmy control checks pass. The earlier local Bitdefender PowerShell finding remains
+open; this independent CI result does not clear that vendor finding.
+
+This is an experimental beta. The independent 400-task quality study is deferred
+at the user's direction, and physical 16 GB measurements are scheduled after
+release. Laya CPU requests can reach their two-second fallback. Final clean
+Windows 11 installer lifecycle and optional native add-on source/notice review
+remain open. See [beta readiness](BETA_MERGE_READINESS.md) for current gates and
+[third-party review](THIRD_PARTY.md) before redistributing native add-on files.
+No beta 3 release has been published.
+
 # Scout 0.1.0 beta 2 — 2026-10-09
 
 This beta adds a compact saved search index, folder/type filters, opt-in file-content

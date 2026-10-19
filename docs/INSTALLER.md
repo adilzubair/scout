@@ -12,6 +12,22 @@ uninstaller under HKCU, and launches Scout at the end. Uninstall retains
 `%LOCALAPPDATA%\Scout` user settings and workspaces. The installer is unsigned;
 there is no automatic updater.
 
+## Validation for the experimental 0.1.0 beta 3 candidate
+
+Protected Windows Server CI run
+[39296885807](https://github.com/adilzubair/scout/actions/runs/39296885807) at
+`af2cf90` passed the normal build with Inno Setup 7.1.0, 431 native checks,
+24 unchanged packaging contracts, ZIP/source/checksum verification and an active
+Defender scan with zero new detections. Product/file versions are
+`0.1.0-beta.3` / `0.1.0.3`. Published beta 2 is integrated, and the combined
+candidate's settings/restart/native-picker and TesterArmy control checks pass.
+
+Compiler/package/scan success does not establish a clean standard-account
+Windows 11 install, first launch, interrupted setup, upgrade or removal. Those
+lifecycle checks remain open. The local Bitdefender PowerShell finding remains
+recorded separately. No antivirus settings on the user's PC were changed, and
+no vendor report was submitted.
+
 ## Validation for 0.1.0 beta 2
 
 On 2026-10-09, the release build passed 295/295 C# checks, 13 Python adapter
