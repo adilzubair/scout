@@ -1,3 +1,7 @@
+using System.Buffers.Binary;
+using System.ComponentModel;
+using System.Runtime.InteropServices;
+using Microsoft.Win32.SafeHandles;
 using Scout.App;
 using Scout.Core;
 
@@ -21,9 +25,22 @@ static class SemanticSourceChecks
         }));
         test("Native semantic source change time detects a rewrite with preserved size and write time", () => With(f =>
         {
+            // Back-to-back filesystem operations can share a native clock tick.
+            // Seed an older change time so this checks inclusion of that field,
+            // independently of the host clock's resolution or test speed.
+            ChangeTime(f.Path, DateTime.UtcNow.AddMinutes(-2).ToFileTimeUtc());
             var original = f.Read()!; var write = File.GetLastWriteTimeUtc(f.Path);
+            Check(f.Read() == original, "unchanged source revision was unstable");
             File.WriteAllText(f.Path, "other"); File.SetLastWriteTimeUtc(f.Path, write);
             Check(f.Read()!.Revision != original.Revision, "rewrite reused source revision");
+        }));
+        test("Snapshot hashing rejects rewritten bytes even with restored native revision metadata", () => With(f =>
+        {
+            using var snapshot = SemanticSourceReader.SnapshotAsync(f.Read()!, f.Scope, f.Work, default).GetAwaiter().GetResult();
+            var write = File.GetLastWriteTimeUtc(f.Path); var change = ChangeTime(f.Path);
+            File.WriteAllText(f.Path, "other"); File.SetLastWriteTimeUtc(f.Path, write); ChangeTime(f.Path, change);
+            Check(f.Read() == snapshot.Source, "fixture did not restore the native revision metadata");
+            Check(!snapshot.IsCurrentAsync(f.Scope, default).GetAwaiter().GetResult(), "changed source bytes passed snapshot validation");
         }));
         test("Native semantic sources reject excluded, hidden and alternate stream paths", () => With(f =>
         {
@@ -74,6 +91,25 @@ static class SemanticSourceChecks
     private static void Check(bool condition, string message = "Source assertion failed") { if (!condition) throw new Exception(message); }
     private static void Throws<T>(Action action) where T : Exception { try { action(); } catch (T) { return; } throw new Exception("Expected " + typeof(T).Name); }
     private static void With(Action<Fixture> action) { using var fixture = new Fixture(); action(fixture); }
+    private static long ChangeTime(string path, long? value = null)
+    {
+        using var handle = File.OpenHandle(path, FileMode.Open, value == null ? FileAccess.Read : FileAccess.ReadWrite, FileShare.ReadWrite | FileShare.Delete);
+        var basic = new byte[40]; // FILE_BASIC_INFO: four FILETIMEs and attributes.
+        if (!GetFileInformationByHandleEx(handle, 0, basic, (uint)basic.Length)) throw new Win32Exception(Marshal.GetLastWin32Error());
+        var previous = BinaryPrimitives.ReadInt64LittleEndian(basic.AsSpan(24));
+        if (value is { } next)
+        {
+            BinaryPrimitives.WriteInt64LittleEndian(basic.AsSpan(24), next);
+            if (!SetFileInformationByHandle(handle, 0, basic, (uint)basic.Length)) throw new Win32Exception(Marshal.GetLastWin32Error());
+        }
+        return previous;
+    }
+    [DllImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetFileInformationByHandleEx(SafeFileHandle handle, int kind, [Out] byte[] buffer, uint size);
+    [DllImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool SetFileInformationByHandle(SafeFileHandle handle, int kind, byte[] buffer, uint size);
     private sealed class Fixture : IDisposable
     {
         private static readonly string TestRoot = System.IO.Path.GetFullPath("artifacts/diagnostics/multimodal/source-checks");
