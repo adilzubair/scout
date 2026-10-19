@@ -188,7 +188,15 @@ public partial class MainWindow
                 var dialog=new SettingsWindow(options,_=>true,()=>cleared=true,pickFolder:_=>{selected++;return fixture;}){Owner=this};
                 try
                 {
-                    dialog.Show();Click(Find(dialog,page));dialog.UpdateLayout();Inventory(dialog,page);
+                    dialog.Show();Click(Find(dialog,page));dialog.UpdateLayout();
+                    CheckBox? wholeDisk=null;
+                    if(page=="Folders")
+                    {
+                        foreach(var advanced in UiDiagnostics.Descendants<Expander>(dialog).ToArray())advanced.IsExpanded=true;
+                        wholeDisk=UiDiagnostics.Descendants<CheckBox>(dialog).Single(box=>Label(box)=="Index file names on selected drives");wholeDisk.IsChecked=true;
+                        dialog.UpdateLayout();
+                    }
+                    Inventory(dialog,page);
                     foreach(var box in UiDiagnostics.Descendants<CheckBox>(dialog).ToArray())
                     {
                         var before=box.IsChecked;var provider=(IToggleProvider)new CheckBoxAutomationPeer(box).GetPattern(PatternInterface.Toggle);
@@ -202,10 +210,12 @@ public partial class MainWindow
                     }
                     if(page=="Folders")
                     {
-                        var enabled=UiDiagnostics.Descendants<CheckBox>(dialog).Single(box=>Label(box)=="Search inside files in selected folders");
-                        Require(!Field(dialog,"Content search folders").IsEnabled,"Content folder unexpectedly enabled.");
-                        ((IToggleProvider)new CheckBoxAutomationPeer(enabled).GetPattern(PatternInterface.Toggle)).Toggle();
-                        Require(Field(dialog,"Content search folders").IsEnabled,"Content toggle did not enable folder input.");
+                        wholeDisk!.IsChecked=false;
+                        UiDiagnostics.AddSearchFolder(dialog,fixture,contents:true);UiDiagnostics.AddSearchFolder(dialog,fixture);
+                        var folders=UiDiagnostics.Descendants<FolderSelectionView>(dialog).Single();
+                        Require(folders.Selection.Items.Count(item=>item.Path==fixture)==1 && folders.Selection.ContentFolders.Contains(fixture),"Add/deduplication/content opt-in did not preserve the selected folder.");
+                        Click(UiDiagnostics.Descendants<Button>(folders).Single(button=>AutomationProperties.GetName(button)=="Remove folder "+fixture));
+                        Require(!folders.Selection.Items.Any(item=>item.Path==fixture),"The actual Remove folder handler did not remove its fixture.");
                     }
                     foreach(var browse in UiDiagnostics.Descendants<Button>(dialog).Where(button=>AutomationProperties.GetName(button).StartsWith("Browse for ",StringComparison.Ordinal)).ToArray())
                     {
@@ -222,17 +232,33 @@ public partial class MainWindow
                 }finally{dialog.Close();}
             });
         }
-        foreach(var label in new[]{"Additional folders","Excluded folders","Automation folders","Content search folders"})
+        foreach(var label in new[]{"Folder path","Excluded folders","Automation folders"})
         {
             await Check("settings validation: "+label,()=>
             {
                 Modal<SettingsWindow>(()=>new SettingsWindow(new(){ContentSearchEnabled=true},_=>true,()=>{}){Owner=this}.ShowDialog(),dialog=>
                 {
-                    Click(Find(dialog,"Folders"));Field(dialog,label).Text="relative\\invalid";Click(Find(dialog,"Save settings"));
+                    Click(Find(dialog,"Folders"));dialog.UpdateLayout();
+                    foreach(var advanced in UiDiagnostics.Descendants<Expander>(dialog).ToArray())advanced.IsExpanded=true;
+                    dialog.UpdateLayout();Field(dialog,label).Text="relative\\invalid";Click(Find(dialog,"Save settings"));
                     Require(dialog.IsVisible && Field(dialog,label).IsKeyboardFocusWithin,"Invalid folder did not retain dialog and focus field.");Click(Find(dialog,"Cancel"));
                 });return Task.CompletedTask;
             });
         }
+        await Check("settings validation: Add folder and empty drive selection",()=>
+        {
+            var applied=0;
+            Modal<SettingsWindow>(()=>new SettingsWindow(new(),_=>{applied++;return true;},()=>{}){Owner=this}.ShowDialog(),dialog=>
+            {
+                Click(Find(dialog,"Folders"));dialog.UpdateLayout();var folders=UiDiagnostics.Descendants<FolderSelectionView>(dialog).Single();
+                folders.PathField.Text="relative\\invalid";Click(UiDiagnostics.Descendants<Button>(folders).Single(button=>button.Content as string=="Add"));
+                Require(folders.PathField.IsKeyboardFocusWithin && !folders.Selection.Items.Any(item=>item.Path=="relative\\invalid"),"Invalid Add did not retain focus and reject its path.");
+                folders.PathField.Clear();
+                UiDiagnostics.Descendants<CheckBox>(dialog).Single(box=>Label(box)=="Index file names on selected drives").IsChecked=true;
+                Click(Find(dialog,"Save settings"));
+                Require(dialog.IsVisible && applied==0,"Invalid drive selection changed the active hotkey or closed settings.");Click(Find(dialog,"Cancel"));
+            });return Task.CompletedTask;
+        });
         await Check("settings: all preferences survive Save",()=>
         {
             ScoutSettings? saved=null;

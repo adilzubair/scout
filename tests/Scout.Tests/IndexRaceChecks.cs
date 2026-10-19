@@ -32,6 +32,7 @@ static class IndexRaceChecks
             try { await service.ConfigureAsync(Enabled(selectedRoot)); }
             catch (IOException error) { failure = error; }
 
+            Check(service.Progress.Phase == IndexPhase.Incomplete, "Failed reconciliation was marked ready");
             Check(failure != null, "ConfigureAsync completed successfully after content reconciliation failed");
             Check(service.SearchContent(token, Scope.Files, DateTimeOffset.UtcNow, CancellationToken.None).Length == 0,
                 "Content search became available after content reconciliation failed");
@@ -96,6 +97,9 @@ static class IndexRaceChecks
 
             var oldConfiguration = service.ConfigureAsync(oldSettings);
             await WaitFor(oldExtractionStarted.Task, "old extraction");
+            Check(service.Progress.Phase == IndexPhase.Contents, "Initial scan did not show the content indexing stage");
+            Check(service.Progress.FindFolder(oldRoot) is { Phase: FolderPhase.Ready, Files: 1, ContentsReady: false }, "Filename readiness was not distinct from pending contents");
+            Check(service.SearchContentResponse("grep:\"privacycanary\"", Scope.Files, DateTimeOffset.UtcNow, CancellationToken.None).Notice.Contains("still being indexed"), "Pending content search did not explain readiness");
             var disabledConfiguration = service.ConfigureAsync(disabledSettings);
             var newConfiguration = service.ConfigureAsync(newSettings);
             releaseOldExtraction.TrySetResult();
@@ -111,6 +115,8 @@ static class IndexRaceChecks
             var newId = Candidate.Key(ItemKind.File, newPath);
             Check(service.Roots.SequenceEqual([newRoot], StringComparer.OrdinalIgnoreCase), "The final roots did not match the last configuration");
             Check(!service.Catalog.Contains(oldId) && service.Catalog.Contains(newId), "The final catalog retained the removed folder or omitted the new folder");
+            Check(service.Progress.Phase == IndexPhase.Ready && service.Progress.FindFolder(newRoot) is { Phase: FolderPhase.Ready, Files: 1, Documents: 1, ContentsReady: true }, "Completed content indexing did not publish folder readiness");
+            Check(service.Progress.Documents == 1 && service.Progress.Files == 1, "Global indexing counts did not reflect the final scope");
             Check(store.ContentIndex.Count == 1, "The final content index did not contain exactly the new scope");
             Check(store.ContentIndex.Search([oldToken]).Length == 0, "The removed-folder body ID remained in the content index");
             Check(store.ContentIndex.Search([newToken]).Single().CandidateId == newId, "The new folder body was not indexed");

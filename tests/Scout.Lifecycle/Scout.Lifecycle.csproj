@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><ScoutCoreAssembly Condition="'$(ScoutCoreAssembly)' == ''">$(MSBuildProjectDirectory)/../../src/Scout.Core/bin/Release/net10.0/Scout.Core.dll</ScoutCoreAssembly><ScoutAppAssembly Condition="'$(ScoutAppAssembly)' == ''">$(MSBuildProjectDirectory)/../../src/Scout.App/bin/Release/net10.0-windows10.0.19041.0/Scout.dll</ScoutAppAssembly><OutputType>Exe</OutputType><AssemblyName>Scout.Tests</AssemblyName><TargetFramework>net10.0-windows10.0.19041.0</TargetFramework><UseWPF>true</UseWPF><UseWindowsForms>true</UseWindowsForms></PropertyGroup>
+  <ItemGroup>
+    <Reference Include="Scout.Core"><HintPath>$(ScoutCoreAssembly)</HintPath></Reference>
+    <Reference Include="Scout"><HintPath>$(ScoutAppAssembly)</HintPath></Reference>
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.0" />
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="3.0.5" />
+    <Compile Include="../Scout.Tests/LifecycleAudit.cs" Link="LifecycleAudit.cs" />
+  </ItemGroup>
+</Project>

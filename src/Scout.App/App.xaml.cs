@@ -102,9 +102,11 @@ public partial class App : Application
                             Detail = "Downloads", Source = "Files", AddedAt = now.AddMinutes(-i * 3 - 2),
                             ModifiedAt = now.AddMinutes(-i * 3 - 2)
                         }))
+                    .Append(new Candidate("smoke:folder", ItemKind.Folder, "Projects", Path.Combine(DataDirectory, "Projects")) { Source = "Folder" })
                     .ToArray();
                 store.ReplaceIndex(fixtures);
             }
+            if (diagnose) Environment.SetEnvironmentVariable("SCOUT_INDEX_AUDIT", "1");
             index = new IndexService(store); model = new ModelHost();
             if (!smoke && !diagnose && !bluetooth) _ = model.WarmAsync(store.Settings);
             multimodal = new MultimodalHost();
@@ -121,6 +123,10 @@ public partial class App : Application
             tray.ContextMenuStrip.Items.Add("Settings", null, (_, _) => main.ShowSettings());
             tray.ContextMenuStrip.Items.Add("Quit", null, (_, _) => Shutdown());
             main.Show();
+            var startupClock = Stopwatch.StartNew(); var startupGaps = new List<double>(); double startupTick = 0;
+            var startupHeartbeat = new System.Windows.Threading.DispatcherTimer(System.Windows.Threading.DispatcherPriority.Input) { Interval = TimeSpan.FromMilliseconds(20) };
+            startupHeartbeat.Tick += (_,_) => { var elapsed = startupClock.Elapsed.TotalMilliseconds; startupGaps.Add(elapsed-startupTick); startupTick=elapsed; };
+            if (diagnose) startupHeartbeat.Start();
             var indexReady = !smoke && !bluetooth
                 ? ConfigureIndexAsync(index, store.Settings, diagnose || realworld ? null : main)
                 : index.LoadFixturesAsync();
@@ -129,10 +135,20 @@ public partial class App : Application
                 var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };
                 timer.Tick += async (_, _) =>
                 {
-                    timer.Stop();
-                    try { await indexReady; var report = bluetooth ? await main.DiagnoseBluetoothAsync() : realworld ? await main.DiagnoseRealWorldAsync() : await main.DiagnoseAsync(); File.WriteAllText(Path.Combine(DataDirectory, "desktop-diagnostics.json"), System.Text.Json.JsonSerializer.Serialize(report, new System.Text.Json.JsonSerializerOptions { WriteIndented = true })); }
+                    timer.Stop(); double? initialCrawlMs = null;
+                    try
+                    {
+                        await indexReady; startupHeartbeat.Stop(); initialCrawlMs = startupClock.Elapsed.TotalMilliseconds;
+                        var report = bluetooth ? await main.DiagnoseBluetoothAsync() : realworld ? await main.DiagnoseRealWorldAsync() : await main.DiagnoseAsync();
+                        File.WriteAllText(Path.Combine(DataDirectory, "desktop-diagnostics.json"), System.Text.Json.JsonSerializer.Serialize(report, new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
+                    }
                     catch (Exception error) { File.WriteAllText(Path.Combine(DataDirectory, "desktop-diagnostics.json"), System.Text.Json.JsonSerializer.Serialize(new { passed = false, error = error.ToString() })); Environment.ExitCode = 1; }
-                    finally { Shutdown(); }
+                    finally
+                    {
+                        startupHeartbeat.Stop();
+                        if (diagnose) File.WriteAllText(Path.Combine(DataDirectory,"startup-responsiveness.json"),System.Text.Json.JsonSerializer.Serialize(new { initialCrawlMs, samples=startupGaps.Count, p95UiGapMs=startupGaps.Count==0?0:startupGaps.Order().ElementAt((int)(startupGaps.Count*.95)), worstUiGapMs=startupGaps.DefaultIfEmpty(0).Max() }));
+                        Shutdown();
+                    }
                 }; timer.Start();
             }
             if (smoke)

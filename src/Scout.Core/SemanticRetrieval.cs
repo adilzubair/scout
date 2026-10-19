@@ -47,16 +47,19 @@ public static class SemanticRetrieval
 
 public static class SearchEligibility
 {
-    internal static bool Allows(SearchDocument doc,Scope scope,QueryIntent intent,LibraryItem? memory,DateTimeOffset now,
+    internal static bool Allows(SearchEntry doc,Scope scope,QueryIntent intent,LibraryItem? memory,DateTimeOffset now,
         string[] locations,out DateTimeOffset? opened,out DateTimeOffset? date)
     {
-        var raw=doc.Candidate;
+        var raw=doc;
         opened=memory?.LastLaunch is {} last && (raw.OpenedAt==null || last>raw.OpenedAt)?last:raw.OpenedAt;
         var basis=intent.Recency==RecencyBasis.None && intent.Window!=null?(raw.Kind==ItemKind.Link?RecencyBasis.Visited:RecencyBasis.Modified):intent.Recency;
         date=basis==RecencyBasis.Opened?opened:raw.Date(basis);
         if(!raw.InScope(scope) || intent.Kind!=null && raw.Kind!=intent.Kind && !(intent.Kind==ItemKind.App && raw.Kind==ItemKind.Automation))return false;
         if(intent.Extension!=null && !FileTypes.Matches(doc.Extension,intent.Extension) || intent.Screenshots && !doc.Screenshot)return false;
-        if(intent.Folder is {} folder && (locations.Length==0 || raw.Kind!=ItemKind.File || !locations.Any(path=>folder.DirectOnly?
+        if(intent.ExplicitExtensions.Length>0 && !intent.ExplicitExtensions.Any(extension=>FileTypes.Matches(doc.Extension,extension)))return false;
+        if(intent.MinimumSize is {} min && (raw.SizeBytes==null || raw.SizeBytes<min) || intent.MaximumSize is {} max && (raw.SizeBytes==null || raw.SizeBytes>max))return false;
+        if(intent.ModifiedWindow is {} modified && (raw.ModifiedAt==null || raw.ModifiedAt<modified.Since || raw.ModifiedAt>=modified.Until))return false;
+        if(intent.Folder is {} folder && (locations.Length==0 || raw.Kind!=ItemKind.File && !(intent.SlashFilter=="folder" && raw.Kind==ItemKind.Folder) || !locations.Any(path=>folder.DirectOnly?
             Path.GetDirectoryName(raw.Target)?.Equals(path,StringComparison.OrdinalIgnoreCase)==true:IndexPolicy.Within(raw.Target,path))))return false;
         if(basis!=RecencyBasis.None && (date==null || date>now.AddSeconds(2)))return false;
         if(intent.Window is {} window && (date==null || date<window.Since || date>=window.Until))return false;
@@ -65,16 +68,20 @@ public static class SearchEligibility
     public static Dictionary<string,Candidate> Files(SearchResult local,Scope scope,SearchCatalog catalog,IReadOnlyDictionary<string,LibraryItem> library,DateTimeOffset now,CancellationToken token=default)
     {
         var result=new Dictionary<string,Candidate>();
-        if(local.Intent.Literal || local.Intent.Kind is ItemKind.Folder or ItemKind.App or ItemKind.Link || local.Intent.Terms.Length==0 || scope is not (Scope.All or Scope.Files))return result;
+        if(local.Intent.Literal || local.Intent.ContentPattern!=null || local.Intent.QueryError.Length>0 || local.Intent.Kind is ItemKind.Folder or ItemKind.App or ItemKind.Link || local.Intent.Terms.Length==0 || scope is not (Scope.All or Scope.Files))return result;
         // Screenshot content can be present under an unrelated filename. For semantic
         // retrieval it is a visual concept; extension/folder/time remain hard filters.
         var intent=local.Intent with {Screenshots=false};
+        using var lease=catalog.Acquire();
         var position=0;
         foreach(var doc in catalog.Documents)
         {
             if((position++&127)==0)token.ThrowIfCancellationRequested();
-            if(doc.Candidate.Kind==ItemKind.File && Allows(doc,scope,intent,library.GetValueOrDefault(doc.Candidate.Id),now,local.Locations,out var opened,out _))
-                result[doc.Candidate.Id]=opened==doc.Candidate.OpenedAt?doc.Candidate:doc.Candidate with {OpenedAt=opened,OpenedSource="Scout launch history"};
+            if(doc.Kind==ItemKind.File && Allows(doc,scope,intent,library.GetValueOrDefault(doc.Id),now,local.Locations,out var opened,out _))
+            {
+                var candidate=doc.Candidate;
+                result[doc.Id]=opened==doc.OpenedAt?candidate:candidate with {OpenedAt=opened,OpenedSource="Scout launch history"};
+            }
         }
         return result;
     }
@@ -84,7 +91,7 @@ public static class SemanticFusion
 {
     public static SearchResult Apply(SearchResult local,IReadOnlyList<SemanticContentMatch> matches,int limit=100)
     {
-        if(local.Intent.Literal || matches.Count==0)return local;
+        if(local.Intent.Literal || local.Intent.ContentPattern!=null || local.Intent.QueryError.Length>0 || matches.Count==0)return local;
         var semantic=matches.Select((match,i)=>(match,i)).ToDictionary(x=>x.match.Candidate.Id);
         var lexical=local.Hits.Select((hit,i)=>(hit,i)).ToDictionary(x=>x.hit.Candidate.Id);
         var all=local.Hits.Concat(matches.Where(match=>!lexical.ContainsKey(match.Candidate.Id)).Select(match=>new SearchHit(match.Candidate,0,match.Pinned)))

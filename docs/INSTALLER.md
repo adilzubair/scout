@@ -12,6 +12,27 @@ uninstaller under HKCU, and launches Scout at the end. Uninstall retains
 `%LOCALAPPDATA%\Scout` user settings and workspaces. The installer is unsigned;
 there is no automatic updater.
 
+## Validation for 0.1.0 beta 2
+
+On 2026-10-09, the release build passed 295/295 C# checks, 13 Python adapter
+checks, seven native folder-picker checks and an isolated desktop UI smoke test.
+The HTTP contract checks cover authentication, browser-origin rejection, ranking,
+folder candidates, malformed requests and the typed inference endpoint. On this
+PC, CPU ranking sometimes exceeds its two-second budget and returns complete
+abstention; this is recorded separately from a successful ranking response.
+No production model, prompt or deadline was changed for release validation.
+
+The release uses self-contained Windows x64 binaries and Inno Setup 7, with
+version 0.1.0-beta.2 / file version 0.1.0.2. Package validation checks the archive
+contents, binary version, checksums and an isolated desktop smoke run of the
+published executable. Those diagnostics and private data remain outside the
+package. See [RELEASE_NOTES.md](RELEASE_NOTES.md) for upgrade instructions.
+
+A fresh Windows 11 VM or spare PC was unavailable. Installation, first launch
+and uninstall on a clean machine remain unverified for beta 2; the beta 1
+installation evidence below does not establish beta 2 installer behavior.
+Setup remains unsigned and updates are manual.
+
 ## Validation for 0.1.0 beta 1
 
 On 2026-09-26, the release build passed 182/182 C# checks. A local non-admin
@@ -26,6 +47,5 @@ shortcuts, and uninstall entry while retaining user data. The installer
 signature check reported `NotSigned`.
 
 A separate clean Windows setup was unavailable, and the user waived that test.
-Do not describe this validation as a clean-machine test. Before the next beta,
-run the same install, first launch, hotkey, and uninstall checks in a fresh
-Windows 11 VM or spare PC.
+Do not describe this validation as a clean-machine test. A future clean-machine check should cover installation, first launch, hotkey
+and uninstall in a fresh Windows 11 VM or spare PC.

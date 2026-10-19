@@ -57,37 +57,53 @@ public static class FolderQuery
     }
 }
 
-/// <summary>Folder names are a distinct index; ordinary filename queries never match whole ancestor trees.</summary>
+/// <summary>Folder names are a distinct index; folder hits never imply filename matches for their descendants.</summary>
 public sealed class FolderCatalog
 {
+    public static FolderCatalog FromPaths(IEnumerable<string> paths, IEnumerable<string> roots) => new(paths, roots);
+    private FolderCatalog(IEnumerable<string> paths, IEnumerable<string> roots)
+    {
+        var knownRoots = roots.Select(CanonicalPath).ToArray();
+        foreach (var root in knownRoots) Add(root);
+        preferred = knownRoots.GroupBy(p => Normalize(FolderName(p)), StringComparer.OrdinalIgnoreCase).ToDictionary(g => g.Key, g => g.ToArray(), StringComparer.OrdinalIgnoreCase);
+        foreach (var path in paths) Add(path);
+        exact = entries.Values.GroupBy(e => Normalize(e.Name), StringComparer.OrdinalIgnoreCase).ToDictionary(g => g.Key, g => g.Select(e => e.Path).ToArray(), StringComparer.OrdinalIgnoreCase);
+    }
     private sealed record Entry(string Path, string Name, string[] Words);
     private readonly Dictionary<string, Entry> entries = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, string[]> exact;
     private readonly Dictionary<string, string[]> preferred;
     public FolderCatalog(IEnumerable<Candidate> candidates, IEnumerable<string>? roots = null)
     {
-        var knownRoots = (roots ?? []).Select(p => p.TrimEnd('\\', '/')).ToArray();
+        var knownRoots = (roots ?? []).Select(CanonicalPath).ToArray();
         foreach (var root in knownRoots) Add(root);
-        preferred = knownRoots.GroupBy(p => Normalize(Path.GetFileName(p)), StringComparer.OrdinalIgnoreCase).ToDictionary(g => g.Key, g => g.ToArray(), StringComparer.OrdinalIgnoreCase);
+        preferred = knownRoots.GroupBy(p => Normalize(FolderName(p)), StringComparer.OrdinalIgnoreCase).ToDictionary(g => g.Key, g => g.ToArray(), StringComparer.OrdinalIgnoreCase);
+        foreach (var directory in candidates.Where(c => c.Kind == ItemKind.Folder)) Add(directory.Target);
         foreach (var candidate in candidates.Where(c => c.Kind == ItemKind.File))
             if (Path.GetDirectoryName(candidate.Target) is { Length: > 0 } parent) Add(parent);
         exact = entries.Values.GroupBy(e => Normalize(e.Name), StringComparer.OrdinalIgnoreCase).ToDictionary(g => g.Key, g => g.Select(e => e.Path).ToArray(), StringComparer.OrdinalIgnoreCase);
     }
+    private static string CanonicalPath(string path)
+    {
+        var trimmed = path.TrimEnd('\\', '/'); var root = Path.GetPathRoot(path);
+        return root != null && trimmed.Equals(root.TrimEnd('\\', '/'), StringComparison.OrdinalIgnoreCase) ? root : trimmed;
+    }
+    private static string FolderName(string path) => Path.GetFileName(path) is { Length: > 0 } name ? name : path.TrimEnd('\\', '/');
     private static string Normalize(string value) => string.Join(' ', QueryParser.Tokenize(value));
     public bool IsPreferred(string text) => preferred.ContainsKey(Normalize(text.Trim().Trim('"', '\'')));
     private void Add(string path)
     {
-        path = path.TrimEnd('\\', '/');
+        path = CanonicalPath(path);
         while (Path.IsPathFullyQualified(path) && !entries.ContainsKey(path))
         {
-            var name = Path.GetFileName(path); if (name.Length == 0) break;
+            var name = FolderName(path); if (name.Length == 0) break;
             entries[path] = new(path, name, QueryParser.Tokenize(name));
             var parent = Path.GetDirectoryName(path); if (string.IsNullOrEmpty(parent) || parent == path) break; path = parent;
         }
     }
     public string[] Resolve(string text)
     {
-        text = text.Trim().Trim('"', '\'').Replace('/', '\\').TrimEnd('\\');
+        text = CanonicalPath(text.Trim().Trim('"', '\'').Replace('/', '\\'));
         if (Path.IsPathFullyQualified(text)) return entries.ContainsKey(text) ? [text] : [];
         if (text.Contains('\\')) return entries.Values.Where(e => e.Path.EndsWith("\\" + text, StringComparison.OrdinalIgnoreCase)).Select(e => e.Path).ToArray();
         var name = Normalize(text);

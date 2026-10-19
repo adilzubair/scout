@@ -52,6 +52,35 @@ static class SemanticRetrievalChecks
             var catalog=new SearchCatalog([image]);var local=SearchEngine.Search("screenshot showing payment failure",Scope.Files,catalog,new Dictionary<string,LibraryItem>(),now);
             Check(local.Hits.Count==0 && SearchEligibility.Files(local,Scope.Files,catalog,new Dictionary<string,LibraryItem>(),now).ContainsKey(image.Id));
         });
+        test("Semantic admission preserves slash type, explicit extension, size and modification filters",()=>
+        {
+            var now=DateTimeOffset.UtcNow;var memory=new Dictionary<string,LibraryItem>();
+            var good=File("f01.png",@"C:\Selected",now.AddHours(-1)) with {SizeBytes=2048};
+            var small=File("f02.png",@"C:\Selected",now.AddHours(-1)) with {SizeBytes=16};
+            var old=File("f03.png",@"C:\Selected",now.AddDays(-3)) with {SizeBytes=2048};
+            var other=File("f04.txt",@"C:\Selected",now.AddHours(-1)) with {SizeBytes=2048};
+            var catalog=new SearchCatalog([good,small,old,other]);
+            var local=SearchEngine.Search("/image invoice ext:png size:>=1kb mtime:<1d",Scope.Files,catalog,memory,now);
+            Check(local.Intent.QueryError.Length==0 && SearchEligibility.Files(local,Scope.Files,catalog,memory,now).Keys.SequenceEqual([good.Id]));
+        });
+        test("Explicit literal and regex searches never acquire unverified semantic hits",()=>
+        {
+            var now=DateTimeOffset.UtcNow;var file=File("f01.txt",@"C:\Selected",now);var catalog=new SearchCatalog([file]);var memory=new Dictionary<string,LibraryItem>();
+            foreach(var query in new[]{"invoice grep:\"approved\"","invoice regex:\"approved.*\""})
+            {
+                var local=SearchEngine.Search(query,Scope.Files,catalog,memory,now);
+                Check(local.Intent.ContentPattern!=null && local.Intent.Terms.Length>0 && local.Intent.QueryError.Length==0);
+                Check(SearchEligibility.Files(local,Scope.Files,catalog,memory,now).Count==0);
+                Check(SemanticFusion.Apply(local,[Match(file,.99)]).Hits.Count==0);
+            }
+        });
+        test("Invalid advanced queries cannot acquire semantic results",()=>
+        {
+            var now=DateTimeOffset.UtcNow;var file=File("f01.txt",@"C:\Selected",now);var catalog=new SearchCatalog([file]);var memory=new Dictionary<string,LibraryItem>();
+            var local=SearchEngine.Search("invoice size:invalid",Scope.Files,catalog,memory,now);
+            Check(local.Intent.QueryError.Length>0 && SearchEligibility.Files(local,Scope.Files,catalog,memory,now).Count==0);
+            Check(SemanticFusion.Apply(local,[Match(file,.99)]).Hits.Count==0);
+        });
         test("Opaque audio and video recordings remain semantically eligible",()=>
         {
             var now=DateTimeOffset.UtcNow;var audio=File("f01.wav",@"C:\Selected",now.AddMinutes(-1));var video=File("f02.mp4",@"C:\Selected",now.AddMinutes(-1));var document=File("f03.pdf",@"C:\Selected",now.AddMinutes(-1));

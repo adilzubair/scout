@@ -44,7 +44,7 @@ internal static class SettingsPersistenceDiagnostics
     private static void Check(bool value,string message){if(!value)throw new IOException(message);}
     private static void AssertFolders(ScoutSettings settings,string[] expected)
     {
-        Check(settings.ExtraFolders.SequenceEqual([Folder("extra")]),"Additional folders did not persist.");
+        Check(settings.ExtraFolders.SequenceEqual([Folder("extra"),Folder("content")]),"Unified search folders did not persist.");
         Check(settings.ContentSearchEnabled && settings.ContentFolders.SequenceEqual([Folder("content")]),"Keyword content folders did not persist.");
         Check(settings.Exclusions.SequenceEqual([Folder("excluded")]),"Excluded folders did not persist.");
         Check(settings.AutomationFolders.SequenceEqual([Folder("automation")]),"Automation folders did not persist.");
@@ -84,10 +84,10 @@ internal static class SettingsPersistenceDiagnostics
         if(invalid)
         {
             Button(window,"Folders").RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));window.UpdateLayout();
-            Field(window,"Additional folders").Text="not an existing absolute path";
+            UiDiagnostics.Descendants<FolderSelectionView>(window).Single().PathField.Text="not an existing absolute path";
             Button(window,"Save settings").RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));
             Check(window.IsVisible,"Invalid folder validation closed Settings.");
-            Check(UiDiagnostics.Descendants<TextBlock>(window).Any(text=>text.IsVisible && text.Text.StartsWith("Use existing, full folder paths",StringComparison.Ordinal)),"Invalid folder validation was not visible.");
+            Check(UiDiagnostics.Descendants<TextBlock>(window).Any(text=>text.IsVisible && text.Text.StartsWith("Choose Add to include",StringComparison.Ordinal)),"Unadded folder validation was not visible.");
         }
         multimodal.Text=Folder("discarded-draft");
         Button(window,"Cancel").RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));
@@ -128,9 +128,10 @@ internal static class SettingsPersistenceDiagnostics
             var apply=Dialog(main,window=>
             {
                 Button(window,"Folders").RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));window.UpdateLayout();
-                Field(window,"Additional folders").Text=Folder("extra");Field(window,"Content search folders").Text=Folder("content");
+                UiDiagnostics.AddSearchFolder(window,Folder("extra"));UiDiagnostics.AddSearchFolder(window,Folder("content"),contents:true);
+                foreach(var advanced in UiDiagnostics.Descendants<Expander>(window).ToArray())advanced.IsExpanded=true;
+                window.UpdateLayout();
                 Field(window,"Excluded folders").Text=Folder("excluded");Field(window,"Automation folders").Text=Folder("automation");
-                UiDiagnostics.Descendants<CheckBox>(window).Single(box=>AutomationProperties.GetName(box)=="Search inside files in selected folders").IsChecked=true;
                 Button(window,"Multimodal").RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));window.UpdateLayout();
                 Field(window,"Multimodal content folders").Text=string.Join(Environment.NewLine,original);
                 Button(window,"Save settings").RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));

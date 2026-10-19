@@ -18,21 +18,25 @@ public sealed class ContentIndexer
         this.clear = clear ?? (token => Task.Run(index.Clear, token));
     }
 
-    public async Task SynchronizeAsync(IEnumerable<Candidate> candidates, IEnumerable<string> selectedFolders, IEnumerable<string> roots, IEnumerable<string> exclusions, CancellationToken token)
+    public async Task SynchronizeAsync(IEnumerable<Candidate> candidates, IEnumerable<string> selectedFolders, IEnumerable<string> roots, IEnumerable<string> exclusions, CancellationToken token, Action<int>? progress = null)
     {
         var activeRoots = roots.Select(Normalize).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
         var selected = selectedFolders.Select(Normalize).Where(folder => activeRoots.Any(root => IndexPolicy.Within(folder, root) || IndexPolicy.Within(root, folder))).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
         var excluded = exclusions.ToArray();
         var eligible = new HashSet<string>(StringComparer.Ordinal);
+        var processed = 0; var nextReport = DateTime.UtcNow;
         foreach (var candidate in candidates)
         {
             token.ThrowIfCancellationRequested();
             if (candidate.Kind != ItemKind.File || !InScope(candidate.Target, selected, activeRoots, excluded)) continue;
             eligible.Add(candidate.Id);
             await UpdateAsync(candidate, selected, activeRoots, excluded, token).ConfigureAwait(false);
+            processed++;
+            if (DateTime.UtcNow >= nextReport) { progress?.Invoke(processed); nextReport = DateTime.UtcNow.AddMilliseconds(250); }
         }
         token.ThrowIfCancellationRequested();
         index.RemoveExcept(eligible);
+        progress?.Invoke(processed);
     }
 
     public async Task UpdateAsync(Candidate candidate, IEnumerable<string> selectedFolders, IEnumerable<string> roots, IEnumerable<string> exclusions, CancellationToken token)
@@ -40,7 +44,8 @@ public sealed class ContentIndexer
         var selected = selectedFolders.Select(Normalize).ToArray();
         var activeRoots = roots.Select(Normalize).ToArray();
         var excluded = exclusions.ToArray();
-        if (candidate.Kind != ItemKind.File || !InScope(candidate.Target, selected, activeRoots, excluded))
+        if (candidate.Kind != ItemKind.File) return;
+        if (!InScope(candidate.Target, selected, activeRoots, excluded))
         {
             index.Remove([candidate.Id]);
             return;

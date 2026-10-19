@@ -14,6 +14,32 @@ static class ContentSearchChecks
             Check(store.ContentIndex.Count == 0);
         }));
 
+        test("Content readiness counts supported documents and overlapping Unicode scopes", () => WithFixture(fixture =>
+        {
+            var first = FileCandidate(fixture.Write("selected/東京/note.txt", "counted body"));
+            var empty = FileCandidate(fixture.Write("selected/empty.txt", ""));
+            var unsupported = FileCandidate(fixture.Write("selected/image.png", "not a supported text format"));
+            var parent = Path.Combine(fixture.Root, "selected"); var child = Path.Combine(parent, "東京");
+            var store = new ScoutStore(fixture.DatabasePath); var processed = 0;
+            new ContentIndexer(store.ContentIndex).SynchronizeAsync([first, empty, unsupported], [parent], [fixture.Root], [], CancellationToken.None, count => processed = count).GetAwaiter().GetResult();
+            var counts = store.ContentIndex.CountsByFolder([parent, child, parent.ToUpperInvariant()]);
+            Check(counts.Count == 2 && counts[parent] == 1 && counts[child] == 1 && processed == 3);
+            store.ContentIndex.Clear();
+            Check(store.ContentIndex.CountsByFolder([parent, child]).Values.All(n => n == 0));
+        }));
+
+        test("Mixed directory metadata does not interrupt content synchronization or stale cleanup", () => WithFixture(fixture =>
+        {
+            var stale = FileCandidate(fixture.Write("selected/stale.txt", "oldbodytoken"));
+            var fresh = FileCandidate(fixture.Write("selected/fresh.txt", "newbodytoken"));
+            var folder = new Candidate("folder", ItemKind.Folder, "selected", Path.GetDirectoryName(fresh.Target)!);
+            var store = new ScoutStore(fixture.DatabasePath); var indexer = new ContentIndexer(store.ContentIndex);
+            indexer.SynchronizeAsync([stale], [fixture.Root], [fixture.Root], [], CancellationToken.None).GetAwaiter().GetResult();
+            var processed = 0;
+            indexer.SynchronizeAsync([folder, fresh], [fixture.Root], [fixture.Root], [], CancellationToken.None, count => processed = count).GetAwaiter().GetResult();
+            Check(processed == 1 && store.ContentIndex.Search(["oldbodytoken"]).Length == 0 && store.ContentIndex.Search(["newbodytoken"]).Single().CandidateId == fresh.Id);
+        }));
+
         test("Body words retrieve files with unrelated titles as local-only evidence", () => WithFixture(fixture =>
         {
             var path = fixture.Write("selected/notes.txt", "quartzsignal appears only inside this document");

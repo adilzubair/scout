@@ -1,6 +1,6 @@
 # Packaging comparison with the published betas
 
-Date: 2026-10-19. No security report or source has been submitted externally.
+Date: 2026-10-19. No security-vendor report or sample has been submitted.
 The user declined vendor submission and asked for another verification path.
 
 ## What changed
@@ -22,7 +22,7 @@ script through the phase wrapper. It did not introduce the packaging contracts.
 | Packaging contracts now blocked locally | Not present | Added on 15 October; 24 contracts cover valid packages and rejection paths |
 | ZIP creation | `Compress-Archive` | Canonical forward-slash names, source/inventory/hash verification |
 | Private payload protection | Earlier packaging process | Explicit rejection of models, private runtimes, indexes and unexpected runtime files |
-| Native coverage | 295 reported checks | 355 passing checks in the latest clean-source run |
+| Native coverage | 295 reported checks | 356 passing checks on protected CI; 431 passing checks in the combined beta 2 integration |
 | Installer | Per-user, unsigned, Inno Setup 7 | Same basic installer technology; beta 3 metadata prepared |
 | Independent clean Windows install | Still open in beta 2's own INSTALLER.md | Still open for the new candidate |
 
@@ -39,10 +39,30 @@ accounts for its later rejection.
 ## Independent verification path
 
 [Windows package verification](../.github/workflows/windows-package-verification.yml)
-is prepared for a dedicated `ci/beta-package-verification` branch in the existing
-private repository, and for pull requests to main. It has not been pushed or run.
-Running it requires permission to push that verification branch and use the
-repository's hosted Windows runner minutes. It does not publish a GitHub release.
+runs on the authorized `ci/beta-package-verification` branch in the existing
+private repository, and on pull requests to main. The user authorized the branch
+push and hosted Windows runner use. It does not publish a GitHub release.
+
+[Run 39294081382](https://github.com/adilzubair/scout/actions/runs/39294081382)
+at `7a84fbdadac3370f97c845633aad946fca858d73` passed the normal build,
+**356 native checks, 24 unchanged packaging contracts**, portable inventory and
+installer compilation. Active Defender with no exclusions was checked before
+checkout; the final scan recorded **zero new detections** with protection still
+active. Downloaded artifact hashes match the CI receipts:
+
+- ZIP: `f42e38f8df6f0d5f28a2eefa67074ea16edf5693d822a5c83e0434c531bf6c1a`
+- Installer: `a024dbe03fefe47d30dfb6b6b86c664ff115a495897b81220b5e8e615e90acae`
+
+This run predates the beta 2 integration below. Its development artifacts must
+not replace the published beta. Receipts are retained locally under
+`artifacts/diagnostics/release-20261019/ci-run-39294081382/`.
+
+The first CI run, 39292728131, failed a test fixture that assumed consecutive
+writes always produce distinct native change-time ticks. Commit `7a84fbd` seeds
+an older fixture timestamp deterministically and adds a stronger same-size,
+restored-metadata rewrite test: the snapshot content hash must reject the changed
+bytes even when the metadata revision is identical. No production check or
+packaging script was weakened. The original failed log is retained.
 
 The job uses the same `scripts/build.ps1 -Publish -Installer`, including the
 unchanged blocked contract script and validator. Their reviewed SHA-256 hashes
@@ -52,7 +72,7 @@ Git attributes preserve the two reviewed scripts' LF bytes across fresh Windows
 checkouts; their contents and existing SHA-256 values remain unchanged.
 
 The [official hosted-image setup](https://github.com/actions/runner-images/blob/main/images/windows/scripts/build/Configure-WindowsDefender.ps1)
-disables Defender and sets broad exclusions. The proposed job therefore first
+disables Defender and sets broad exclusions. The job therefore first
 enables the disposable runner's protection and removes its scan exclusions.
 It fails before checkout/build if protection is inactive or script/archive
 scanning is disabled. Automatic sample submission stays disabled; no vendor
@@ -65,26 +85,35 @@ checks for new detections, and rechecks artifact hashes, payload integrity,
 ZIP inventory and checksums. It retains diagnostics and successful development
 artifacts for seven days. A failed or unavailable protection/scan step is not a
 successful security check. The local Bitdefender finding remains recorded even
-if this independent job succeeds; success would supply separate packaging
+after this independent job succeeds; success supplies separate packaging
 evidence, not Bitdefender clearance. Windows Server CI does not establish the
 Windows 11 desktop/installer lifecycle or model quality gates.
 
 ## Published-release integration gap
 
-Remote main is an ancestor of the experimental branch, but the published beta 2
-tag is not. There are **21 beta 2 commits absent from this branch's history**.
+The initial experimental branch included remote main but omitted **21 published
+beta 2 commits**.
 Their diff includes compact persisted search snapshots, selected-drive crawling,
 folder indexing/type filters, explicit literal/regex content search, indexing
-readiness UI and exclusion updates. This history must be reconciled before the
-new candidate can be treated as a successor to the published beta.
+readiness UI and exclusion updates.
 
 A non-mutating `git merge-tree --write-tree HEAD v0.1.0-beta.2` trial records
 **14 conflicting files**, including indexing/search, settings, previews, the
 test dispatcher and build metadata. Its receipt is retained at
 `artifacts/diagnostics/release-20261019/beta2-merge-trial.txt`. The working index
-and files were not merged; unrelated interactive-demo edits remain preserved.
-No conflict resolution or regression coverage is claimed yet.
+was used to prepare an isolated integration worktree. Its conflicts have now
+been resolved, preserving beta 3's multimodal settings, durable save handling,
+PDF recovery and stricter package verification alongside beta 2's features.
+The combined source builds without warnings/errors and passes **431/431 native
+checks**, including hard extension/size/time filters for semantic eligibility
+and rejection of semantic fusion for explicit grep/regex or invalid queries.
+Updated real-WPF settings/control checks cover the unified folder list, content
+opt-in, duplicate/add/remove handling and invalid-drive save ordering. The
+protected workflow will rerun packaging and these UI checks on the combined
+commit; these integration CI results are pending. Unrelated interactive-demo
+edits remain outside the integration.
 
-The current candidate is therefore not ready to merge/publish. Independent
-packaging verification can proceed without waiting for a vendor report, while
-release-history integration and final installer/distribution work remain open.
+Independent packaging verification has succeeded without waiting for a vendor
+report. The combined candidate still needs its CI/UI result and final installer
+lifecycle evidence before release approval; local Bitdefender compatibility and
+optional native add-on distribution review remain explicit open items.

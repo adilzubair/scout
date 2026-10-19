@@ -3,7 +3,7 @@ using Microsoft.Data.Sqlite;
 
 namespace Scout.Core;
 
-public sealed class ScoutStore
+public sealed partial class ScoutStore
 {
     private readonly string connectionString;
     private readonly object gate = new();
@@ -14,6 +14,7 @@ public sealed class ScoutStore
     public ScoutStore(string path)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path))!);
+        DatabasePath = Path.GetFullPath(path);
         connectionString = new SqliteConnectionStringBuilder { DataSource = path, Mode = SqliteOpenMode.ReadWriteCreate, Pooling = false }.ToString();
         WithConnection(c =>
         {
@@ -24,7 +25,12 @@ public sealed class ScoutStore
                 CREATE TABLE IF NOT EXISTS library (id TEXT PRIMARY KEY, json TEXT NOT NULL);
                 CREATE TABLE IF NOT EXISTS workspaces (id TEXT PRIMARY KEY, json TEXT NOT NULL);
                 CREATE TABLE IF NOT EXISTS candidates (id TEXT PRIMARY KEY, json TEXT NOT NULL);
-                PRAGMA user_version=1;
+                CREATE TABLE IF NOT EXISTS index_state(id INTEGER PRIMARY KEY CHECK(id=1), generation INTEGER NOT NULL);
+                INSERT OR IGNORE INTO index_state VALUES(1,0);
+                CREATE TABLE IF NOT EXISTS candidate_changes(generation INTEGER NOT NULL, id TEXT NOT NULL, json TEXT, PRIMARY KEY(generation,id));
+                CREATE TABLE IF NOT EXISTS index_checkpoint(id INTEGER PRIMARY KEY CHECK(id=1), generation INTEGER NOT NULL);
+                INSERT OR IGNORE INTO index_checkpoint VALUES(1,0);
+                PRAGMA user_version=2;
                 """;
             command.ExecuteNonQuery();
             return 0;
@@ -79,27 +85,33 @@ public sealed class ScoutStore
     {
         using var tx = c.BeginTransaction();
         using var clear = c.CreateCommand();
+        var replacements = candidates.ToArray();
+        using var oldRows = c.CreateCommand(); oldRows.Transaction = tx; oldRows.CommandText = "SELECT id FROM candidates";
+        using var oldReader = oldRows.ExecuteReader(); var oldIds = new List<string>(); while (oldReader.Read()) oldIds.Add(oldReader.GetString(0)); oldReader.Close();
         clear.Transaction = tx; clear.CommandText = "DELETE FROM candidates"; clear.ExecuteNonQuery();
         using var insert = c.CreateCommand();
         insert.Transaction = tx; insert.CommandText = "INSERT OR REPLACE INTO candidates VALUES($id,$json)";
         var id = insert.Parameters.Add("$id", SqliteType.Text);
         var json = insert.Parameters.Add("$json", SqliteType.Text);
-        foreach (var item in candidates)
+        foreach (var item in replacements)
         {
             id.Value = item.Id; json.Value = JsonSerializer.Serialize(item); insert.ExecuteNonQuery();
         }
+        Journal(c, tx, replacements, oldIds);
         tx.Commit(); return 0;
     });
     public void UpdateIndex(IEnumerable<Candidate> changed, IEnumerable<string> removed) => WithConnection(c =>
     {
+        var updates = changed.ToArray(); var removals = removed.ToArray();
         using var transaction = c.BeginTransaction();
         using var command = c.CreateCommand(); command.Transaction = transaction;
         command.CommandText = "DELETE FROM candidates WHERE id=$id";
         var id = command.Parameters.Add("$id", SqliteType.Text);
-        foreach (var key in removed) { id.Value = key; command.ExecuteNonQuery(); }
-        command.CommandText = "INSERT OR REPLACE INTO candidates VALUES($id,$json)";
+        foreach (var key in removals) { id.Value = key; command.ExecuteNonQuery(); }
+        command.CommandText = "INSERT INTO candidates(id,json) VALUES($id,$json) ON CONFLICT(id) DO UPDATE SET json=excluded.json";
         var json = command.Parameters.Add("$json", SqliteType.Text);
-        foreach (var item in changed) { id.Value = item.Id; json.Value = JsonSerializer.Serialize(item); command.ExecuteNonQuery(); }
+        foreach (var item in updates) { id.Value = item.Id; json.Value = JsonSerializer.Serialize(item); command.ExecuteNonQuery(); }
+        Journal(c, transaction, updates, removals);
         transaction.Commit(); return 0;
     });
     public void TogglePin(Candidate c)
@@ -118,7 +130,7 @@ public sealed class ScoutStore
             var old = Library.GetValueOrDefault(c.Id) ?? new(c, false, 0, null, []);
             var aliases = old.Aliases.AsEnumerable();
             var intent = QueryParser.Parse(query, now);
-            if (c.Source != "File contents" && !string.IsNullOrWhiteSpace(query) && intent.Recency == RecencyBasis.None && intent.Window == null && !intent.Plural) aliases = new[] { query.Trim().ToLowerInvariant() }.Concat(aliases);
+            if (intent.SlashFilter == null && c.Source != "File contents" && !string.IsNullOrWhiteSpace(query) && intent.Recency == RecencyBasis.None && intent.Window == null && !intent.Plural) aliases = new[] { query.Trim().ToLowerInvariant() }.Concat(aliases);
             Put("library", c.Id, old with { Candidate = c, Launches = Math.Min(100_000, old.Launches + 1), LastLaunch = now, Aliases = aliases.Distinct().Take(20).ToArray() });
         }
     }

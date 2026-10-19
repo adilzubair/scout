@@ -58,6 +58,8 @@ public partial class MainWindow : Window
         this.store = store; this.index = index; this.model = model; this.multimodal = multimodal;
         InitializeComponent();
         WindowVisuals.Configure(this);
+        UpdateIndexProgress();
+        index.ProgressChanged += _ => Dispatcher.BeginInvoke(UpdateIndexProgress);
         SourceInitialized += (_, _) =>
         {
             HwndSource.FromHwnd(new WindowInteropHelper(this).Handle)?.AddHook(WindowMessage);
@@ -113,7 +115,7 @@ public partial class MainWindow : Window
         if (IsVisible && !show) { HidePanel(); return; }
         modelIdle.Stop();
         _ = model.WarmAsync(store.Settings);
-        WindowVisuals.RefreshTheme(); UpdateExpansion();
+        WindowVisuals.RefreshTheme(); UpdateIndexProgress(); UpdateExpansion();
         model.Context = WindowsIntegration.CaptureContext();
         Show(); Activate(); WindowsIntegration.SetForegroundWindow(new WindowInteropHelper(this).Handle); Query.Focus(); Query.SelectAll();
         _ = index.RefreshAsync(forceHistory: true); ScheduleSearch(false);
@@ -198,9 +200,13 @@ public partial class MainWindow : Window
             await Task.Delay(30, token);
             var catalog = index.Catalog;
             var library = store.Library;
-            var extra = enriched.Concat(store.Workspaces.Select(w => w.ToCandidate())).Concat(library.Values.Where(l => (l.Pinned || l.LastLaunch != null) && l.Candidate.IsPinnable && !catalog.Contains(l.Candidate.Id)).Select(l => l.Candidate)).ToArray();
+            var extra = enriched.Concat(store.Workspaces.Select(w => w.ToCandidate())).Concat(library.Values.Where(l => (l.Pinned || l.LastLaunch != null) && l.Candidate.IsPinnable && index.IsSearchable(l.Candidate) && !catalog.Contains(l.Candidate.Id)).Select(l => l.Candidate)).ToArray();
             var now = DateTimeOffset.Now;
-            var result = await Task.Run(() => SearchEngine.Search(query, requestedScope, catalog, library, now, cancellationToken: token, extra: extra, contentMatches: index.SearchContent(query, requestedScope, now, token)), token);
+            var result = await Task.Run(() => {
+                var content = index.SearchContentResponse(query, requestedScope, now, token);
+                var found = SearchEngine.Search(query, requestedScope, catalog, library, now, cancellationToken: token, extra: extra, contentMatches: content.Matches);
+                return found with { Notice = string.Join(" ", new[] { found.Notice, content.Notice }.Where(n => n.Length > 0)) };
+            }, token);
             if (token.IsCancellationRequested || generation != revision) return;
             current = result;lexicalCurrent=result; appliedRevision = generation;
             judgment = null;
@@ -240,7 +246,7 @@ public partial class MainWindow : Window
     }
     private string ResultStatus(SearchResult result)
     {
-        if (result.Query.Length == 0) return "Scout";
+        if (result.Query.Length == 0 || result.Intent.SlashFilter == "") return "Scout";
         if (result.Notice.Length > 0) return result.Notice;
         return result.Locations.Length == 1 ? result.Locations[0] : "Scout";
     }
@@ -296,8 +302,8 @@ public partial class MainWindow : Window
         foreach(var id in semanticProvenance.Keys.Where(id=>!semanticIds.Contains(id)).ToArray())semanticProvenance.Remove(id);
         foreach(var hit in displayedHits.Where(hit=>hit.Semantic!=null))semanticProvenance[hit.Candidate.Id]=hit.Semantic!;
         var effective = displayedHits.ToList();
-        if (scope == Scope.All && current?.Intent.Literal != true && current?.Intent.Folder == null && SyntheticResults.Calculation(Query.Text) is { } calculation) effective.Insert(0, new(calculation, 2000));
-        if (store.Settings.WebFallback && current?.Intent.Literal != true && current?.Intent.Folder == null && scope is Scope.All or Scope.Links && SyntheticResults.Web(Query.Text) is { } web) effective.Add(new(web, -100));
+        if (scope == Scope.All && current?.Intent.SlashFilter == null && current?.Intent.Literal != true && current?.Intent.Folder == null && SyntheticResults.Calculation(Query.Text) is { } calculation) effective.Insert(0, new(calculation, 2000));
+        if (store.Settings.WebFallback && current?.Intent.SlashFilter == null && current?.Intent.Literal != true && current?.Intent.Folder == null && scope is Scope.All or Scope.Links && SyntheticResults.Web(Query.Text) is { } web) effective.Add(new(web, -100));
         if (group.Count >= 2)
         {
             var kinds = group.Values.Select(c => c.Kind).Distinct().ToArray();
@@ -305,24 +311,24 @@ public partial class MainWindow : Window
             effective.Insert(0, new(new Candidate("group:current", ItemKind.Group, $"Open all {group.Count} {noun}", "") { Detail = string.Join(", ", group.Values.Take(3).Select(c => c.Title)) + (group.Count > 3 ? ", …" : ""), Source = "Group" }, 2000));
         }
         var ready = current != null && RankingPolicy.Ready(current, effective, judgment);
-        var rows = effective.Select((h, i) => new ResultRow(h.Candidate, h.Pinned, group.ContainsKey(h.Candidate.Id), current?.Intent.Recency ?? RecencyBasis.None, i == 0 && (ready || h.Candidate.Kind == ItemKind.Group), group.Count > 0,h.Evidence)).ToArray();
+        var rows = effective.Select((h, i) => new ResultRow(h.Candidate, h.Pinned, group.ContainsKey(h.Candidate.Id), current?.Intent.Recency ?? RecencyBasis.None, i == 0 && (ready || h.Candidate.Kind == ItemKind.Group), group.Count > 0, h.MatchKind, h.Evidence)).ToArray();
         Results.ItemsSource = rows;
         lastRenderedQuery = Query.Text;
         lastRenderedIds = rows.Select(row => row.Candidate.Id).ToHashSet();
         Results.SelectedItem = rows.FirstOrDefault(r => r.Candidate.Id == selected) ?? rows.FirstOrDefault();
         applying = false;
         Empty.Visibility = rows.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
-        EmptyTitle.Text = Query.Text.Length == 0 ? "What can we help you find?" : "No matches yet";
+        EmptyTitle.Text = current?.Intent.SlashFilter == "" ? "Search filters" : Query.Text.Length == 0 ? "What can we help you find?" : "No matches yet";
         EmptyDetail.Text = Query.Text.Length == 0 ? "An app, a file, or a few words to get started." : "Try a different name or search in All.";
         if (Query.Text.Length == 0 && scope != Scope.All)
         {
             EmptyTitle.Text = scope == Scope.Workspaces ? "Your work, ready to reopen" : $"Find your {scope.ToString().ToLowerInvariant()}";
-            EmptyDetail.Text = scope == Scope.Workspaces ? "Add results to a group, then save a workspace to open them together." : "Start typing a name. Pinned and recently opened items appear here.";
+            EmptyDetail.Text = scope == Scope.Workspaces ? "Add results to a group, then save a workspace to open them together." : "Try a name, /folder or /image. Pinned and recently opened items appear here.";
         }
         if (rows.Length == 0 && current?.Intent.Recency is RecencyBasis.Added or RecencyBasis.Downloaded) EmptyDetail.Text = "No matching arrival dates. Browser history can supply completed-download dates when enabled in Settings.";
         if (rows.Length == 0 && current?.Intent.Recency == RecencyBasis.Opened) EmptyDetail.Text = "No matching openings in Windows Recent Items or Scout launch history.";
         if (current?.Notice is { Length: > 0 } notice) EmptyDetail.Text = notice;
-        ResultsHeading.Text = rows.Length == 0 ? "" : Query.Text.Length == 0 ? "Suggestions" : "Results";
+        ResultsHeading.Text = rows.Length == 0 ? "" : current?.Intent.SlashFilter is { } filter ? "/" + filter + " results" : Query.Text.Length == 0 ? "Suggestions" : "Results";
         ResultCount.Text = rows.Length == 0 ? "" : $"{rows.Length} {(rows.Length == 1 ? "item" : "items")}";
         Examples.Visibility = Query.Text.Length == 0 && scope == Scope.All ? Visibility.Visible : Visibility.Collapsed;
         ResultHints.Visibility = rows.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
@@ -349,6 +355,7 @@ public partial class MainWindow : Window
     {
         var target = !expanded ? 76 : count == 0 ? (Examples.Visibility == Visibility.Visible ? 448 : 370)
             : Math.Max(370, 250 + Math.Min(6, count) * 60 + (calculation ? 22 : 0));
+        if (IndexIndicator.Visibility == Visibility.Visible) target += 28;
         if (GroupBar.Visibility == Visibility.Visible) target += 56;
         var height = Math.Min(target, MaxHeight);
         if (Math.Abs(requestedHeight - height) < 1) return;
@@ -470,7 +477,7 @@ public partial class MainWindow : Window
         {
             ValidateSemanticAction(item);
             var evidence=semanticProvenance.GetValueOrDefault(item.Id)?.Evidence.FirstOrDefault();
-            new PreviewWindow(item,evidence,index.Semantic==null?null:index.Semantic.IsCurrent,index.Semantic==null?null:index.Semantic.PreparePlaybackAsync){Owner=this}.ShowDialog();
+            new PreviewWindow(item,evidence,index.Semantic==null?null:index.Semantic.IsCurrent,index.Semantic==null?null:index.Semantic.PreparePlaybackAsync,matches:displayedHits.FirstOrDefault(h=>h.Candidate.Id==item.Id)?.Excerpts){Owner=this}.ShowDialog();
         }
         catch(IOException error){Status.Text=error.Message;}
     }
@@ -543,12 +550,22 @@ public partial class MainWindow : Window
     }
     private async void OpenGroupClick(object sender, RoutedEventArgs e) => await Execute(group.Values.ToArray());
     private void SettingsClick(object sender, RoutedEventArgs e) => ShowSettings();
-    internal async void ShowSettings() => await ShowSettingsAsync();
-    internal async Task ShowSettingsAsync()
+    private void UpdateIndexProgress()
+    {
+        var progress = index.Progress;
+        IndexIndicator.Visibility = progress.ShowInLauncher ? Visibility.Visible : Visibility.Collapsed;
+        IndexState.Text = progress.LauncherSummary; IndexState.ToolTip = progress.Description;
+        IndexBusy.Visibility = progress.IsWorking ? Visibility.Visible : Visibility.Collapsed;
+        IndexBusy.IsIndeterminate = progress.IsWorking && WindowVisuals.MotionEnabled;
+        ResizeToResults(Results.Items.Count, Selected?.Kind == ItemKind.Calculation);
+    }
+    private void IndexDetailsClick(object sender, RoutedEventArgs e) => ShowSettings("Folders");
+    internal async void ShowSettings(string initialPage = "General") => await ShowSettingsAsync(initialPage);
+    internal async Task ShowSettingsAsync(string initialPage = "General")
     {
         Toggle(true);
         var dialog = new SettingsWindow(store.Settings, ApplyHotkey, () => store.ClearLaunchHistory(), multimodal,
-            () => { var saved = store.Settings; saved.Multimodal.Enabled = false; store.SaveSettings(saved); },index.Semantic,persistSettings:store.SaveSettings) { Owner = this };
+            () => { var saved = store.Settings; saved.Multimodal.Enabled = false; store.SaveSettings(saved); },index.Semantic,persistSettings:store.SaveSettings,index:index,initialPage:initialPage) { Owner = this };
         if (dialog.ShowDialog() == true)
         {
             search.Cancel(); revision++; uiRefresh.Stop();
@@ -566,7 +583,7 @@ public partial class MainWindow : Window
                 indexChanged = false; observedIndexVersion = index.Version;
                 Status.Text = "Settings saved. The content index couldn't be updated. Check folder access or restart Scout to retry.";
             }
-            finally { uiRefresh.Start(); _ = model.WarmAsync(store.Settings); }
+            finally { _ = model.WarmAsync(store.Settings); }
         }
         Query.Focus();
     }
@@ -596,7 +613,7 @@ public partial class MainWindow : Window
         else return;
         e.Handled = true;
     }
-    private sealed class ResultRow(Candidate candidate, bool pinned, bool grouped, RecencyBasis basis, bool ready, bool membership,string contentEvidence="") : System.ComponentModel.INotifyPropertyChanged
+    private sealed class ResultRow(Candidate candidate, bool pinned, bool grouped, RecencyBasis basis, bool ready, bool membership, SearchMatchKind matchKind = SearchMatchKind.Metadata, string matchEvidence = "") : System.ComponentModel.INotifyPropertyChanged
     {
         public Candidate Candidate => candidate;
         public bool Grouped => grouped;
@@ -610,9 +627,10 @@ public partial class MainWindow : Window
         private async Task LoadIcon() { icon = await NativeIcons.Get(candidate.Target); PropertyChanged?.Invoke(this, new(nameof(Icon))); PropertyChanged?.Invoke(this, new(nameof(GlyphVisibility))); PropertyChanged?.Invoke(this, new(nameof(IconBackground))); }
         public Visibility GlyphVisibility => icon == null ? Visibility.Visible : Visibility.Collapsed;
         public string Title => Candidate.Title;
-        public string Detail => contentEvidence.Length>0?contentEvidence:Candidate.Date(basis) is { } date
+        private string MetadataDetail => Candidate.Date(basis) is { } date
             ? $"{(basis == RecencyBasis.Downloaded && Candidate.DownloadedAt == null ? "Arrived" : basis)} {Age(date)} · {Candidate.Detail}" : Candidate.Detail.Length > 0 ? Candidate.Detail : Candidate.Source;
-        public string Evidence => (contentEvidence.Length>0?contentEvidence+"\n":"")+Candidate.Evidence(basis) + (Candidate.Date(basis) is { } date ? $"\n{date.LocalDateTime:F}" : "") + "\n" + Candidate.Target;
+        public string Detail => matchKind == SearchMatchKind.Subsequence ? "Filename abbreviation · " + MetadataDetail : matchKind is SearchMatchKind.LiteralContent or SearchMatchKind.RegexContent ? "Verified contents · " + MetadataDetail : matchEvidence.Length > 0 ? matchEvidence : MetadataDetail;
+        public string Evidence => (matchEvidence.Length > 0 ? matchEvidence + "\n" : "") + Candidate.Evidence(basis) + (Candidate.Date(basis) is { } date ? $"\n{date.LocalDateTime:F}" : "") + "\n" + Candidate.Target;
         private static string Age(DateTimeOffset date)
         {
             var span = DateTimeOffset.Now - date;
@@ -674,10 +692,10 @@ public partial class MainWindow : Window
         try
         {
             var startup = Stopwatch.StartNew();
-            while (!index.Candidates.Any(c => c.Kind == ItemKind.App))
+            while (!index.Applications.Any())
             { if (startup.Elapsed > TimeSpan.FromSeconds(20)) throw new InvalidOperationException("Applications were not discovered"); await Task.Delay(25); }
             var appsReadyMs = startup.Elapsed.TotalMilliseconds;
-            var apps = index.Candidates.Where(c => c.Kind == ItemKind.App).ToArray();
+            var apps = index.Applications.ToArray();
             var checks = new List<object>();
             foreach (var query in new[] { "notepad", "chrome", "edge", "vscode", "code", "excel", "word", "terminal" })
             {
@@ -721,10 +739,14 @@ public partial class MainWindow : Window
             File.Delete(watchFile);
             await Until(() => !index.Catalog.Contains(watchId));
             if (index.FullScanCount != fullScans) throw new InvalidOperationException("A file change triggered a full scan");
-            WindowsIntegration.TestDefaultHotkey(); await Until(() => !IsVisible);
-            WindowsIntegration.TestDefaultHotkey(); await Until(() => IsVisible); await WaitForSearch();
+            var testHotkey = Environment.GetEnvironmentVariable("SCOUT_TEST_HOTKEY") != "0";
+            if (testHotkey)
+            {
+                WindowsIntegration.TestDefaultHotkey(); await Until(() => !IsVisible);
+                WindowsIntegration.TestDefaultHotkey(); await Until(() => IsVisible); await WaitForSearch();
+            }
             if (gaps.Count > 0 && gaps.Order().ElementAt((int)(gaps.Count * .95)) > 100) throw new InvalidOperationException("UI responsiveness exceeded 100 ms p95");
-            return new { passed = true, appsReadyMs, appCount = apps.Length, fileCount = index.Candidates.Count(c => c.Kind == ItemKind.File), checks, inputCycleMs, worstUiGapMs = gaps.DefaultIfEmpty(0).Max(), p95UiGapMs = gaps.Count == 0 ? 0 : gaps.Order().ElementAt((int)(gaps.Count * .95)), fullScans, watcherCreateModifyDelete = true, globalHotkey = true };
+            return new { passed = true, appsReadyMs, appCount = apps.Length, cachedFileCount = index.CachedFileCount, checks, inputCycleMs, worstUiGapMs = gaps.DefaultIfEmpty(0).Max(), p95UiGapMs = gaps.Count == 0 ? 0 : gaps.Order().ElementAt((int)(gaps.Count * .95)), fullScans, index.LastScanSeenCount, index.LastScanRemovedCount, index.LastScanUnavailableCount, index.LargestWatcherRemoval, watcherCreateModifyDelete = true, globalHotkey = testHotkey, globalHotkeySkipped = !testHotkey };
         }
         finally { heartbeat.Stop(); }
     }

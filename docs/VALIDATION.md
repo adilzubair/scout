@@ -1,9 +1,13 @@
 # Validation
 
 Current experimental beta candidate: **0.1.0-beta.3**. The 2026-10-19 follow-up
-passes 355 native checks, PDF contention/navigation recovery and background
-indexing/search/Laya isolation checks. Packaging is blocked by Bitdefender, and
-the final installer lifecycle and distribution review remain open. The user
+passes 431 native checks on the combined beta 2 integration. Earlier PDF
+contention/navigation recovery and background indexing/search/Laya isolation
+checks remain recorded below. Protected Windows CI passes 356 native checks,
+24 unchanged packaging contracts, installer compilation and a Defender scan
+with zero new detections at `7a84fbd`; combined integration CI/UI is pending.
+The local Bitdefender compatibility finding, final installer lifecycle and
+optional native add-on distribution review remain open. The user
 deferred the independent 400-task quality study for this beta and physical
 16 GB testing until after release. See the [current E2E evidence](E2E_TESTING_2026_10_19.md)
 and [beta readiness decision](BETA_MERGE_READINESS.md); earlier results below
