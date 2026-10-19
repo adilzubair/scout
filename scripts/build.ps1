@@ -21,7 +21,7 @@ try {
         Copy-Item -LiteralPath README.md -Destination (Join-Path $publishDir 'README.md')
         $docsDir = Join-Path $publishDir 'docs'
         New-Item -ItemType Directory -Path $docsDir -Force | Out-Null
-        foreach ($doc in @('VALIDATION', 'THIRD_PARTY', 'PARITY', 'UI', 'SEARCH_EVALUATION', 'SEMANTIC_SEARCH', 'LOCAL_SEMANTIC_HELPER', 'LIGHTWEIGHT_BASELINE', 'OFFLINE_EVALUATION', 'MULTIMODAL_ADDON', 'MULTIMODAL_RUNTIME_SCREEN', 'MULTIMODAL_SEARCH_PLAN', 'MULTIMODAL_QUALITY_EVALUATION')) {
+        foreach ($doc in @('VALIDATION', 'THIRD_PARTY', 'PARITY', 'UI', 'SEARCH_EVALUATION', 'SEMANTIC_SEARCH', 'LOCAL_SEMANTIC_HELPER', 'LIGHTWEIGHT_BASELINE', 'OFFLINE_EVALUATION', 'MULTIMODAL_ADDON', 'MULTIMODAL_RUNTIME_SCREEN', 'MULTIMODAL_SEARCH_PLAN', 'MULTIMODAL_QUALITY_EVALUATION', 'BETA_MERGE_READINESS', 'E2E_TESTING_2026_10_19')) {
             Copy-Item -LiteralPath "docs/$doc.md" -Destination (Join-Path $docsDir "$doc.md")
         }
         $scriptsDir = Join-Path $publishDir 'scripts'
@@ -40,8 +40,8 @@ try {
                 (Join-Path $env:ProgramFiles 'Inno Setup 7/ISCC.exe')
             ) | Where-Object { $_ -and (Test-Path -LiteralPath $_ -PathType Leaf) })
             if (-not $compilerPaths) { throw 'Inno Setup 7 compiler (ISCC.exe) is required for -Installer.' }
-            $version = ([xml](Get-Content -LiteralPath src/Scout.App/Scout.App.csproj -Raw)).Project.PropertyGroup.Version
-            & $compilerPaths[0] "/DScoutVersion=$version" installer/Scout.iss
+            $versionProperties = ([xml](Get-Content -LiteralPath src/Scout.App/Scout.App.csproj -Raw)).Project.PropertyGroup
+            & $compilerPaths[0] "/DScoutVersion=$($versionProperties.Version)" "/DScoutFileVersion=$($versionProperties.FileVersion)" installer/Scout.iss
             if ($LASTEXITCODE -ne 0) { throw 'Installer compilation failed.' }
             $setup = Join-Path $artifactsDir 'Scout-Setup.exe'
             if (-not (Test-Path -LiteralPath $setup -PathType Leaf)) { throw 'Installer output is missing.' }

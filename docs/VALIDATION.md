@@ -1,5 +1,14 @@
 # Validation
 
+Current experimental beta candidate: **0.1.0-beta.3**. The 2026-10-19 follow-up
+passes 355 native checks, PDF contention/navigation recovery and background
+indexing/search/Laya isolation checks. Packaging is blocked by Bitdefender, and
+the final installer lifecycle and distribution review remain open. The user
+deferred the independent 400-task quality study for this beta and physical
+16 GB testing until after release. See the [current E2E evidence](E2E_TESTING_2026_10_19.md)
+and [beta readiness decision](BETA_MERGE_READINESS.md); earlier results below
+retain their original dates, packages and limits.
+
 Latest optional local helper: **56/64** fresh semantic validation cases versus
 38/64 with Laya alone; **497/504** prior real-metadata regressions versus 484/504.
 Four fresh false matches and two older presentation-query regressions remain.

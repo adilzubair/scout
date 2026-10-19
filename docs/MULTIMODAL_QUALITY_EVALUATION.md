@@ -3,7 +3,11 @@
 The release protocol is `evaluation/multimodal/protocol.json`. Keep its frozen
 admission floor and existing dataset receipts intact. Engineering fixtures, the
 authored pilot and the natural-audio diagnostic below are development evidence.
-The independent 400-task, seven-family holdout remains a separate gate.
+The independent 400-task, seven-family holdout remains a general-release gate.
+On 2026-10-19 the user selected an experimental beta merge with that study
+deferred. This changes the beta acceptance scope, not the protocol or quality
+results. Keep the add-on experimental and avoid general accuracy claims. See
+[beta merge readiness](BETA_MERGE_READINESS.md).
 
 ## Natural-audio development diagnostic
 

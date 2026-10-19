@@ -3,6 +3,14 @@
 Date: 2026-10-15. Branch: `feature/multimodal-semantic-search`.
 Status: internal-preview handoff complete; production release work deferred.
 
+2026-10-19 scope override: the user selected **Prepare experimental beta merge**.
+The independent seven-family 400-task quality study is deferred for this beta;
+it remains required for a general-release quality claim. Preserve the frozen
+protocol, corpus receipts and admission floor. Keep the add-on experimental and
+off by default. This decision does not clear the antivirus packaging block,
+clean installation/update/removal checks or native distribution review. The
+current decision record is [beta merge readiness](BETA_MERGE_READINESS.md).
+
 2026-10-19 scheduling override: physical 16 GB testing is post-release work at
 the user's direction. It no longer blocks the beta merge/release. Keep minimum
 hardware claims provisional, and retain the other quality, lifecycle and

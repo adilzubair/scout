@@ -2,7 +2,13 @@
 
 A native Windows launcher built against [Intern](https://github.com/dabit3/intern)'s behavior, using local [Laya](https://huggingface.co/convaiinnovations/laya) instead of Jev. C#/.NET 10, WPF, SQLite and an authenticated Python sidecar. Intern is cloned under `.reference/intern` for reference; its code and assets are not redistributed.
 
-[Website](https://adilzubair.github.io/scout-site/) · [Public beta download](https://github.com/adilzubair/scout-site/releases/tag/v0.1.0-beta.1)
+[Website](https://adilzubair.github.io/scout-site/) · [Published beta download](https://github.com/adilzubair/scout-site/releases/tag/v0.1.0-beta.2)
+
+This branch prepares **0.1.0-beta.3**, an experimental beta. It has not been
+published. The independent multimodal quality study and physical 16 GB validation
+are deferred; retrieval accuracy and minimum hardware support remain unvalidated.
+Packaging security, installer lifecycle and distribution checks are still open.
+See [beta merge readiness](docs/BETA_MERGE_READINESS.md).
 
 ## Download and install
 
@@ -42,15 +48,17 @@ experimental installations can still be tested by starting Scout with
 Keyword content search is separate from local AI. Its document text stays in
 Scout's private index and is not sent to Laya or the Qwen helper.
 
-This branch also includes a **Settings → Multimodal** development preview for
+This branch also includes a **Settings → Multimodal** experimental preview for
 the optional full EmbeddingGemma 2 add-on. It installs and tests text, image,
 audio and video support independently of Laya. LibreOffice is not required;
 Office content will use dedicated readers for text, cells, chart data and
 embedded images, with extracted evidence previews rather than exact Office
-layout. Folder indexing and semantic
-search results are still being implemented. Selected content will be supplied
-to the local embedding worker when that pipeline is connected; Laya and Qwen
-continue to receive no document bodies. See [add-on status and checks](docs/MULTIMODAL_ADDON.md).
+layout. Opted-in folders support background indexing, content search and matched
+evidence previews across documents, presentations, spreadsheets, code, images,
+audio and video. Selected content is processed by the local embedding worker;
+Laya and Qwen continue to receive no document bodies. The add-on is off by default,
+and authored smoke checks do not establish general retrieval accuracy. See
+[add-on status and checks](docs/MULTIMODAL_ADDON.md).
 
 Command-line setup is also available:
 
