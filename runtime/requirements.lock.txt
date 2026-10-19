@@ -12,7 +12,8 @@ h11==0.16.0
 huggingface-hub==0.36.0
 idna==3.20
 jinja2==3.1.6
-laya==0.3.7
+# PyPI no longer serves 0.3.7. This immutable upstream source has the same runtime code.
+laya @ https://github.com/NandhaKishorM/laya/archive/010bacef009c855ccba814b51f7c8e1d38ab5e3f.tar.gz#sha256=db7efbfe4a472b8af59a8ecae2ea6b13199679f79f77bc911f100c13b527dda7
 markupsafe==3.0.3
 mpmath==1.3.0
 networkx==3.6.1

@@ -152,7 +152,7 @@ internal sealed class PreviewWindow : Window
             UiDiagnostics.Descendants<Button>(this).Single(button=>button.Content as string==label).RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));
             var deadline=System.Diagnostics.Stopwatch.StartNew();
             while(rendering){if(deadline.Elapsed>TimeSpan.FromSeconds(35))throw new IOException("PDF navigation timed out.");await Task.Delay(25);}
-            if(page!=expected || !status.Text.StartsWith($"Page {expected+1} of ",StringComparison.Ordinal))throw new IOException("PDF navigation did not render the requested page.");
+            if(page!=expected || !status.Text.StartsWith($"Page {expected+1} of ",StringComparison.Ordinal))throw new IOException($"PDF navigation '{label}' expected page {expected+1}, selected {page+1}: {status.Text}");
         }
     }
     private void OpenMedia(string path,double seek)
@@ -182,16 +182,17 @@ internal sealed class PreviewWindow : Window
     internal async Task CheckMediaAsync()
     {
         if(media==null || mediaReady==null)throw new InvalidOperationException("No media preview loaded.");
-        media.Pause();
+        UiDiagnostics.Descendants<Button>(this).Single(button=>button.Content as string=="Pause").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
         if(!await mediaReady.Task.WaitAsync(TimeSpan.FromSeconds(90),lifetime.Token))throw new IOException(status.Text);
         // Opening a codec alone does not prove playback. Advance the authored
         // smoke clip silently and leave normal previews paused until Play.
         var player=media??throw new IOException("Media preview closed.");
-        player.IsMuted=true;var before=player.Position;player.Play();
+        player.IsMuted=true;var before=player.Position;
+        UiDiagnostics.Descendants<Button>(this).Single(button=>button.Content as string=="Play").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
         var startup=System.Diagnostics.Stopwatch.StartNew();
         while(player.Position<=before+TimeSpan.FromMilliseconds(100) && startup.Elapsed<TimeSpan.FromSeconds(3))
             await Task.Delay(50,lifetime.Token);
-        player.Pause();
+        UiDiagnostics.Descendants<Button>(this).Single(button=>button.Content as string=="Pause").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
         if(player.Position<=before+TimeSpan.FromMilliseconds(100))throw new IOException("Media playback did not advance.");
         player.IsMuted=false;
     }

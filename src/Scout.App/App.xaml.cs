@@ -14,6 +14,8 @@ public partial class App : Application
     private MultimodalHost? multimodal;
     internal static bool IsIsolatedDiagnostic { get; private set; }
     internal static string? PreviewSmokeExtension { get; private set; }
+    internal static bool ControlsSmokeOnly { get; private set; }
+    internal static bool PdfSmokeOnly { get; private set; }
     internal static string ShowEventName => IsIsolatedDiagnostic ? "Local\\Scout.Test.Show" : "Local\\Scout.Show";
     internal static string DataDirectory => Environment.GetEnvironmentVariable("SCOUT_DATA_DIR") ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Scout");
     protected override async void OnStartup(StartupEventArgs e)
@@ -30,7 +32,9 @@ public partial class App : Application
         var previewSmoke = e.Args.Length==2 && e.Args[0]=="--media-preview-smoke-test" && new[]{"all","wav","mp3","m4a","flac","mp4","mov","mkv","webm"}.Contains(e.Args[1]);
         if(e.Args.Contains("--media-preview-smoke-test") && !previewSmoke){Shutdown(1);return;}
         PreviewSmokeExtension=previewSmoke?e.Args[1]:null;
-        var uiSmoke = previewSmoke || e.Args.Contains("--ui-smoke-test");
+        ControlsSmokeOnly = e.Args.Contains("--controls-smoke-test");
+        PdfSmokeOnly = e.Args.Contains("--pdf-preview-smoke-test");
+        var uiSmoke = PdfSmokeOnly || ControlsSmokeOnly || previewSmoke || e.Args.Contains("--ui-smoke-test");
         var folderPickerSmoke = e.Args.Contains("--folder-picker-smoke-test");
         var settingsE2e = e.Args.Length == 2 && e.Args[0] == "--settings-e2e-test" && e.Args[1] is "write" or "read";
         if(e.Args.Contains("--settings-e2e-test") && !settingsE2e){Shutdown(1);return;}
@@ -146,6 +150,8 @@ public partial class App : Application
                         if (uiSmoke) await UiDiagnostics.Snapshot(main, "launcher");
                         File.WriteAllText(Path.Combine(DataDirectory, "smoke-result.txt"), folderPickerSmoke
                             ? "Folder picker checks passed: actual native select and cancel, repeated settings browsing, duplicate prevention and recoverable picker failures."
+                            : ControlsSmokeOnly ? "Control checks passed; see control-checks.json for interactions and inventory."
+                            : PdfSmokeOnly ? "Repeated PDF navigation, worker cancellation, malformed input and cleanup checks passed; see pdf-checks.json."
                             : uiSmoke
                             ? "UI checks passed: rendering, scopes, manual selection, arrival selection, editable Open all, calculator, web fallback, settings navigation and validation focus, workspace naming, UI screenshots."
                             : "Desktop checks passed: rendering, scopes, manual selection, arrival selection, editable Open all, calculator, web fallback, PDF/image/Office/text previews, model host (when configured).");

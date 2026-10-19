@@ -13,7 +13,10 @@ public partial class MainWindow
     // Runs only in the isolated --ui-smoke-test flow; no user settings are saved.
     private async Task CaptureUiChecks()
     {
+        if(App.PdfSmokeOnly){await CapturePdfNavigationChecks(3);return;}
         if(App.PreviewSmokeExtension is {} extension){await CaptureMediaPreviews(extension=="all"?null:extension);return;}
+        await CaptureControlChecks();
+        if(App.ControlsSmokeOnly)return;
         async Task SearchView(string text, Scope filter, string name, int pixelScale = 1)
         {
             scope = filter; UpdateScopes(); Query.Text = text; RefreshLocal(); await WaitForSearch();
@@ -161,8 +164,33 @@ public partial class MainWindow
         }
         finally{matched.Close();}
         await CaptureSemanticFormatChecks();
+        await CapturePdfNavigationChecks();
+        await SearchView("preview benefits",Scope.Files,"semantic-before-arrival");
+        var manualItem=new Candidate("ui:manual",ItemKind.File,"Benefits notes.txt",previewPath);
+        var baseline=current! with {Hits=[new(manualItem,100)]};current=baseline;ApplyRows(baseline.Hits);
+        manualSelection=true;Results.SelectedIndex=0;
+        var fused=SemanticFusion.Apply(baseline,[new(matchedItem,.9,[match])]);current=fused;ApplyRows(fused.Hits);
+        if(Selected?.Id!=manualItem.Id || !((ResultRow[])Results.ItemsSource).Any(row=>row.Candidate.Id==matchedItem.Id && row.Detail.StartsWith("Content match",StringComparison.Ordinal)))
+            throw new InvalidOperationException("Late content results lost manual selection or evidence labels.");
+        await UiDiagnostics.Snapshot(this,"semantic-results-retained-selection");
+        try{ValidateSemanticAction(matchedItem);throw new InvalidOperationException("An out-of-scope content action was admitted.");}
+        catch(IOException){}
+        manualSelection=false;RefreshLocal();await WaitForSearch();
+        await CaptureMediaPreviews();
+    }
+    private async Task CapturePdfNavigationChecks(int repetitions=1)
+    {
         var scanPath=Path.GetFullPath("artifacts/diagnostics/multimodal/scan-fixtures-v1/f003.pdf");
-        if(File.Exists(scanPath))
+        if(!File.Exists(scanPath))throw new IOException("The authored PDF navigation fixture is missing.");
+        var runs=new List<object>();
+        for(var iteration=0;iteration<repetitions;iteration++)
+        {
+            var clock=Stopwatch.StartNew();
+            try{await Run();runs.Add(new{iteration,status="passed",elapsedMs=clock.ElapsedMilliseconds,error=(string?)null});}
+            catch(Exception error){runs.Add(new{iteration,status="failed",elapsedMs=clock.ElapsedMilliseconds,error=error.ToString()});throw;}
+            finally{File.WriteAllText(Path.Combine(App.DataDirectory,"pdf-checks.json"),System.Text.Json.JsonSerializer.Serialize(runs,new System.Text.Json.JsonSerializerOptions{WriteIndented=true}));}
+        }
+        async Task Run()
         {
             var scanItem=new Candidate(Candidate.Key(ItemKind.File,scanPath),ItemKind.File,"Authored scanned PDF",scanPath);
             var scanEvidence=new SemanticEvidence("authored-scan",scanItem.Id,new string('a',64),scanPath,"text",new("page"){Page=2},"RIVER DELTA PURCHASE Invoice total 73510",[]);
@@ -203,18 +231,6 @@ public partial class MainWindow
             var sessions=Path.Combine(App.DataDirectory,"pdf-previews","sessions");
             if(Directory.Exists(sessions) && Directory.EnumerateDirectories(sessions).Any())throw new IOException("PDF preview left temporary source/raster data behind.");
         }
-        await SearchView("preview benefits",Scope.Files,"semantic-before-arrival");
-        var manualItem=new Candidate("ui:manual",ItemKind.File,"Benefits notes.txt",previewPath);
-        var baseline=current! with {Hits=[new(manualItem,100)]};current=baseline;ApplyRows(baseline.Hits);
-        manualSelection=true;Results.SelectedIndex=0;
-        var fused=SemanticFusion.Apply(baseline,[new(matchedItem,.9,[match])]);current=fused;ApplyRows(fused.Hits);
-        if(Selected?.Id!=manualItem.Id || !((ResultRow[])Results.ItemsSource).Any(row=>row.Candidate.Id==matchedItem.Id && row.Detail.StartsWith("Content match",StringComparison.Ordinal)))
-            throw new InvalidOperationException("Late content results lost manual selection or evidence labels.");
-        await UiDiagnostics.Snapshot(this,"semantic-results-retained-selection");
-        try{ValidateSemanticAction(matchedItem);throw new InvalidOperationException("An out-of-scope content action was admitted.");}
-        catch(IOException){}
-        manualSelection=false;RefreshLocal();await WaitForSearch();
-        await CaptureMediaPreviews();
     }
     private async Task CaptureMediaPreviews(string? extension=null)
     {

@@ -13,6 +13,7 @@ import urllib.request
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--helper', action='store_true')
+    parser.add_argument('--models-dir', type=Path)
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
     temporary_root = root / 'artifacts' / 'test-tmp'
@@ -20,7 +21,7 @@ def main():
     with tempfile.TemporaryDirectory(prefix='scout-http-', dir=temporary_root) as folder:
         ready = Path(folder) / 'ready.json'
         secret = secrets.token_hex(32)
-        env = {**os.environ, 'SCOUT_READY_FILE': str(ready), 'SCOUT_MODELS_DIR': str(root / '.runtime/models'), 'LAYA_API_KEY': secret, 'LAYA_DEVICE': 'cpu', 'SCOUT_PARENT_PID': str(os.getpid())}
+        env = {**os.environ, 'SCOUT_READY_FILE': str(ready), 'SCOUT_MODELS_DIR': str(args.models_dir or root / '.runtime/models'), 'LAYA_API_KEY': secret, 'LAYA_DEVICE': 'cpu', 'SCOUT_PARENT_PID': str(os.getpid())}
         env['SCOUT_SEMANTIC_HELPER'] = '1' if args.helper else '0'
         if args.helper:
             env['LAYA_DEVICE'] = 'cuda'

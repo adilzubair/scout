@@ -178,8 +178,10 @@ static class SemanticServiceChecks
     {
         var root=Path.GetFullPath("artifacts/diagnostics/multimodal/scheduler-smoke/"+Guid.NewGuid().ToString("N"));
         var selected=Path.Combine(root,"selected");Directory.CreateDirectory(selected);
+        var passed=false;
         try
         {
+            if(Scout.App.MultimodalSetup.Find(addonRoot)==null)throw new IOException("A matching verified add-on is required; the marker/runtime is missing or stale.");
             foreach(var file in new[]{"notes.docx","notes.odt","growth.pptx","growth.odp","sales.xlsx","sales.ods"})
                 File.Copy(Path.GetFullPath("artifacts/diagnostics/multimodal/office-fixtures-v2/"+file),Path.Combine(selected,file));
             foreach(var file in new[]{"tone.wav","tone.mp3","tone.m4a","tone.flac","scene.mp4","scene.mov","scene.mkv","scene.webm"})
@@ -214,10 +216,10 @@ static class SemanticServiceChecks
             await metadata.Semantic.ResumeAsync();await Wait(()=>metadata.Semantic.Activity.State=="ready");
             value.Multimodal.Enabled=false;await metadata.ConfigureAsync(value);
             Check(metadata.Semantic.Index!.Progress.Files==0 && metadata.Semantic.Index.Vectors().Length==0 && host.ProcessId==null);
-            Console.WriteLine("PASS real all-family background indexing, pause/resume, watched arrival/rename, maintenance and revocation");return 0;
+            passed=true;Console.WriteLine("PASS real all-family background indexing, pause/resume, watched arrival/rename, maintenance and revocation");return 0;
         }
         catch(Exception error){Console.Error.WriteLine(error);return 1;}
-        finally{SemanticExtractor.DeleteJob(Path.GetDirectoryName(root)!,root);}
+        finally{if(passed)SemanticExtractor.DeleteJob(Path.GetDirectoryName(root)!,root);else Console.Error.WriteLine("Scheduler evidence retained: "+root);}
     }
     private static SemanticExtraction Good()=>new(new string('a',64),[new("text",new("lines"){StartLine=1,EndLine=1},"authored evidence",Enumerable.Range(0,768).Select(i=>i==0?1f:0f).ToArray())],false,"");
     private static async Task Wait(Func<bool> condition,TimeSpan? timeout=null)

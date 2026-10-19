@@ -476,10 +476,10 @@ public partial class MainWindow : Window
     }
     private void UpdateGroup() { GroupBar.Visibility = expanded && (group.Count > 0 || editingWorkspace != null) ? Visibility.Visible : Visibility.Collapsed; GroupLabel.Text = $"{group.Count} selected"; UpdateExpansion(); }
     private void ActionsClick(object sender, RoutedEventArgs e) => ShowActions();
-    private void ShowActions()
+    private ContextMenu? ShowActions()
     {
         RevealSuggestions();
-        if (Selected is not { } item) return;
+        if (Selected is not { } item) return null;
         manualSelection=true;var menuRevision=revision;
         var menu = new ContextMenu { PlacementTarget = ActionsButton, Placement = System.Windows.Controls.Primitives.PlacementMode.Top };
         void Add(string label, Action action)
@@ -520,6 +520,7 @@ public partial class MainWindow : Window
             Add("Delete workspace", () => { store.DeleteWorkspace(item.Id); if (editingWorkspace == item.Id) ClearGroup(); RefreshLocal(); });
         }
         menu.IsOpen = true;
+        return menu;
     }
     private void ReviewGroupClick(object sender, RoutedEventArgs e) => ReviewGroup();
     private void ReviewGroup()

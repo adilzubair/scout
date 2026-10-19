@@ -3,6 +3,17 @@
 Date: 2026-10-15. Branch: `feature/multimodal-semantic-search`.
 Status: internal-preview handoff complete; production release work deferred.
 
+2026-10-19 scheduling override: physical 16 GB testing is post-release work at
+the user's direction. It no longer blocks the beta merge/release. Keep minimum
+hardware claims provisional, and retain the other quality, lifecycle and
+distribution checks. Historical pre-release hardware gates below describe the
+earlier plan and are superseded only for this scheduling decision.
+
+2026-10-19 expanded native E2E results and the fixed fresh Laya installation are
+recorded in [the current E2E report](E2E_TESTING_2026_10_19.md). Current packaging
+validation is blocked by local antivirus; the historical package passes below
+do not supersede that block or close the remaining release gates.
+
 The immediate-reopen folder-persistence bug is reproduced and fixed in `2f5173a`.
 Saving no longer waits for a full index reconfiguration: Settings writes validated
 preferences before closing and retains edits if writing fails. Real WPF tests cover

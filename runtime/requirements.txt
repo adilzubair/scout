@@ -1,4 +1,4 @@
-laya[serve]==0.3.7
+laya[serve] @ https://github.com/NandhaKishorM/laya/archive/010bacef009c855ccba814b51f7c8e1d38ab5e3f.tar.gz#sha256=db7efbfe4a472b8af59a8ecae2ea6b13199679f79f77bc911f100c13b527dda7
 torch==2.8.0
 transformers==4.57.6
 numpy==2.3.4

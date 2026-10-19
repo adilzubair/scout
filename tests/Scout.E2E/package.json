@@ -1,0 +1,8 @@
+{
+  "name": "scout-windows-e2e",
+  "private": true,
+  "type": "module",
+  "scripts": { "test": "node run.mjs" },
+  "engines": { "node": "^22.22.3 || >=24.8.0" },
+  "devDependencies": { "e2e": "0.21.2" }
+}

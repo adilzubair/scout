@@ -31,12 +31,15 @@ public partial class MainWindow
                 window.Show();await Task.Delay(300);
                 var list=UiDiagnostics.Descendants<System.Windows.Controls.ListView>(window).Single();
                 if(list.Items.Count!=4 || list.Items.Cast<SemanticCoverageWindow.CoverageRow>().Any(row=>row.Coverage.Length==0))throw new InvalidOperationException("Coverage files or explanations were lost.");
+                UiDiagnostics.Descendants<Button>(window).Single(button=>button.Content as string=="Refresh").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                await Task.Delay(100);
+                if(list.Items.Count!=4)throw new InvalidOperationException("Coverage Refresh lost visible files.");
                 await UiDiagnostics.Snapshot(window,"semantic-content-coverage");
                 await service.DisableAsync();await Task.Delay(400);
                 if(list.Items.Count!=0)throw new InvalidOperationException("Revoked scope retained coverage rows.");
                 await UiDiagnostics.Snapshot(window,"semantic-revoked-coverage");
             }
-            finally{window.Close();}
+            finally{UiDiagnostics.Descendants<Button>(window).Single(button=>button.Content as string=="Close").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));}
         }
         var pack=Path.GetFullPath("artifacts/diagnostics/multimodal/office-fixtures-v2");
         if(!File.Exists(Path.Combine(pack,"fixtures.json")))return;

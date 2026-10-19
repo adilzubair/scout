@@ -8,6 +8,11 @@ The optional Windows setup executable is built with Inno Setup 7. Its copyright 
 
 Optional model setup installs Laya and its dependencies separately. Laya code and checkpoint weights identify their license as Apache-2.0. PyTorch, Transformers, FastAPI, Uvicorn, Hugging Face Hub, and their dependencies retain their respective upstream licenses and installed package metadata. Scout does not redistribute checkpoint weights in its application ZIP.
 
+Laya 0.3.7 is installed from its retained [upstream source commit](https://github.com/NandhaKishorM/laya/tree/010bacef009c855ccba814b51f7c8e1d38ab5e3f),
+with the archive SHA-256 pinned in both requirements files. PyPI no longer lists
+that version. The nine Python source files match Scout's previously tested
+0.3.7 installation after line-ending normalization; the model revision is unchanged.
+
 Optional descriptive file search additionally downloads Qwen3-4B-Instruct-2507
 in Unsloth's Q4_K_M GGUF conversion (Apache-2.0), and llama.cpp's Windows Vulkan
 runtime (MIT, with its bundled dependency notices). Repository revisions and

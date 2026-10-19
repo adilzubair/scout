@@ -12,3 +12,5 @@ __pycache__/
 torchinductor_*/
 *.py[cod]
 .pytest_cache/
+tests/Scout.E2E/node_modules/
+tests/Scout.E2E/.e2e/

@@ -1,4 +1,5 @@
 import json
+import os
 from pathlib import Path
 import sys
 import unittest
@@ -22,7 +23,7 @@ class FakeAgent:
 class ContractTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.real = load_agent('english', Path(__file__).resolve().parents[1] / '.runtime/models')
+        cls.real = load_agent('english', Path(os.environ.get('SCOUT_TEST_MODELS', Path(__file__).resolve().parents[1] / '.runtime/models')))
     def setUp(self):
         self.agent = FakeAgent(self.real)
     def test_budget_preserves_query(self):

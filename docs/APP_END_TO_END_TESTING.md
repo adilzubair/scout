@@ -1,5 +1,9 @@
 # App settings and multimodal end-to-end checks
 
+For the expanded 2026-10-19 TesterArmy run, fresh-install fix, retained failures
+and current release limitations, see [the current E2E report](E2E_TESTING_2026_10_19.md).
+The measurements below are the historical 2026-10-15 run.
+
 Date: 2026-10-15. Branch: `feature/multimodal-semantic-search`.
 
 Final self-contained product: `f53e3d6`, delivered as
