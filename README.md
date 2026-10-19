@@ -140,3 +140,24 @@ With `SCOUT_DATA_DIR` set to an isolated directory, `Scout.exe --smoke-test` che
 See [validation](docs/VALIDATION.md) for measured results and limits, and [parity](docs/PARITY.md) for Windows mappings. English queries are supported; Unicode filenames are preserved. No live Jev comparison has been run, so feature coverage and local benchmarks do not establish equal general model quality.
 
 The [search upgrade evaluation](docs/SEARCH_EVALUATION.md) measures the current build against a saved baseline on 504 frozen queries grounded in local file metadata. It also records remaining descriptive-search failures; those results are not a claim of general Intern parity.
+
+## Workspace cleanup
+
+Run `pwsh -File scripts/clean.ps1` to preview removable build output, retired test
+packages, old UI builds, and bytecode caches. Use `-Apply` to delete the listed
+files, or `-Apply -WhatIf` to exercise the deletion preview. Close any Scout or
+test processes running from those directories first. Build again with
+`scripts/build.ps1`; publishing uses `scripts/build.ps1 -Installer`.
+
+The cleanup retains the standard release outputs, the latest verified internal
+preview (`Scout-multimodal-preview-e2e-fixed`), model weights, Python environments,
+fixtures, evaluation data, diagnostic reports and linked test installations.
+The static website's `dist/` directory is its source and stays in place. Active
+regression tests remain part of the build. Cleanup refuses tracked content, links
+and nested Git repositories; it never touches installed Scout settings under
+`%LOCALAPPDATA%`. Run `pwsh -File scripts/test-clean.ps1` to verify its deletion
+and preservation contracts in a disposable repository.
+
+The retired hard-coded prompt experiment and failed portable LibreOffice
+download spike have been removed. Their history remains in Git; the documented
+MSI renderer experiment remains available for reproducing its research results.

@@ -1,0 +1,62 @@
+$ErrorActionPreference = 'Stop'
+$scoutRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
+$parent = Join-Path $scoutRoot 'artifacts/diagnostics/cleanup-contracts'
+$testRoot = Join-Path $parent ([guid]::NewGuid().ToString('N'))
+$checks = 0
+function Write-Fixture([string]$Name) {
+    $path = Join-Path $testRoot $Name
+    New-Item -ItemType Directory -Path (Split-Path -Parent $path) -Force | Out-Null
+    [IO.File]::WriteAllText($path, 'fixture')
+}
+function Assert([bool]$Condition, [string]$Message) {
+    if (-not $Condition) { throw $Message }
+    $script:checks++
+}
+function Expect-Rejection([string]$Message) {
+    $caught = $null
+    try { & $clean -Apply | Out-Null } catch { $caught = $_.Exception.Message }
+    Assert ($caught -like "*$Message*") "Expected '$Message', received '$caught'."
+    Assert (Test-Path -LiteralPath (Join-Path $testRoot 'artifacts/Scout-UI-v2/Scout.exe')) 'Preflight deleted an earlier target.'
+}
+try {
+    New-Item -ItemType Directory -Path (Join-Path $testRoot 'scripts') -Force | Out-Null
+    $clean = Join-Path $testRoot 'scripts/clean.ps1'
+    Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'clean.ps1') -Destination $clean
+    & git -C $testRoot init -q
+    if ($LASTEXITCODE -ne 0) { throw 'Test repository initialization failed.' }
+    $obsolete = @('artifacts/Scout-UI-v2/Scout.exe', 'src/Scout.App/obj/cache', 'tests/Scout.Benchmark/obj/cache', 'runtime/__pycache__/old.pyc')
+    $retained = @(
+        'artifacts/Scout/Scout.exe', 'artifacts/Scout-win-x64.zip', 'artifacts/Scout-Setup.exe',
+        'artifacts/Scout-multimodal-preview-e2e-fixed/Scout.exe',
+        'artifacts/Scout-multimodal-preview-e2e-fixed.zip',
+        'artifacts/Scout-multimodal-preview-e2e-fixed.zip.sha256',
+        'artifacts/diagnostics/multimodal/office-fixtures-v2/fixtures.json',
+        'artifacts/diagnostics/multimodal/app-e2e-current/report.json',
+        'artifacts/evaluation/frozen.json', '.runtime/models/weights.bin',
+        '.runtime/semantic-search/.venv/Scripts/python.exe', 'website/dist/index.html'
+    )
+    foreach ($name in ($obsolete + $retained)) { Write-Fixture $name }
+    [IO.File]::WriteAllText((Join-Path $testRoot 'src/Scout.App/obj/.git'), '')
+    & $clean | Out-Null
+    foreach ($name in $obsolete) { Assert (Test-Path -LiteralPath (Join-Path $testRoot $name)) "Preview removed $name" }
+    & $clean -Apply -WhatIf | Out-Null
+    foreach ($name in $obsolete) { Assert (Test-Path -LiteralPath (Join-Path $testRoot $name)) "WhatIf removed $name" }
+    & $clean -Apply -Confirm:$false | Out-Null
+    foreach ($name in $obsolete) { Assert (-not (Test-Path -LiteralPath (Join-Path $testRoot $name))) "Cleanup missed $name" }
+    foreach ($name in $retained) { Assert ([IO.File]::ReadAllText((Join-Path $testRoot $name)) -eq 'fixture') "Cleanup changed $name" }
+
+    Write-Fixture 'artifacts/Scout-UI-v2/Scout.exe'
+    Write-Fixture 'src/Scout.App/obj/tracked.txt'
+    & git -C $testRoot add -f -- src/Scout.App/obj/tracked.txt
+    if ($LASTEXITCODE -ne 0) { throw 'Test staging failed.' }
+    Expect-Rejection 'Tracked content'
+    & git -C $testRoot rm --cached -q -- src/Scout.App/obj/tracked.txt
+    if ($LASTEXITCODE -ne 0) { throw 'Test index cleanup failed.' }
+    Write-Fixture 'src/Scout.App/obj/.git'
+    Expect-Rejection 'Nested repository'
+    Write-Output "$checks cleanup contracts passed."
+} finally {
+    $resolved = [IO.Path]::GetFullPath($testRoot)
+    if (-not $resolved.StartsWith($parent + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) { throw 'Test cleanup escaped owned directory.' }
+    if (Test-Path -LiteralPath $resolved) { Remove-Item -LiteralPath $resolved -Recurse -Force }
+}

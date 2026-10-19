@@ -8,3 +8,7 @@ __pycache__/
 *.log
 .vs/
 .reference/
+.omo/
+torchinductor_*/
+*.py[cod]
+.pytest_cache/

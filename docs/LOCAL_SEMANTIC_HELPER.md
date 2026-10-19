@@ -103,7 +103,7 @@ The helpers do not install dependencies during ordinary inference.
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts/setup-laya.ps1 -Cuda -SemanticHelper
 
 .runtime/.venv/Scripts/python.exe runtime/search_quality.py --fixtures artifacts/diagnostics/semantic-helper/validation.json --models .runtime/models --helper --output artifacts/diagnostics/semantic-helper/new-predictions.json
-dotnet tests/Scout.Tests/bin/Release/net10.0/Scout.Tests.dll --search-eval artifacts/diagnostics/semantic-helper/frozen.json artifacts/diagnostics/semantic-helper/new-assessment.json validation artifacts/diagnostics/semantic-helper/new-predictions.json
+dotnet run --project tests/Scout.Tests -c Release -- --search-eval artifacts/diagnostics/semantic-helper/frozen.json artifacts/diagnostics/semantic-helper/new-assessment.json validation artifacts/diagnostics/semantic-helper/new-predictions.json
 
 .runtime/.venv/Scripts/python.exe runtime/test_semantic_helper.py
 .runtime/.venv/Scripts/python.exe runtime/test_helper_process.py

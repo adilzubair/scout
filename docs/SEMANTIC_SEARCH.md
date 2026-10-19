@@ -126,9 +126,9 @@ and records the selected checkpoint alongside fixture/ranker hashes.
 
 ```powershell
 .runtime/.venv/Scripts/python.exe scripts/build-semantic-evaluation.py --source artifacts/diagnostics/search-upgrade/frozen-v2.json --output artifacts/diagnostics/semantic-upgrade/new-frozen.json
-dotnet tests/Scout.Tests/bin/Release/net10.0/Scout.Tests.dll --search-eval artifacts/diagnostics/semantic-upgrade/new-frozen.json artifacts/diagnostics/semantic-upgrade/new-development.json development
+dotnet run --project tests/Scout.Tests -c Release -- --search-eval artifacts/diagnostics/semantic-upgrade/new-frozen.json artifacts/diagnostics/semantic-upgrade/new-development.json development
 .runtime/.venv/Scripts/python.exe runtime/search_quality.py --fixtures artifacts/diagnostics/semantic-upgrade/new-development.json --models .runtime/models --checkpoint english --output artifacts/diagnostics/semantic-upgrade/new-predictions.json
-dotnet tests/Scout.Tests/bin/Release/net10.0/Scout.Tests.dll --search-eval artifacts/diagnostics/semantic-upgrade/new-frozen.json artifacts/diagnostics/semantic-upgrade/new-assessment.json development artifacts/diagnostics/semantic-upgrade/new-predictions.json
+dotnet run --project tests/Scout.Tests -c Release -- --search-eval artifacts/diagnostics/semantic-upgrade/new-frozen.json artifacts/diagnostics/semantic-upgrade/new-assessment.json development artifacts/diagnostics/semantic-upgrade/new-predictions.json
 ```
 
 Assess through the C# policy, not just the model's highest probability. Evaluation

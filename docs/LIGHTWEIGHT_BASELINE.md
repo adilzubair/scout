@@ -78,7 +78,7 @@ Reproduce the CPU model and C# policy measurements with ignored local fixtures:
 
 ```powershell
 .runtime/.venv/Scripts/python.exe runtime/search_quality.py --fixtures artifacts/diagnostics/semantic-helper/validation.json --models .runtime/models --device cpu --output artifacts/diagnostics/lightweight/cpu-laya-baseline.json
-dotnet tests/Scout.Tests/bin/Debug/net10.0/Scout.Tests.dll --search-eval artifacts/diagnostics/semantic-helper/frozen.json artifacts/diagnostics/lightweight/cpu-laya-assessment.json validation artifacts/diagnostics/lightweight/cpu-laya-baseline.json
+dotnet run --project tests/Scout.Tests -c Release -- --search-eval artifacts/diagnostics/semantic-helper/frozen.json artifacts/diagnostics/lightweight/cpu-laya-assessment.json validation artifacts/diagnostics/lightweight/cpu-laya-baseline.json
 ```
 
 The runner refuses to overwrite existing output. These ignored reports contain

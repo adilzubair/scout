@@ -74,7 +74,7 @@ unique targets and task families alongside case counts.
 
 ```powershell
 .runtime/.venv/Scripts/python.exe scripts/freeze-task-benchmark.py --source artifacts/diagnostics/search-upgrade/frozen.json --tasks artifacts/diagnostics/task-benchmark/tasks.json --output artifacts/diagnostics/task-benchmark/holdout.json
-dotnet tests/Scout.Tests/bin/Release/net10.0/Scout.Tests.dll --search-eval artifacts/diagnostics/task-benchmark/holdout.json artifacts/diagnostics/task-benchmark/local-report.json holdout
+dotnet run --project tests/Scout.Tests -c Release -- --search-eval artifacts/diagnostics/task-benchmark/holdout.json artifacts/diagnostics/task-benchmark/local-report.json holdout
 ```
 
 The summary now reports `positives`, `positiveShortlistRecall`,
@@ -144,7 +144,7 @@ Reproduce the authored screen and policy selection with ignored outputs:
 ```powershell
 .runtime/.venv/Scripts/python.exe scripts/build-prospective-tasks.py --base artifacts/diagnostics/search-upgrade/frozen-v2.json --source-out artifacts/diagnostics/task-benchmark/prospective-source.json --tasks-out artifacts/diagnostics/task-benchmark/prospective-tasks.json
 .runtime/.venv/Scripts/python.exe scripts/freeze-task-benchmark.py --source artifacts/diagnostics/task-benchmark/prospective-source.json --tasks artifacts/diagnostics/task-benchmark/prospective-tasks.json --output artifacts/diagnostics/task-benchmark/prospective-frozen.json
-dotnet tests/Scout.Tests/bin/Release/net10.0/Scout.Tests.dll --search-eval artifacts/diagnostics/task-benchmark/prospective-frozen.json artifacts/diagnostics/task-benchmark/development-local.json development
+dotnet run --project tests/Scout.Tests -c Release -- --search-eval artifacts/diagnostics/task-benchmark/prospective-frozen.json artifacts/diagnostics/task-benchmark/development-local.json development
 .runtime/.venv/Scripts/python.exe scripts/ettin-onnx-probe.py --fixtures artifacts/diagnostics/task-benchmark/development-local.json --model .runtime/models/ettin-reranker-150m-v1 --output artifacts/diagnostics/task-benchmark/development-ettin-150m.json --threads 4
 .runtime/.venv/Scripts/python.exe scripts/compact-admission.py --development artifacts/diagnostics/task-benchmark/development-ettin-150m.json --max-false-matches 2 --policy-out artifacts/diagnostics/task-benchmark/ettin-150m-policy.json
 ```

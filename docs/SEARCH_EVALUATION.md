@@ -126,9 +126,9 @@ an existing corpus; the inference runner likewise refuses to overwrite predictio
 ```powershell
 dotnet build tests/Scout.Tests -c Release -m:1
 .runtime/.venv/Scripts/python.exe scripts/build-search-evaluation.py --snapshot artifacts/diagnostics/search-upgrade/snapshot.db --output artifacts/diagnostics/search-upgrade/new-corpus.json
-dotnet tests/Scout.Tests/bin/Release/net10.0/Scout.Tests.dll --search-eval artifacts/diagnostics/search-upgrade/new-corpus.json artifacts/diagnostics/search-upgrade/new-cases.json development
+dotnet run --project tests/Scout.Tests -c Release --no-build -- --search-eval artifacts/diagnostics/search-upgrade/new-corpus.json artifacts/diagnostics/search-upgrade/new-cases.json development
 .runtime/.venv/Scripts/python.exe runtime/search_quality.py --fixtures artifacts/diagnostics/search-upgrade/new-cases.json --models .runtime/models --output artifacts/diagnostics/search-upgrade/new-predictions.json
-dotnet tests/Scout.Tests/bin/Release/net10.0/Scout.Tests.dll --search-eval artifacts/diagnostics/search-upgrade/new-corpus.json artifacts/diagnostics/search-upgrade/new-report.json development artifacts/diagnostics/search-upgrade/new-predictions.json
+dotnet run --project tests/Scout.Tests -c Release --no-build -- --search-eval artifacts/diagnostics/search-upgrade/new-corpus.json artifacts/diagnostics/search-upgrade/new-report.json development artifacts/diagnostics/search-upgrade/new-predictions.json
 ```
 
 The evaluation command reports failures as measurements rather than a nonzero
