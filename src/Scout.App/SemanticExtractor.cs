@@ -142,7 +142,19 @@ internal sealed class SemanticExtractor : ISemanticExtractionSession
     }
     internal static async Task<JsonDocument> ReadJsonAsync(string path, long maximum, CancellationToken token)
     {
-        using var file = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 65536, FileOptions.Asynchronous);
+        // A published receipt may be briefly held by another local reader or
+        // scanner. Retry only sharing/lock violations; invalid bytes and access
+        // failures retain their normal rejection, and cancellation stays prompt.
+        FileStream file;
+        var waiting=System.Diagnostics.Stopwatch.StartNew();
+        while(true)
+        {
+            token.ThrowIfCancellationRequested();
+            try{file=new FileStream(path,FileMode.Open,FileAccess.Read,FileShare.Read,65536,FileOptions.Asynchronous);break;}
+            catch(IOException error)when((error.HResult&0xffff) is 32 or 33 && waiting.Elapsed<TimeSpan.FromSeconds(2))
+            {await Task.Delay(25,token).ConfigureAwait(false);}
+        }
+        using var receipt=file;
         if (file.Length is < 2 || file.Length > maximum) throw new IOException("Extraction output size limit.");
         var bytes = new byte[checked((int)file.Length)]; await file.ReadExactlyAsync(bytes, token).ConfigureAwait(false);
         return JsonDocument.Parse(bytes, new JsonDocumentOptions { MaxDepth = 32 });

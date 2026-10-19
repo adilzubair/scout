@@ -36,10 +36,15 @@ test('Runtime source and archive packaging contracts', () => phase('packaging', 
 test('Cleanup preservation contracts', () => phase('cleanup', ['-Phase', 'cleanup']));
 test('Expanded launcher, workspace and settings control interactions', () => phase('controls', ['-Phase', 'controls']));
 test('Repeated PDF navigation, cancellation and malformed recovery', () => phase('pdf', ['-Phase', 'pdf']));
+test('Hidden published PDF workers and failure recovery', () => phase('pdf-worker', ['-Phase', 'pdf-worker']));
 test('Real WPF settings, restart, picker, launcher and previews', () => phase('application', ['-Phase', 'application']));
 test('Real-model seven-family indexing, watching, pause and revocation', () => phase('scheduler', ['-Phase', 'scheduler']));
 test('Python reader, model-boundary and setup contracts', () => phase('python', ['-Phase', 'python']));
 test('Laya adapter and authenticated local HTTP', () => phase('laya', ['-Phase', 'laya']));
+test('Ordinary search with indexing, PDF and Laya concurrency', async () => {
+  test.skip(process.env.SCOUT_E2E_CONCURRENCY !== '1', 'Set SCOUT_E2E_CONCURRENCY=1 for the development-machine workload with real model indexing and Laya.');
+  await phase('concurrency', ['-Phase', 'concurrency']);
+});
 test('CUDA full-model worker and joint audiovisual inputs', async () => {
   test.skip(process.env.SCOUT_E2E_CUDA !== '1', 'Set SCOUT_E2E_CUDA=1 on a PC with the CUDA test environment and supported GPU.');
   await phase('cuda', ['-Phase', 'cuda']);

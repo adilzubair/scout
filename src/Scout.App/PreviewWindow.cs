@@ -23,6 +23,7 @@ internal sealed class PreviewWindow : Window
     private TaskCompletionSource<bool>? mediaReady;
     private Task? loading;
     private readonly Func<SemanticEvidence,CancellationToken,Task<PreparedPlayback>>? preparePlayback;
+    private readonly Func<string,uint,CancellationToken,Task<RenderedPdf>> renderPdf;
     private PreparedPlayback? playback;
     private bool fallbackAttempted;
     private SemanticEvidence? evidence;
@@ -31,8 +32,10 @@ internal sealed class PreviewWindow : Window
     internal ContentLocator? MatchedLocator=>evidence?.Locator;
     internal uint? RenderedPdfPage=>pdfPages==0?null:page+1;
     public PreviewWindow(Candidate item,SemanticEvidence? evidence=null,Func<SemanticEvidence,bool>? validate=null,
-        Func<SemanticEvidence,CancellationToken,Task<PreparedPlayback>>? preparePlayback=null)
+        Func<SemanticEvidence,CancellationToken,Task<PreparedPlayback>>? preparePlayback=null,
+        Func<string,uint,CancellationToken,Task<RenderedPdf>>? pdfRenderer=null)
     {
+        renderPdf=pdfRenderer??((path,number,token)=>PdfPreviewRenderer.RenderAsync(path,number,token));
         this.item = item;this.evidence=evidence;this.validate=validate;this.preparePlayback=preparePlayback; Title = item.Title; Width = 850; Height = 660; MinWidth = 600; MinHeight = 380; WindowStartupLocation = WindowStartupLocation.CenterOwner;
         if(evidence!=null)evidence.Locator.Validate();
         WindowVisuals.Configure(this, WindowSurface.Document);
@@ -45,8 +48,8 @@ internal sealed class PreviewWindow : Window
         Button("Open file", () => { try { if(CheckEvidence())WindowsIntegration.Open(item); } catch (Exception e) when (e is IOException or System.ComponentModel.Win32Exception) { status.Text = e.Message; } });
         if (Path.GetExtension(item.Target).Equals(".pdf", StringComparison.OrdinalIgnoreCase))
         {
-            Button("Previous page", () => { if (!rendering && page > 0) { page--; _ = RenderPdf(); } });
-            Button("Next page", () => { if (!rendering && page + 1 < pdfPages) { page++; _ = RenderPdf(); } });
+            Button("Previous page", () => { if (!rendering && page > 0) _ = RenderPdf(page-1); });
+            Button("Next page", () => { if (!rendering && page + 1 < pdfPages) _ = RenderPdf(page+1); });
         }
         if (FileTypes.Matches(Path.GetExtension(item.Target).ToLowerInvariant(), "video") || FileTypes.Matches(Path.GetExtension(item.Target).ToLowerInvariant(), "audio"))
         { Button("Play", () => media?.Play()); Button("Pause", () => media?.Pause()); }
@@ -105,7 +108,7 @@ internal sealed class PreviewWindow : Window
                 {
                     page=(uint)(evidence.Locator.Page!.Value-1);
                 }
-                if (!lifetime.IsCancellationRequested) await RenderPdf(); return;
+                if (!lifetime.IsCancellationRequested) await RenderPdf(page); return;
             }
             if(evidence!=null && evidence.Locator.Kind is "paragraphs" or "slide" or "sheet" or "lines" or "image")
             {ShowEvidence();return;}
@@ -144,15 +147,28 @@ internal sealed class PreviewWindow : Window
         await EnsureLoaded();
         if (preview.Content == null || status.Text.StartsWith("Preview unavailable", StringComparison.Ordinal) || status.Text.StartsWith("PDF preview unavailable", StringComparison.Ordinal)) throw new InvalidOperationException(status.Text);
     }
-    internal async Task CheckPdfNavigationAsync()
+    internal async Task CheckPdfNavigationAsync(bool checkFailureRecovery=false)
     {
         if(pdfPages<2 || page!=1)throw new IOException("The authored PDF navigation check needs page two.");
+        if(checkFailureRecovery)await Navigate("Previous page",1u,false);
         foreach(var (label,expected) in new[]{("Previous page",0u),("Next page",1u)})
+            await Navigate(label,expected,true);
+        async Task Navigate(string label,uint expected,bool success)
         {
-            UiDiagnostics.Descendants<Button>(this).Single(button=>button.Content as string==label).RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));
+            Buttons(this).Single(button=>button.Content as string==label).RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));
             var deadline=System.Diagnostics.Stopwatch.StartNew();
             while(rendering){if(deadline.Elapsed>TimeSpan.FromSeconds(35))throw new IOException("PDF navigation timed out.");await Task.Delay(25);}
-            if(page!=expected || !status.Text.StartsWith($"Page {expected+1} of ",StringComparison.Ordinal))throw new IOException($"PDF navigation '{label}' expected page {expected+1}, selected {page+1}: {status.Text}");
+            var prefix=success?$"Page {expected+1} of ":"PDF preview unavailable:";
+            if(page!=expected || !status.Text.StartsWith(prefix,StringComparison.Ordinal))throw new IOException($"PDF navigation '{label}' expected page {expected+1}, selected {page+1}: {status.Text}");
+        }
+        static IEnumerable<Button> Buttons(DependencyObject root)
+        {
+            // Logical children also work in a hidden, never-shown WPF window.
+            foreach(var child in LogicalTreeHelper.GetChildren(root).OfType<DependencyObject>())
+            {
+                if(child is Button button)yield return button;
+                foreach(var descendant in Buttons(child))yield return descendant;
+            }
         }
     }
     private void OpenMedia(string path,double seek)
@@ -196,18 +212,19 @@ internal sealed class PreviewWindow : Window
         if(player.Position<=before+TimeSpan.FromMilliseconds(100))throw new IOException("Media playback did not advance.");
         player.IsMuted=false;
     }
-    private async Task RenderPdf()
+    private async Task RenderPdf(uint requestedPage)
     {
         if (rendering || lifetime.IsCancellationRequested) return;
         rendering = true;
         try
         {
-            var rendered=await PdfPreviewRenderer.RenderAsync(item.Target,page,lifetime.Token);
+            var rendered=await renderPdf(item.Target,requestedPage,lifetime.Token);
             if (lifetime.IsCancellationRequested || !CheckEvidence()) return;
             pdfPages=rendered.Pages;
             using var input = new MemoryStream(rendered.Png);
             var image = new BitmapImage(); image.BeginInit(); image.CacheOption = BitmapCacheOption.OnLoad; image.StreamSource = input; image.EndInit(); image.Freeze();
             preview.Content = new ScrollViewer { Content = new Image { Source = image, Stretch = Stretch.Uniform }, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
+            page=requestedPage;
             status.Text = $"Page {page + 1} of {pdfPages}"+(evidence!=null?" · Content match":"");
         }
         catch(OperationCanceledException)when(lifetime.IsCancellationRequested){}

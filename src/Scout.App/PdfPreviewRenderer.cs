@@ -52,7 +52,7 @@ internal static class PdfPreviewRenderer
                 {
                     deadline.Token.ThrowIfCancellationRequested();
                     if(drains.IsFaulted)await drains.ConfigureAwait(false);
-                    if(child.Process.HasExited)throw new IOException("The PDF renderer could not prepare this page.");
+                    if(child.Process.HasExited)throw new IOException($"The PDF renderer could not prepare this page (exit 0x{child.Process.ExitCode:X8}).");
                     await Task.Delay(40,deadline.Token).ConfigureAwait(false);
                 }
                 using var receipt=await SemanticExtractor.ReadJsonAsync(ready,4096,deadline.Token).ConfigureAwait(false);

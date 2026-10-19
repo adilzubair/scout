@@ -1,5 +1,5 @@
 param(
-    [Parameter(Mandatory)][ValidateSet('native','packaging','cleanup','controls','pdf','application','scheduler','python','laya','cuda','laya-install')][string]$Phase,
+    [Parameter(Mandatory)][ValidateSet('native','packaging','cleanup','controls','pdf','pdf-worker','concurrency','application','scheduler','python','laya','cuda','laya-install')][string]$Phase,
     [string]$Executable = $env:SCOUT_E2E_EXECUTABLE,
     [string]$AddonRoot = $env:SCOUT_E2E_ADDON_ROOT,
     [string]$PythonHome = $env:SCOUT_E2E_PYTHON_HOME,
@@ -12,9 +12,9 @@ if (!$AddonRoot) { $AddonRoot = Join-Path $scoutRoot 'artifacts/diagnostics/e2e/
 if (!$PythonHome) { $PythonHome = Join-Path $scoutRoot '.runtime/python/cpython-3.12.13-windows-x86_64-none' }
 if (!$Python) { $Python = Join-Path $scoutRoot '.runtime/semantic-search/cpu-venv/Scripts/python.exe' }
 $scoutTestProject = if ($env:SCOUT_E2E_TEST_PROJECT) { $env:SCOUT_E2E_TEST_PROJECT } else { Join-Path $scoutRoot 'tests/Scout.Tests/Scout.Tests.csproj' }
-if ($Phase -in @('application','scheduler','pdf')) {
+if ($Phase -in @('application','scheduler','pdf','pdf-worker','concurrency')) {
     $scoutFixtures = @('scan-fixtures-v1/f003.pdf')
-    if ($Phase -ne 'pdf') {
+    if ($Phase -notin @('pdf','pdf-worker')) {
         $scoutFixtures += @('office-fixtures-v2/fixtures.json')
         $scoutFixtures += @('notes.docx','notes.odt','growth.pptx','growth.odp','sales.xlsx','sales.ods') | ForEach-Object { 'office-fixtures-v2/' + $_ }
         $scoutFixtures += @('tone.wav','tone.mp3','tone.m4a','tone.flac','scene.mp4','scene.mov','scene.mkv','scene.webm') | ForEach-Object { 'media-fixtures-v1/' + $_ }
@@ -23,7 +23,7 @@ if ($Phase -in @('application','scheduler','pdf')) {
         if (!(Test-Path -LiteralPath (Join-Path $scoutRoot ('artifacts/diagnostics/multimodal/' + $scoutFixture)) -PathType Leaf)) { throw ('Required authored fixture is missing: ' + $scoutFixture) }
     }
 }
-if ($Phase -in @('application','scheduler')) {
+if ($Phase -in @('application','scheduler','concurrency')) {
     $scoutMarkerPath = Join-Path $AddonRoot 'installed.json'
     if (!(Test-Path -LiteralPath $scoutMarkerPath -PathType Leaf)) { throw 'Prepare a verified E2E add-on and set SCOUT_E2E_ADDON_ROOT; no installation marker was found.' }
     $scoutMarker = Get-Content -LiteralPath $scoutMarkerPath -Raw | ConvertFrom-Json
@@ -45,6 +45,17 @@ try {
         cleanup { & "$PSScriptRoot/test-clean.ps1" }
         controls { & "$PSScriptRoot/test-app-e2e.ps1" -Executable $Executable -ControlsOnly -OutputDirectory artifacts/diagnostics/e2e }
         pdf { & "$PSScriptRoot/test-app-e2e.ps1" -Executable $Executable -PdfOnly -OutputDirectory artifacts/diagnostics/e2e }
+        pdf-worker {
+            $scoutPdfOutput=Join-Path $scoutRoot ('artifacts/diagnostics/e2e/pdf-workers-'+[guid]::NewGuid().ToString('N'))
+            & dotnet run --project $scoutTestProject -c Release --no-build --no-restore -- --pdf-worker-checks ([IO.Path]::GetDirectoryName([IO.Path]::GetFullPath($Executable))) (Join-Path $scoutRoot 'artifacts/diagnostics/multimodal/scan-fixtures-v1/f003.pdf') $scoutPdfOutput 3
+            if($LASTEXITCODE -ne 0 -or !(Test-Path -LiteralPath (Join-Path $scoutPdfOutput 'profile/pdf-recovery.txt'))){throw 'Hidden PDF worker/recovery checks failed; rebuild the Release test driver if the new mode is unavailable.'}
+        }
+        concurrency {
+            $scoutConcurrencyOutput=Join-Path $scoutRoot ('artifacts/diagnostics/e2e/concurrent-search-'+[guid]::NewGuid().ToString('N'))
+            $scoutLayaPython=Join-Path $scoutRoot '.runtime/.venv/Scripts/python.exe'
+            & dotnet run --project $scoutTestProject -c Release --no-build --no-restore -- --concurrent-search ([IO.Path]::GetDirectoryName([IO.Path]::GetFullPath($Executable))) $AddonRoot $PythonHome $scoutLayaPython $scoutConcurrencyOutput
+            if($LASTEXITCODE -ne 0 -or !(Test-Path -LiteralPath (Join-Path $scoutConcurrencyOutput 'report.json'))){throw 'Concurrent search workload failed; retain its private profiles and logs.'}
+        }
         application {
             & "$PSScriptRoot/test-app-e2e.ps1" -Executable $Executable -IncludeUi -UiAddonRoot $AddonRoot -UiPythonHome $PythonHome -OutputDirectory artifacts/diagnostics/e2e
         }

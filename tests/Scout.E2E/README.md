@@ -23,6 +23,8 @@ npm test
 ```
 
 The app target must be a self-contained package with its normal runtime/scripts.
+The hidden PDF/concurrency probes require a clean base package without an installed
+`.runtime` directory; use a separate disposable package for Laya installer tests.
 `scripts/build.ps1 -Publish` creates that package and runs packaging checks; do
 not bypass antivirus blocks or disable security tooling if a script is blocked.
 The test add-on must have matching model/setup/lock hashes and an existing private
@@ -59,6 +61,20 @@ override it with `SCOUT_E2E_PYTHON`. Laya checks use `.runtime/.venv` and the
 separately downloaded pinned checkpoints.
 `SCOUT_E2E_TEST_PROJECT` can select an already built Release regression project
 from a clean source export; the default is this checkout's `tests/Scout.Tests`.
+
+The hidden PDF test uses the exact published Windows PDF worker and real WPF
+Previous/Next handlers in a never-shown window, including injected render failure
+and retry. It does not start Scout's launcher. Set `SCOUT_E2E_CONCURRENCY=1` for
+an additional workload comparing 100,000 authored metadata entries alone, during
+17-file/seven-family indexing and PDF renders, and with Laya enabled as well.
+It records ordinary-search timings, unchanged result signatures, Laya outcomes,
+observed indexing completion and whole-job peak commit. These are engineering
+measurements; visible WPF/debounce timing, battery and minimum hardware remain
+separate. The user's other desktop workloads may affect the measurements.
+The same workload verifies real Laya reset and watchdog cleanup after abrupt
+owner termination, before closing its enclosing test job. Laya fallback counts
+are retained separately from ordinary-search success; a passing isolation check
+does not establish timely or accurate AI ranking.
 
 Set `SCOUT_E2E_CUDA=1` to run the optional actual CUDA worker and joint audiovisual
 checks with `.runtime/semantic-search/.venv` on a supported NVIDIA GPU. Otherwise

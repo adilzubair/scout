@@ -3,6 +3,10 @@ using System.Text.Json;
 using Microsoft.Data.Sqlite;
 using Scout.Core;
 
+if (args.Length == 6 && args[0] == "--concurrent-search") return await ConcurrentSearchChecks.Run(args[1],args[2],args[3],args[4],args[5]);
+if (args.Length == 6 && args[0] == "--concurrent-search-child") return await ConcurrentSearchChecks.Child(args[1],args[2],args[3],args[4],args[5]);
+if (args.Length == 5 && args[0] == "--pdf-worker-checks") return await PdfPreviewChecks.Run(args[1],args[2],args[3],int.Parse(args[4]));
+if (args.Length == 4 && args[0] == "--pdf-worker-child") return await PdfPreviewChecks.Child(args[1],args[2],int.Parse(args[3]));
 if (args.Length == 3 && args[0] == "--profile") return SearchProfiler.Run(args[1], args[2]);
 if (args.Length == 2 && args[0] == "--job-parent") return MultimodalChecks.JobParent(args[1]);
 if (args.Length >= 3 && args[0] == "--owned-child") return OwnedProcessChecks.Child(args.Skip(1).ToArray());

@@ -8,6 +8,41 @@ static class SemanticExtractorChecks
 {
     public static void Run(Action<string, Action> test)
     {
+        test("Published JSON receipt survives a brief exclusive file lock",()=>With(f=>
+        {
+            async Task Run()
+            {
+                var path=Path.Combine(f.Root,"held.json");File.WriteAllText(path,"{\"published\":true}");
+                using var held=new FileStream(path,FileMode.Open,FileAccess.Read,FileShare.None);
+                var pending=SemanticExtractor.ReadJsonAsync(path,1024,default);
+                await Task.Delay(75);Check(!pending.IsCompleted,"Sharing contention was not retried.");
+                held.Dispose();using var result=await pending;
+                Check(result.RootElement.GetProperty("published").GetBoolean());
+            }
+            Run().GetAwaiter().GetResult();
+        }));
+        test("Published JSON receipt lock waiting respects cancellation",()=>With(f=>
+        {
+            var path=Path.Combine(f.Root,"held.json");File.WriteAllText(path,"{\"published\":true}");
+            using var held=new FileStream(path,FileMode.Open,FileAccess.Read,FileShare.None);
+            using var cancel=new CancellationTokenSource(TimeSpan.FromMilliseconds(75));
+            Throws<OperationCanceledException>(()=>SemanticExtractor.ReadJsonAsync(path,1024,cancel.Token).GetAwaiter().GetResult());
+        }));
+        test("Published JSON receipt lock waiting is bounded",()=>With(f=>
+        {
+            var path=Path.Combine(f.Root,"held.json");File.WriteAllText(path,"{\"published\":true}");
+            using var held=new FileStream(path,FileMode.Open,FileAccess.Read,FileShare.None);
+            var clock=System.Diagnostics.Stopwatch.StartNew();
+            Throws<IOException>(()=>SemanticExtractor.ReadJsonAsync(path,1024,default).GetAwaiter().GetResult());
+            Check(clock.Elapsed<TimeSpan.FromSeconds(5),"A persistent lock exceeded its bounded retry.");
+        }));
+        test("Published JSON receipt rejects invalid and oversized bytes",()=>With(f=>
+        {
+            var path=Path.Combine(f.Root,"invalid.json");File.WriteAllText(path,"{malformed}");
+            Throws<JsonException>(()=>SemanticExtractor.ReadJsonAsync(path,1024,default).GetAwaiter().GetResult());
+            File.WriteAllText(path,new string(' ',1025));
+            Throws<IOException>(()=>SemanticExtractor.ReadJsonAsync(path,1024,default).GetAwaiter().GetResult());
+        }));
         test("Joint audiovisual receipts require strict finite audio aligned to the locator",()=>With(f=>
         {
             var image="iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aBZkAAAAASUVORK5CYII=";
