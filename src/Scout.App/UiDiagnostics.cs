@@ -99,6 +99,8 @@ public partial class MainWindow
             scope = filter; UpdateScopes(); Query.Text = text; RefreshLocal(); await WaitForSearch();
             await UiDiagnostics.Snapshot(this, name, pixelScale);
             if (Query.ActualWidth < 200 || Results.ActualHeight < 100) throw new InvalidOperationException("Launcher content was clipped.");
+            if (FooterBar.IsVisible && FooterBar.TranslatePoint(new System.Windows.Point(0, FooterBar.ActualHeight), this).Y > ActualHeight + .5)
+                throw new InvalidOperationException($"The footer overflowed the launcher in {name}.");
         }
         await SearchView("", Scope.All, "launcher-empty");
         if (ActualHeight > 90 || ScopesRow.IsVisible || ResultsRegion.IsVisible) throw new InvalidOperationException("Empty search did not open compact.");
@@ -130,6 +132,15 @@ public partial class MainWindow
         await SearchView("latest 3 files in downloads", Scope.All, "site-download-group", pixelScale: 3);
         if (Selected?.Kind != ItemKind.Group || group.Count != 3) throw new InvalidOperationException("Site download example did not form a three-file group.");
         ClearGroup();
+        // Dark variants for the project website, which uses dark product panels.
+        WindowVisuals.SetTestTheme(true, false);
+        try
+        {
+            await SearchView("the pdf I just downloaded", Scope.All, "site-recent-download-dark", pixelScale: 3);
+            await SearchView("latest 3 files in downloads", Scope.All, "site-download-group-dark", pixelScale: 3);
+            ClearGroup();
+        }
+        finally { WindowVisuals.SetTestTheme(null); }
         await SearchView("/folder projects", Scope.Files, "launcher-folder-filter");
         if (Selected?.Kind != ItemKind.Folder || Selected.Title != "Projects" || ResultsHeading.Text != "/folder results")
             throw new InvalidOperationException("Slash folder filter did not select the independent folder.");

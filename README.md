@@ -15,7 +15,10 @@ descriptive queries such as *"the pdf I just downloaded"*.
 [Release notes](docs/RELEASE_NOTES.md)
 
 <p align="center">
-  <img src="website/dist/scout-download-group-3x.png" alt="Scout showing the latest three files in Downloads, grouped so they can be opened together" width="640">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="website/dist/scout-arrival-dark-3x.png">
+    <img src="website/dist/scout-arrival-3x.png" alt="Scout finding &quot;the pdf I just downloaded&quot;, with results on the left and a preview of the selected file on the right" width="720">
+  </picture>
 </p>
 
 > [!NOTE]

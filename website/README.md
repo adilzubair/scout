@@ -5,7 +5,7 @@ It has no build step. Serve that
 directory with a local static server to preview it. Asset paths are relative so
 the site also works under a project path such as GitHub Pages.
 
-The Find / Control / Resume buttons switch illustrative examples only. Without
+The Find / Control / Resume buttons switch between examples. Without
 JavaScript, all three examples remain visible. The website never searches the
 visitor's computer or executes Windows commands. FAQ entries use native HTML
 disclosure controls. No external font services or analytics are loaded.
@@ -13,9 +13,15 @@ disclosure controls. No external font services or analytics are loaded.
 The visual design is inspired by the current [Atomic Chat](https://atomic.chat/)
 website: charcoal surfaces, large sentence-case headings, white download buttons,
 a subtle hero grid, and spacious sections. Scout retains its own branding,
-capabilities, and downloads. Product panels are labelled HTML illustrations
-rather than live search or device controls. Mobile navigation uses a native
-disclosure menu and works without JavaScript.
+capabilities, and downloads. Mobile navigation uses a native disclosure menu
+and works without JavaScript.
+
+The search screenshots (`scout-*-3x.png`, light and dark) are rendered by the
+app itself from authored fixture data, so they never show personal files.
+Regenerate them after interface changes. Point `SCOUT_DATA_DIR` at an empty
+directory, then run `Scout.exe --ui-smoke-test` and copy `site-recent-download*.png`
+and `site-download-group*.png` from that directory. The "Control" example
+remains an HTML illustration.
 
 With JavaScript available, mobile navigation also closes after choosing a link
 or pressing Escape. All native navigation and FAQ disclosures remain usable
@@ -24,7 +30,7 @@ when the script is unavailable.
 Uncut Sans is self-hosted in `dist/fonts/` and comes from the official
 [`kaspernordkvist/uncut_sans`](https://github.com/kaspernordkvist/uncut_sans)
 project. Its SIL Open Font License is included in `UncutSans-LICENSE.txt`.
-The product illustrations use self-hosted Inter from the official `rsms/inter`
+The HTML illustration uses self-hosted Inter from the official `rsms/inter`
 project, with its license in `dist/fonts/LICENSE.txt`.
 
 The public site and beta downloads are published from

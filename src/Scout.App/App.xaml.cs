@@ -89,8 +89,9 @@ public partial class App : Application
                 store.SaveSettings(new ScoutSettings { WindowsSearch = false });
                 var now = DateTimeOffset.UtcNow;
                 var demoDownloads = Path.Combine(Path.GetPathRoot(DataDirectory) ?? "C:\\", "Users", "Alex", "Downloads");
+                var demoDocuments = Path.Combine(Path.GetDirectoryName(demoDownloads)!, "Documents");
                 var fixtures = new[] { "Product Roadmap.pdf", "Research Notes.pdf", "Quarterly Review.pdf" }
-                    .Select((name, i) => new Candidate("smoke:" + i, ItemKind.File, name, Path.Combine(DataDirectory, name))
+                    .Select((name, i) => new Candidate("smoke:" + i, ItemKind.File, name, Path.Combine(demoDocuments, name))
                     {
                         Detail = "Documents", Source = "Files", AddedAt = now.AddMinutes(-i - 1),
                         ModifiedAt = now.AddMinutes(-i - 1), DownloadedAt = i == 0 ? now.AddMinutes(-1) : null,

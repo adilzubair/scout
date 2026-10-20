@@ -334,8 +334,10 @@ public partial class MainWindow : Window
         ResultsHeading.Text = rows.Length == 0 ? "" : current?.Intent.SlashFilter is { } filter ? "/" + filter + " results" : Query.Text.Length == 0 ? "Suggestions" : "Results";
         ResultCount.Text = rows.Length == 0 ? "" : $"{rows.Length} {(rows.Length == 1 ? "item" : "items")}";
         Examples.Visibility = Query.Text.Length == 0 && scope == Scope.All ? Visibility.Visible : Visibility.Collapsed;
-        ResultHints.Visibility = rows.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
-        FooterActions.Visibility = rows.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
+        // Hide rather than collapse: a footer that changes height between the empty
+        // and results states can keep a stale measurement and overflow the window.
+        ResultHints.Visibility = rows.Length > 0 ? Visibility.Visible : Visibility.Hidden;
+        FooterActions.Visibility = rows.Length > 0 ? Visibility.Visible : Visibility.Hidden;
         DetailPane.Visibility = rows.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
         ActionsButton.IsEnabled = rows.Length > 0;
         ResizeToResults(rows.Length);
