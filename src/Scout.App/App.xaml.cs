@@ -81,7 +81,7 @@ public partial class App : Application
                 var testSettings = store.Settings;
                 var watchRoot = Path.Combine(DataDirectory, "watcher-fixtures"); Directory.CreateDirectory(watchRoot);
                 testSettings.ExtraFolders = testSettings.ExtraFolders.Append(watchRoot).Distinct().ToArray();
-                testSettings.WindowsSearch = false; testSettings.AiEnabled = false; testSettings.Hotkey = "Ctrl+Alt+Space";
+                testSettings.WindowsSearch = false; testSettings.AiEnabled = false; testSettings.Hotkey = ScoutSettings.DefaultHotkey;
                 store.SaveSettings(testSettings);
             }
             if (smoke)
@@ -115,7 +115,7 @@ public partial class App : Application
             var main = new MainWindow(store, index, model, multimodal); MainWindow = main;
             tray = new System.Windows.Forms.NotifyIcon
             {
-                Text = "Scout — Ctrl+Alt+Space", Icon = System.Drawing.Icon.ExtractAssociatedIcon(Environment.ProcessPath!) ?? System.Drawing.SystemIcons.Application,
+                Text = "Scout — Ctrl+Space", Icon = System.Drawing.Icon.ExtractAssociatedIcon(Environment.ProcessPath!) ?? System.Drawing.SystemIcons.Application,
                 Visible = true, ContextMenuStrip = new System.Windows.Forms.ContextMenuStrip()
             };
             tray.DoubleClick += (_, _) => main.Toggle(true);

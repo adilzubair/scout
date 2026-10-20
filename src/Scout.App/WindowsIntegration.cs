@@ -34,8 +34,8 @@ internal static class WindowsIntegration
     }
     internal static void TestDefaultHotkey()
     {
-        keybd_event(0x11, 0, 0, 0); keybd_event(0x12, 0, 0, 0); keybd_event(0x20, 0, 0, 0);
-        keybd_event(0x20, 0, 2, 0); keybd_event(0x12, 0, 2, 0); keybd_event(0x11, 0, 2, 0);
+        keybd_event(0x11, 0, 0, 0); keybd_event(0x20, 0, 0, 0);
+        keybd_event(0x20, 0, 2, 0); keybd_event(0x11, 0, 2, 0);
     }
     private static readonly Guid Downloads = new("374DE290-123F-4565-9164-39C4925E467B");
     public static string[] DefaultFolders()

@@ -113,7 +113,8 @@ public sealed class ScoutSettings
     public string Model { get; set; } = "english";
     public string Device { get; set; } = "cpu";
     public int CpuThreads { get; set; } = Math.Max(1, Math.Min(4, Environment.ProcessorCount / 2));
-    public string Hotkey { get; set; } = "Ctrl+Alt+Space";
+    public const string DefaultHotkey = "Ctrl+Space";
+    public string Hotkey { get; set; } = DefaultHotkey;
     public string[] ExtraFolders { get; set; } = [];
     public string[] Exclusions { get; set; } = [];
 }

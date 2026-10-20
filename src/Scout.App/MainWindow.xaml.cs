@@ -512,7 +512,7 @@ public partial class MainWindow : Window
         {
             Add("Copy path or URL    Ctrl+Shift+C", () => Clipboard.SetText(item.Target));
             if (item.Kind is ItemKind.File or ItemKind.App or ItemKind.Folder) Add("Reveal in Explorer    Ctrl+R", () => WindowsIntegration.Reveal(item));
-            if (item.Kind == ItemKind.File) Add("Preview    Ctrl+Space", () => Preview(item));
+            if (item.Kind == ItemKind.File) Add("Preview    Ctrl+Alt+Space", () => Preview(item));
             if (item.IsGroupable) Add("Include / exclude from group    Ctrl+Shift+Space", ToggleGroup);
         }
         else if (item.Kind == ItemKind.Workspace)
@@ -596,7 +596,7 @@ public partial class MainWindow : Window
         else if (ctrl && e.Key == Key.OemComma) ShowSettings();
         else if (ctrl && e.Key == Key.Q) Application.Current.Shutdown();
         else if (ctrl && shift && e.Key == Key.Space) ToggleGroup();
-        else if (ctrl && e.Key == Key.Space && Selected is { Kind: ItemKind.File } preview) Preview(preview);
+        else if (Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Alt) && (e.Key == Key.Space || e.Key == Key.System && e.SystemKey == Key.Space) && Selected is { Kind: ItemKind.File } preview) Preview(preview);
         else if (ctrl && e.Key == Key.P && Selected is { } pin) { store.TogglePin(pin); RefreshLocal(); }
         else if (ctrl && shift && e.Key == Key.C && Selected is { } copy && copy.Kind is not (ItemKind.Workspace or ItemKind.Group or ItemKind.System))
         { try { ValidateSemanticAction(copy);Clipboard.SetText(copy.Target); Status.Text = "Copied"; } catch (IOException error){Status.Text=error.Message;} catch (System.Runtime.InteropServices.COMException) { Status.Text = "Clipboard is busy. Try again."; } }

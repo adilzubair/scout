@@ -12,7 +12,7 @@ See [beta merge readiness](docs/BETA_MERGE_READINESS.md).
 
 ## Download and install
 
-On Windows 11 x64, download `Scout-Setup.exe` from the [public Releases page](https://github.com/adilzubair/scout-site/releases) and open it. Setup installs for your Windows account without admin access, adds **Scout** and **Uninstall Scout** to the Start menu, and launches Scout when it finishes. Press **Ctrl+Alt+Space** to open the panel. Closing it leaves Scout in the notification area; **Ctrl+Q** quits. To uninstall, choose **Uninstall Scout** from Start or use Windows Settings → Apps → Installed apps. Uninstalling leaves your settings and workspaces in `%LOCALAPPDATA%\Scout` for a later reinstall.
+On Windows 11 x64, download `Scout-Setup.exe` from the [public Releases page](https://github.com/adilzubair/scout-site/releases) and open it. Setup installs for your Windows account without admin access, adds **Scout** and **Uninstall Scout** to the Start menu, and launches Scout when it finishes. Press **Ctrl+Space** to open the panel. Closing it leaves Scout in the notification area; **Ctrl+Q** quits. To uninstall, choose **Uninstall Scout** from Start or use Windows Settings → Apps → Installed apps. Uninstalling leaves your settings and workspaces in `%LOCALAPPDATA%\Scout` for a later reinstall.
 
 Scout is an unsigned beta. Windows may show an unknown-publisher or SmartScreen warning. Check that the installer came from the Scout GitHub release and use its SHA-256 checksum if you want to verify it before choosing to proceed. Updates are manual: quit Scout and run the installer from a newer release. There is no automatic updater.
 
@@ -82,12 +82,13 @@ with fresh bearer tokens. Inference is offline after setup. The local API includ
 
 | Shortcut | Action |
 |---|---|
+| Ctrl+Space | Open/hide Scout (global) |
 | Up / Down | Select a result |
 | Enter | Run the selected action or Open all; copy a calculator result |
 | Escape | Close the current overlay/group, then dismiss the panel |
 | Tab / Shift+Tab | Cycle All, Files, Apps, Links, Workspaces |
 | Ctrl+K | Result actions |
-| Ctrl+Space | Preview a file |
+| Ctrl+Alt+Space | Preview a file |
 | Ctrl+P | Pin/unpin |
 | Ctrl+R | Reveal in Explorer |
 | Ctrl+Shift+C | Copy path, URL or calculation |

@@ -150,7 +150,7 @@ internal sealed class SettingsWindow : Window
             return browse;
         }
         var general = Page("General", "\uE713", "Make Scout fit the way you work.");
-        var shortcut = Field(general, "Open Scout", settings.Hotkey); Note(general, "Your global keyboard shortcut. For example, Ctrl+Alt+Space.");
+        var shortcut = Field(general, "Open Scout", settings.Hotkey); Note(general, "Your global keyboard shortcut. For example, Ctrl+Space.");
         Heading(general, "Search behavior");
         var windows = Check(general, "Find more files with Windows Search", settings.WindowsSearch);
         var recent = Check(general, "Include recently opened files", settings.RecentItems);
