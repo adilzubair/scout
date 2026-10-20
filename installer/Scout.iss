@@ -10,9 +10,9 @@ AppId={{52EB8A04-8C08-4BEE-AE6D-11BC4DD9D699}
 AppName=Scout
 AppVersion={#ScoutVersion}
 AppVerName=Scout {#ScoutVersion}
-AppPublisher=Scout
+AppPublisher=Muhamed Adil
 AppPublisherURL=https://adilzubair.github.io/scout-site/
-AppSupportURL=https://github.com/adilzubair/scout-site/issues
+AppSupportURL=https://github.com/adilzubair/scout/issues
 DefaultDirName={localappdata}\Programs\Scout
 DefaultGroupName=Scout
 DisableDirPage=yes
@@ -32,6 +32,7 @@ Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
 VersionInfoDescription=Scout installer
+AppCopyright=Copyright (c) 2026 Muhamed Adil
 VersionInfoVersion={#ScoutFileVersion}
 
 [Files]

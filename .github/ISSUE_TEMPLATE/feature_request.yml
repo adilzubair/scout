@@ -1,0 +1,15 @@
+name: Feature request
+description: Suggest an idea for Scout
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What would you like to do?
+      description: Describe the task or query you have in mind, and why the current behavior falls short.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: Proposed behavior
