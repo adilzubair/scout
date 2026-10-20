@@ -41,14 +41,14 @@ internal sealed class PreviewWindow : Window
         WindowVisuals.Configure(this, WindowSurface.Document);
         var dock = new DockPanel();
         var heading = WindowVisuals.Header(this, item.Title); DockPanel.SetDock(heading, Dock.Top); dock.Children.Add(heading);
-        status.Foreground = WindowVisuals.Brush("Muted"); status.FontSize = 11; status.TextTrimming = TextTrimming.CharacterEllipsis; status.Margin = new Thickness(24, 0, 24, 14);
+        status.Foreground = WindowVisuals.Brush("Muted"); status.FontSize = 11; status.TextTrimming = TextTrimming.CharacterEllipsis; status.Margin = new Thickness(18, 12, 18, 12);
         DockPanel.SetDock(status, Dock.Top); dock.Children.Add(status);
         if (matches is { Length: > 0 })
         {
             var excerpts = new TextBox { Text = string.Join(Environment.NewLine, matches.Select(m => (m.Line is { } line ? $"Line {line}: " : "") + m.Text)), IsReadOnly = true, TextWrapping = TextWrapping.Wrap, MaxHeight = 160, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Margin = new Thickness(24, 0, 24, 12), FontFamily = new FontFamily("Cascadia Mono, Consolas") };
             DockPanel.SetDock(excerpts, Dock.Top); dock.Children.Add(excerpts);
         }
-        var controls = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(24, 16, 24, 20) }; DockPanel.SetDock(controls, Dock.Bottom); dock.Children.Add(controls);
+        var controls = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(18, 12, 18, 16) }; DockPanel.SetDock(controls, Dock.Bottom); dock.Children.Add(controls);
         void Button(string label, Action action) { var b = new Button { Content = label, Margin = new Thickness(0, 0, 8, 0), Style = WindowVisuals.Style(label == "Open file" ? "PrimaryButton" : "QuietButton") }; b.Click += (_, _) => action(); controls.Children.Add(b); }
         Button("Open file", () => { try { if(CheckEvidence())WindowsIntegration.Open(item); } catch (Exception e) when (e is IOException or System.ComponentModel.Win32Exception) { status.Text = e.Message; } });
         if (Path.GetExtension(item.Target).Equals(".pdf", StringComparison.OrdinalIgnoreCase))
@@ -59,7 +59,7 @@ internal sealed class PreviewWindow : Window
         if (FileTypes.Matches(Path.GetExtension(item.Target).ToLowerInvariant(), "video") || FileTypes.Matches(Path.GetExtension(item.Target).ToLowerInvariant(), "audio"))
         { Button("Play", () => media?.Play()); Button("Pause", () => media?.Pause()); }
         Button("Close", Close);
-        dock.Children.Add(new Border { Child = preview, Background = WindowVisuals.Brush("Surface"), BorderBrush = WindowVisuals.Brush("Line"), BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(9), Padding = new Thickness(12), Margin = new Thickness(24, 0, 24, 0) }); Content = WindowVisuals.Frame(dock);
+        dock.Children.Add(new Border { Child = preview, Background = WindowVisuals.Brush("Surface"), BorderBrush = WindowVisuals.Brush("Line"), BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(8), Padding = new Thickness(12), Margin = new Thickness(18, 0, 18, 0) }); Content = WindowVisuals.Frame(dock);
         Loaded += async (_, _) => await EnsureLoaded();
         evidenceTimer.Tick+=(_,_)=>CheckEvidence();if(evidence!=null)evidenceTimer.Start();
         Closed += (_, _) => { evidenceTimer.Stop();lifetime.Cancel();CloseMedia();pdfPages=0;preview.Content=null;evidence=null; };

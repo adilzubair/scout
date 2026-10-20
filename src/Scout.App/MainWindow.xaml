@@ -13,7 +13,7 @@
       <Setter Property="Margin" Value="0,2"/>
     </Style>
   </Window.Resources>
-  <Border x:Name="PanelShell" Background="{DynamicResource Canvas}" BorderBrush="{DynamicResource Rim}" BorderThickness="1" CornerRadius="18">
+  <Border x:Name="PanelShell" Background="{DynamicResource Canvas}" BorderBrush="{DynamicResource Rim}" BorderThickness="1" CornerRadius="{DynamicResource WindowCorners}">
     <Grid x:Name="PanelContent">
       <Grid.RowDefinitions>
         <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/>

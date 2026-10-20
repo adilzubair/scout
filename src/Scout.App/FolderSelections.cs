@@ -50,7 +50,7 @@ internal sealed class FolderSelectionView : StackPanel
     {
         this.progress = progress;
         Selection = new(settings, WindowsIntegration.DefaultFolders());
-        Children.Add(new TextBlock { Text = "Search folders", FontSize = 17, FontWeight = FontWeights.SemiBold });
+        Children.Add(new TextBlock { Text = "Search folders", FontSize = 15, FontWeight = FontWeights.SemiBold });
         Children.Add(new TextBlock { Text = "Search file names in these folders. Choose Search contents only where you want text and Office documents indexed.", TextWrapping = TextWrapping.Wrap, Foreground = WindowVisuals.Brush("Muted"), FontSize = 12, LineHeight = 18, Margin = new Thickness(0, 6, 0, 12) });
         var add = new Grid { Margin = new Thickness(0, 12, 0, 0) };
         add.ColumnDefinitions.Add(new ColumnDefinition()); add.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });

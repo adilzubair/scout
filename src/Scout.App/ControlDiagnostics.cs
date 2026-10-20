@@ -230,6 +230,24 @@ public partial class MainWindow
                         Require(!Find(dialog,"Free unused add-on storage").IsEnabled,"Cleanup enabled without installation.");
                     }
                     await UiDiagnostics.Snapshot(dialog,"e2e-controls-"+page.ToLowerInvariant().Replace(' ','-'));
+                    if (page == "General")
+                    {
+                        foreach (var (dark, contrast, name) in new[] { (false, false, "settings-unified-light"), (true, false, "settings-unified-dark"), (false, true, "settings-unified-contrast") })
+                        {
+                            WindowVisuals.SetTestTheme(dark, contrast);
+                            await UiDiagnostics.Snapshot(dialog, name);
+                        }
+                        WindowVisuals.SetTestTheme(null);
+                        dialog.Width = dialog.MinWidth; dialog.Height = dialog.MinHeight; dialog.UpdateLayout();
+                        var saveButton = Find(dialog, "Save settings");
+                        var field = Field(dialog, "Open Scout");
+                        var saveEdge = saveButton.TranslatePoint(new System.Windows.Point(saveButton.ActualWidth, saveButton.ActualHeight), dialog);
+                        var fieldStart = field.TranslatePoint(new System.Windows.Point(), dialog);
+                        var fieldEnd = field.TranslatePoint(new System.Windows.Point(field.ActualWidth, 0), dialog);
+                        Require(saveEdge.X < dialog.ActualWidth && saveEdge.Y < dialog.ActualHeight && fieldStart.X > 170 && fieldEnd.X < dialog.ActualWidth,
+                            "Settings fields or Save were clipped at the minimum window size.");
+                        await UiDiagnostics.Snapshot(dialog, "settings-unified-small");
+                    }
                 }finally{dialog.Close();}
             });
         }

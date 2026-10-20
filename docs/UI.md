@@ -43,10 +43,18 @@ fallback preview symbols a quiet accent.
 | Selected result | `#CEE5FC` | `#233F60` |
 
 Windows 11 draws native acrylic behind the transient launcher and short-lived
-dialogs, and Mica behind settings and Quick look. The tinted panel, rim, and
+dialogs, including Settings, and Mica behind Quick look. The tinted panel, rim, and
 native shadow keep the launcher defined over both bright and dark apps.
 Windows 10, disabled transparency, and high-contrast mode use a solid themed
 surface. All motion follows the Windows client-area animation preference.
+
+Settings uses the launcher's 780 px width, amber header icon, 22 px display
+title, Escape keycap, 18 px window corners and native acrylic surface. Its
+navigation and content meet at a full-height divider, and its Save/Cancel row
+uses the same bordered footer as search. Pages no longer sit inside a separate
+rounded card. Shared 13 px body text, 12 px buttons and compact form fields also
+apply to workspace dialogs and Quick look; window corners come from one shared
+resource so these surfaces stay aligned.
 
 The 160 ms opening fade and slight translation show the launcher without
 delaying input. Expansion changes the HWND height immediately, then reveals
@@ -85,7 +93,7 @@ the footer and action buttons inside the panel.
 To build this trial while another Scout copy holds the normal output directory:
 
 ```powershell
-dotnet build Scout.slnx -c Release -m:1 -p:OutputPath="$PWD/artifacts/digup-ui/"
+dotnet build Scout.slnx -c Release -m:1 -p:OutputPath="$PWD/artifacts/digup-ui-unified/"
 ```
 
 Trial validation on 20 October 2026: the build completed without warnings and
@@ -98,6 +106,13 @@ under `artifacts/diagnostics/e2e/addon`, then retained that clipboard failure as
 a failing overall exit status. Reports and screenshots stay untracked under
 `artifacts/digup-ui-checks/`.
 
-Quit the current Scout instance before opening `artifacts/digup-ui/Scout.exe`
+The unified Settings revision also builds without warnings. Native checks pass
+for saving, reopening, restarting and folder selection; 22 of 23 control checks
+pass, with the same existing clipboard block retained. The updated Settings was
+visually checked in light, dark and high contrast, and its fields and Save button
+stay within the smallest supported window. These reports and screenshots are
+under `artifacts/digup-ui-unified-checks/`.
+
+Quit the current Scout instance before opening `artifacts/digup-ui-unified/Scout.exe`
 to try the branch; the normal single-instance launcher otherwise reopens the
 already running copy.

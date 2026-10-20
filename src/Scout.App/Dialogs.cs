@@ -20,8 +20,8 @@ internal sealed class NameWindow : Window
         Title = "Save workspace"; Width = 440; SizeToContent = SizeToContent.Height; ResizeMode = ResizeMode.NoResize; WindowStartupLocation = WindowStartupLocation.CenterOwner;
         WindowVisuals.Configure(this);
         var panel = new StackPanel();
-        panel.Children.Add(WindowVisuals.Header(this, "Save workspace", "Keep these items together for next time."));
-        var body = new StackPanel { Margin = new Thickness(24, 0, 24, 24) };
+        panel.Children.Add(WindowVisuals.Header(this, "Save workspace", "Keep these items together for next time.", "\uE8F1"));
+        var body = new StackPanel { Margin = new Thickness(18, 18, 18, 18) };
         var label = new TextBlock { Text = "Workspace name", FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 0, 8) };
         body.Children.Add(label);
         name = new TextBox { Text = initial, MaxLength = 80 }; AutomationProperties.SetLabeledBy(name, label); body.Children.Add(name);
@@ -43,12 +43,12 @@ internal sealed class GroupWindow : Window
         Title = "Review group"; Width = 580; Height = 480; MinWidth = 420; MinHeight = 300; WindowStartupLocation = WindowStartupLocation.CenterOwner;
         WindowVisuals.Configure(this);
         var dock = new DockPanel();
-        var header = WindowVisuals.Header(this, "Open together", "Choose the items to include in this group."); DockPanel.SetDock(header, Dock.Top); dock.Children.Add(header);
-        var footer = new DockPanel { Margin = new Thickness(24, 16, 24, 20) }; DockPanel.SetDock(footer, Dock.Bottom); dock.Children.Add(footer);
+        var header = WindowVisuals.Header(this, "Open together", "Choose the items to include in this group.", "\uE8F1"); DockPanel.SetDock(header, Dock.Top); dock.Children.Add(header);
+        var footer = new DockPanel { Margin = new Thickness(18, 12, 18, 16) }; DockPanel.SetDock(footer, Dock.Bottom); dock.Children.Add(footer);
         var count = new TextBlock { Text = $"{members.Length} items selected", Foreground = WindowVisuals.Brush("Muted"), VerticalAlignment = VerticalAlignment.Center }; footer.Children.Add(count);
         var save = new Button { Content = "Keep selected items", IsDefault = true, Style = WindowVisuals.Style("PrimaryButton"), HorizontalAlignment = HorizontalAlignment.Right };
         save.Click += (_, _) => DialogResult = true; footer.Children.Add(save);
-        var panel = new StackPanel { Margin = new Thickness(24, 0, 24, 0) };
+        var panel = new StackPanel { Margin = new Thickness(18, 0, 18, 0) };
         foreach (var c in members)
         {
             var label = new StackPanel();
@@ -71,11 +71,13 @@ internal sealed class SettingsWindow : Window
     public SettingsWindow(ScoutSettings settings, Func<string, bool> applyHotkey, Action clearHistory, MultimodalHost? multimodalHost = null, Action? addonRemoved = null, SemanticService? semantic = null, Func<Window,string?>? pickFolder = null, Action<ScoutSettings>? persistSettings = null, IndexService? index = null, string initialPage = "General")
     {
         Value = settings;
-        Title = "Scout settings"; Width = 800; Height = 654; MinWidth = 680; MinHeight = 460; WindowStartupLocation = WindowStartupLocation.CenterOwner;
-        WindowVisuals.Configure(this, WindowSurface.Document);
+        Title = "Scout settings"; Width = 780; Height = 654; MinWidth = 680; MinHeight = 460; WindowStartupLocation = WindowStartupLocation.CenterOwner;
+        WindowVisuals.Configure(this);
         var root = new DockPanel();
-        var header = WindowVisuals.Header(this, "Settings"); DockPanel.SetDock(header, Dock.Top); root.Children.Add(header);
-        var footer = new StackPanel { Margin = new Thickness(24, 12, 24, 20) }; DockPanel.SetDock(footer, Dock.Bottom); root.Children.Add(footer);
+        var header = WindowVisuals.Header(this, "Settings", glyph: "\uE713"); DockPanel.SetDock(header, Dock.Top); root.Children.Add(header);
+        var footer = new StackPanel();
+        var footerBar = new Border { Child = footer, BorderBrush = WindowVisuals.Brush("Divider"), BorderThickness = new Thickness(0, 1, 0, 0), Padding = new Thickness(18, 10, 18, 10) };
+        DockPanel.SetDock(footerBar, Dock.Bottom); root.Children.Add(footerBar);
         var feedback = new TextBlock { TextWrapping = TextWrapping.Wrap, Foreground = WindowVisuals.Brush("Error"), Margin = new Thickness(0, 0, 0, 10), Visibility = Visibility.Collapsed };
         AutomationProperties.SetLiveSetting(feedback, AutomationLiveSetting.Polite);
         footer.Children.Add(feedback);
@@ -85,9 +87,9 @@ internal sealed class SettingsWindow : Window
         var cancel = new Button { Content = "Cancel", IsCancel = true, Margin = new Thickness(0, 0, 8, 0) }; cancel.Click += (_, _) => Close(); buttons.Children.Add(cancel);
         var save = new Button { Content = "Save settings", IsDefault = true, Style = WindowVisuals.Style("PrimaryButton") }; buttons.Children.Add(save); actions.Children.Add(buttons); footer.Children.Add(actions);
         var body = new Grid(); body.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(176) }); body.ColumnDefinitions.Add(new ColumnDefinition());
-        var navigation = new StackPanel { Margin = new Thickness(14, 18, 12, 0) }; body.Children.Add(navigation);
+        var navigation = new StackPanel { Margin = new Thickness(10, 12, 10, 0) }; body.Children.Add(navigation);
         var pageHost = new ContentControl { HorizontalContentAlignment = HorizontalAlignment.Stretch, VerticalContentAlignment = VerticalAlignment.Stretch };
-        var pageBorder = new Border { Background = WindowVisuals.Brush("PageSurface"), CornerRadius = new CornerRadius(12), Margin = new Thickness(0, 0, 16, 0), Child = pageHost };
+        var pageBorder = new Border { BorderBrush = WindowVisuals.Brush("Divider"), BorderThickness = new Thickness(1, 0, 0, 0), Child = pageHost };
         Grid.SetColumn(pageBorder, 1); body.Children.Add(pageBorder); root.Children.Add(body); Content = WindowVisuals.Frame(root);
         var pages = new List<(Button Button, ScrollViewer Page)>();
         void SelectPage(ScrollViewer page)
@@ -97,22 +99,22 @@ internal sealed class SettingsWindow : Window
             {
                 var selected = entry.Page == page;
                 entry.Button.Background = selected ? WindowVisuals.Brush("Selection") : Brushes.Transparent;
-                entry.Button.Foreground = WindowVisuals.Brush("Ink");
+                entry.Button.Foreground = WindowVisuals.Brush(selected ? "Ink" : "Muted");
                 entry.Button.FontWeight = selected ? FontWeights.Medium : FontWeights.Normal;
                 AutomationProperties.SetItemStatus(entry.Button, selected ? "Selected" : "");
             }
         }
         StackPanel Page(string title, string glyph, string description)
         {
-            var panel = new StackPanel { Margin = new Thickness(26, 24, 26, 24) };
-            panel.Children.Add(new TextBlock { Text = title, FontSize = 22, FontWeight = FontWeights.SemiBold });
-            panel.Children.Add(new TextBlock { Text = description, TextWrapping = TextWrapping.Wrap, Foreground = WindowVisuals.Brush("Muted"), Margin = new Thickness(0, 7, 0, 24), LineHeight = 20 });
+            var panel = new StackPanel { Margin = new Thickness(24, 20, 24, 20) };
+            panel.Children.Add(new TextBlock { Text = title, FontSize = 18, FontWeight = FontWeights.SemiBold });
+            panel.Children.Add(new TextBlock { Text = description, FontSize = 12, TextWrapping = TextWrapping.Wrap, Foreground = WindowVisuals.Brush("Muted"), Margin = new Thickness(0, 6, 0, 20), LineHeight = 19 });
             var scroller = new ScrollViewer { Content = panel, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
             SettingsScroll.Attach(scroller);
             var label = new StackPanel { Orientation = Orientation.Horizontal };
             label.Children.Add(new TextBlock { Text = glyph, FontFamily = new FontFamily("Segoe Fluent Icons"), FontSize = 16, Margin = new Thickness(0, 0, 11, 0), VerticalAlignment = VerticalAlignment.Center });
             label.Children.Add(new TextBlock { Text = title });
-            var button = new Button { Content = label, Style = WindowVisuals.Style("QuietButton"), Padding = new Thickness(12, 11, 10, 11), Margin = new Thickness(0, 0, 0, 5), HorizontalContentAlignment = HorizontalAlignment.Left };
+            var button = new Button { Content = label, FontSize = 13, Style = WindowVisuals.Style("QuietButton"), Padding = new Thickness(10, 8, 10, 8), Margin = new Thickness(0, 0, 0, 3), HorizontalContentAlignment = HorizontalAlignment.Left };
             AutomationProperties.SetName(button, title);
             button.Click += (_, _) => SelectPage(scroller); navigation.Children.Add(button); pages.Add((button, scroller));
             return panel;

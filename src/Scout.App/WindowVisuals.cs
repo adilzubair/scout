@@ -34,6 +34,7 @@ internal static class WindowVisuals
         return brush;
     }
     internal static Style Style(string key) => (Style)Application.Current.FindResource(key);
+    private static CornerRadius WindowCorners => (CornerRadius)Application.Current.FindResource("WindowCorners");
 
     internal static void Configure(Window window, WindowSurface surface = WindowSurface.Transient)
     {
@@ -50,7 +51,7 @@ internal static class WindowVisuals
         window.WindowStyle = WindowStyle.None;
         WindowChrome.SetWindowChrome(window, new WindowChrome
         {
-            CaptionHeight = 0, CornerRadius = new CornerRadius(window is MainWindow ? 18 : 12), GlassFrameThickness = new Thickness(0),
+            CaptionHeight = 0, CornerRadius = WindowCorners, GlassFrameThickness = new Thickness(0),
             ResizeBorderThickness = new Thickness(window.ResizeMode == ResizeMode.NoResize ? 0 : 5), UseAeroCaptionButtons = false
         });
         window.SourceInitialized += (_, _) =>
@@ -234,25 +235,34 @@ internal static class WindowVisuals
 
     internal static Border Frame(UIElement content) => new()
     {
-        Background = Brush("Canvas"), BorderBrush = Brush("Rim"), BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(12), Child = content
+        Background = Brush("Canvas"), BorderBrush = Brush("Rim"), BorderThickness = new Thickness(1), CornerRadius = WindowCorners, Child = content
     };
 
-    internal static Grid Header(Window window, string title, string? subtitle = null)
+    internal static Grid Header(Window window, string title, string? subtitle = null, string glyph = "\uE8A5")
     {
-        var header = new Grid { Margin = new Thickness(24, 19, 18, 19), Background = Brushes.Transparent };
+        var header = new Grid { Margin = new Thickness(18, 9, 14, 9), MinHeight = 44, Background = Brushes.Transparent };
+        header.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(37) });
         header.ColumnDefinitions.Add(new ColumnDefinition());
         header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        header.Children.Add(new TextBlock
+        {
+            Text = glyph, FontFamily = new FontFamily("Segoe Fluent Icons"), FontSize = 22,
+            Foreground = Brush("BrandAmber"), VerticalAlignment = VerticalAlignment.Center
+        });
         var text = new StackPanel { Margin = new Thickness(0, 0, 14, 0) };
-        text.Children.Add(new TextBlock { Text = title, FontSize = 20, FontWeight = FontWeights.SemiBold, TextTrimming = TextTrimming.CharacterEllipsis });
+        text.VerticalAlignment = VerticalAlignment.Center;
+        text.Children.Add(new TextBlock { Text = title, FontFamily = new FontFamily("Segoe UI Variable Display, Segoe UI"), FontSize = 22, TextTrimming = TextTrimming.CharacterEllipsis });
         if (subtitle != null) text.Children.Add(new TextBlock { Text = subtitle, Foreground = Brush("Muted"), FontSize = 12, Margin = new Thickness(0, 5, 0, 0), TextWrapping = TextWrapping.Wrap });
-        header.Children.Add(text);
+        Grid.SetColumn(text, 1); header.Children.Add(text);
         var close = new Button
         {
-            Content = new TextBlock { Text = "\uE711", FontFamily = new FontFamily("Segoe Fluent Icons"), FontSize = 12 },
-            Style = Style("QuietButton"), Padding = new Thickness(9), VerticalAlignment = VerticalAlignment.Top, ToolTip = "Close (Escape)"
+            Content = new Border { Style = Style("Keycap"), Padding = new Thickness(6, 3, 6, 3), Child = new TextBlock { Text = "esc" } },
+            Style = Style("QuietButton"), Padding = new Thickness(0), VerticalAlignment = VerticalAlignment.Center, ToolTip = "Close (Escape)"
         };
         AutomationProperties.SetName(close, "Close");
-        close.Click += (_, _) => window.Close(); Grid.SetColumn(close, 1); header.Children.Add(close);
+        close.Click += (_, _) => window.Close(); Grid.SetColumn(close, 2); header.Children.Add(close);
+        var divider = new Border { Background = Brush("Divider"), Height = 1, VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(-18, 0, -14, -9), IsHitTestVisible = false };
+        Grid.SetColumnSpan(divider, 3); header.Children.Add(divider);
         header.MouseLeftButtonDown += (_, e) =>
         {
             if (e.ChangedButton == MouseButton.Left && !close.IsMouseOver) window.DragMove();
