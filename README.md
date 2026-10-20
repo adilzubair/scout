@@ -1,190 +1,282 @@
-# Scout
+<h1 align="center">Scout</h1>
 
-A fast, private launcher for Windows. Press **Ctrl+Space** and describe what you
-want: an app, a file, a page you visited, a calculation or a system setting.
-Scout searches locally and can use an optional on-device model to understand
-descriptive queries such as *"the pdf I just downloaded"*.
+<p align="center">
+  <strong>Find your work. Control your PC. Pick up where you left off.</strong>
+</p>
 
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-![Platform: Windows 11 x64](https://img.shields.io/badge/platform-Windows%2011%20x64-0078d4)
-![Status: beta](https://img.shields.io/badge/status-experimental%20beta-orange)
+<p align="center">
+  A private launcher for Windows 11.<br>
+  Search apps, files and browser history, preview results, and return to saved workspaces.
+</p>
 
-[Website](https://adilzubair.github.io/scout-site/) ·
-[Download](https://github.com/adilzubair/scout-site/releases) ·
-[User guide](docs/USER_GUIDE.md) ·
-[Release notes](docs/RELEASE_NOTES.md)
+<p align="center">
+  <img src="https://img.shields.io/badge/Windows_11-x64-0078D4?style=flat-square" alt="Windows 11 x64">
+  <img src="https://img.shields.io/badge/.NET-10-512BD4?style=flat-square" alt="Built with .NET 10">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-256D4B?style=flat-square" alt="MIT license"></a>
+  <img src="https://img.shields.io/badge/Status-Experimental_beta-B66A13?style=flat-square" alt="Experimental beta">
+</p>
+
+<p align="center">
+  <a href="https://github.com/adilzubair/scout-site/releases"><strong>Download for Windows</strong></a>
+  &nbsp;·&nbsp; <a href="https://scout.muhamedadil.com/">Website</a>
+  &nbsp;·&nbsp; <a href="docs/USER_GUIDE.md">User guide</a>
+  &nbsp;·&nbsp; <a href="docs/RELEASE_NOTES.md">Release notes</a>
+</p>
 
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="website/dist/scout-arrival-dark-3x.png">
-    <img src="website/dist/scout-arrival-3x.png" alt="Scout finding &quot;the pdf I just downloaded&quot;, with results on the left and a preview of the selected file on the right" width="720">
+    <img src="website/dist/scout-arrival-3x.png" alt="Scout finding &quot;the pdf I just downloaded&quot;, with results on the left and a preview of the selected file on the right" width="800">
   </picture>
 </p>
 
+<p align="center">
+  <kbd>Ctrl</kbd> + <kbd>Space</kbd> to open. Type what you need. <kbd>Enter</kbd> to act.
+</p>
+
 > [!NOTE]
-> Scout is an experimental beta. Retrieval accuracy and minimum hardware
-> requirements haven't been broadly validated, the installer is unsigned, and
-> there is no automatic updater.
+> This README describes **beta 3 development**. Public downloads are **beta 2**,
+> which uses **Ctrl+Alt+Space** and does not include the multimodal add-on.
+> Scout is experimental: accuracy and minimum hardware requirements are still
+> being evaluated, the installer is unsigned, and updates are manual.
 
-## Features
+<p align="center">
+  <a href="#what-you-can-do">Features</a> ·
+  <a href="#local-ai-and-models">Models</a> ·
+  <a href="#get-started">Get started</a> ·
+  <a href="#keyboard-shortcuts">Shortcuts</a> ·
+  <a href="#privacy-and-control">Privacy</a> ·
+  <a href="#build-from-source">Build</a>
+</p>
 
-- **Natural-language search** over apps, files and browser history:
-  `latest 3 files in downloads`, `files I opened in the past two hours`,
-  `last pdf in "Project Files"`.
-- **Evidence-based time filters.** "Created", "modified", "downloaded", "opened"
-  and "visited" each use the matching Windows or browser timestamp. A result
-  without that evidence never matches.
-- **Groups and workspaces.** Open several results at once, then save the set as
-  a named workspace you can recall later.
-- **Previews** for PDFs, images, text and source files, Office documents, audio
-  and video.
-- **System actions** such as dark mode, Wi-Fi, Bluetooth, volume, brightness,
-  lock and sleep, plus your own `.lnk`/`.url` shortcuts and Power Automate links.
-- **Calculator and web fallback**: `15% of 240`, `sqrt(81)`.
-- **Optional local AI.** [Laya](https://huggingface.co/convaiinnovations/laya)
-  re-ranks results on your machine. An experimental multimodal add-on can also
-  search inside documents, images, audio and video.
-- **Private by default.** Everything runs locally. Nothing launches without
-  Enter or an explicit Open, and models can only choose among known candidates.
-  They never produce shell commands.
+## What you can do
 
-## Install
+Describe what you need, or use a filename, app name or slash filter directly.
+Local results appear first; optional AI can refine them.
 
-Requires Windows 11 x64.
+| Capability | Try it |
+|---|---|
+| **Find apps, files and folders** | `notepad` · `budget excel` · `/folder projects` |
+| **Search by time and activity** | `the pdf I just downloaded` · `latest 3 files in downloads` |
+| **Narrow the results** | `/pdf roadmap` · `/image holiday` · `last pdf in "Project Files"` |
+| **Revisit browser pages** | `docs links I visited today` — Chrome and Edge history are opt-in |
+| **Control Windows** | `dark` · `wifi off` · `bluetooth on` · `volume up` · `lock screen` |
+| **Calculate** | `15% of 240` · `sqrt(81)` |
 
-1. Download `Scout-Setup.exe` from the
-   [Releases page](https://github.com/adilzubair/scout-site/releases) and run it.
-   Setup installs for your account without admin rights.
-2. Press **Ctrl+Space** to open Scout. Closing the panel keeps Scout in the
-   notification area. **Ctrl+Q** quits.
+- **Preview before opening.** Inspect PDFs, images, text, source files,
+  Office/OpenDocument text, audio and video beside your results. Office previews
+  show extracted text rather than the full application layout.
+- **Open a group, then save it.** Review several results, open them together,
+  and save the set as a workspace to recall later.
+- **Search inside selected content.** Opt into local keyword indexing, or use
+  the experimental EmbeddingGemma 2 add-on for multimodal content search.
+- **Bring your own shortcuts.** Add `.lnk`/`.url` shortcuts and Power Automate
+  desktop links, then find and run them by name.
 
-Windows may show a SmartScreen warning because the installer is unsigned. Each
-release publishes SHA-256 checksums you can verify first. A portable
-`Scout-win-x64.zip` is also available: extract it and run `Scout.exe`.
+Time filters use recorded evidence: created, modified, downloaded, opened and
+visited each have their own timestamp source. Missing evidence cannot satisfy
+the corresponding filter. [See how search evidence works.](docs/USER_GUIDE.md#search-evidence-and-privacy)
 
-To uninstall, use **Uninstall Scout** from Start, or **Settings → Apps**. Your
-settings and workspaces stay in `%LOCALAPPDATA%\Scout` for a later reinstall.
+<details>
+<summary><strong>See grouped results</strong></summary>
 
-## Usage
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="website/dist/scout-download-group-dark-3x.png">
+    <img src="website/dist/scout-download-group-3x.png" alt="Scout grouping the latest three files in Downloads, with checkboxes to review the group before opening it" width="800" loading="lazy">
+  </picture>
+</p>
 
-Try queries like:
+</details>
 
-- `notepad`, `vscode`, `budget excel`
-- `the last presentation I created`, `the pdf I just downloaded`
-- `latest json file in downloads`, `files modified yesterday in documents`
-- `latest screenshot in pictures`, `open downloads folder`
-- `docs links I visited today`
-- `/pdf roadmap`, `/image holiday`, `/folder projects` (type `/` for all filters)
-- `dark`, `wifi off`, `bluetooth on`, `volume up`, `mute`, `lock screen`
+## Local AI and models
+
+Scout's filename search, app search and supported system actions work without
+downloading a model. Local AI is optional and off by default.
+
+| Model | What it does in Scout | Availability |
+|---|---|---|
+| **[Laya](https://huggingface.co/convaiinnovations/laya)** | Decision models for candidate ranking, action intent, readiness and group membership. Available checkpoints: **English**, **multilingual** and **typed-decisions**. | Optional local AI. English is the recommended checkpoint in the current evaluation. |
+| **[Google EmbeddingGemma 2](https://huggingface.co/google/embeddinggemma-2)** | Embeds text, images, audio and video for content retrieval. Indexes selected folders and returns matched evidence in previews. | Experimental **Settings → Multimodal** add-on in the current source; installed separately from Laya. |
+| **[Qwen3-4B-Instruct-2507](https://huggingface.co/Qwen/Qwen3-4B-Instruct-2507)** | An experimental helper for descriptive file ranking, using a pinned Q4_K_M GGUF conversion through llama.cpp. | **Research-only**; hidden from standard Settings. [Evaluation and limitations.](docs/research/LOCAL_SEMANTIC_HELPER.md) |
+
+Laya chooses among known candidates and supported actions; it never generates
+shell commands. EmbeddingGemma 2 processes opted-in content in its separate
+local worker. Document bodies are never sent to Laya or the Qwen helper.
+
+### Set up local AI
+
+1. Open **Settings**, choose **cpu** or **cuda** (NVIDIA GPUs), and click
+   **Set up local AI**.
+2. Enable local AI and save Settings. Start with the default **English**
+   checkpoint.
+3. For multimodal content search in the current source, configure the separate
+   add-on under **Settings → Multimodal** and choose the folders to index.
+
+Setup downloads isolated runtimes and pinned model weights, requiring several
+GB plus cache space. It leaves system Python alone. Inference runs offline
+after setup, and model weights are excluded from the application package.
+
+Laya services are released after the launcher has been hidden for a minute.
+CPU ranking can be slow and exceed its fallback budget on typical laptops;
+local results remain available. See the [measured baseline](docs/research/LIGHTWEIGHT_BASELINE.md)
+and [multimodal development status](docs/research/MULTIMODAL_ADDON.md).
+
+<details>
+<summary>Model pins and runtime details</summary>
+
+- [Laya checkpoints and pinned revision](runtime/models.json)
+- [EmbeddingGemma 2 revision and artifact checksums](runtime/embeddinggemma2_model.json)
+- [Qwen GGUF and llama.cpp pins](runtime/semantic_model.json)
+- [Third-party licenses and attributions](docs/THIRD_PARTY.md)
+- [Local AI setup and behavior](docs/USER_GUIDE.md#local-ai)
+
+</details>
+
+## Get started
+
+**Requires Windows 11 x64.**
+
+1. Download **`Scout-Setup.exe`** from the
+   [public beta releases](https://github.com/adilzubair/scout-site/releases)
+   and run it. Setup installs for your account without admin rights.
+2. Open Scout with **Ctrl+Alt+Space** in the published beta 2, or **Ctrl+Space**
+   when running the current source.
+3. Type an app name or a query, review the result, and press **Enter** to open it.
+
+Prefer a portable copy? Extract the entire **`Scout-win-x64.zip`** archive and
+run `Scout.exe`. SHA-256 checksum files accompany both downloads. Windows may
+show a SmartScreen warning because the installer is unsigned.
+
+Closing the panel keeps Scout in the notification area; **Ctrl+Q** quits.
+To update, quit Scout and run the newer installer. To uninstall, use
+**Uninstall Scout** from Start or **Settings → Apps**. Settings and workspaces
+remain in `%LOCALAPPDATA%\Scout` for a later reinstall.
+
+## Keyboard shortcuts
+
+These shortcuts apply to the current source. The published beta 2 uses
+**Ctrl+Alt+Space** to open the launcher.
 
 | Shortcut | Action |
 |---|---|
-| Ctrl+Space | Open or hide Scout (global) |
-| Up / Down | Select a result |
-| Enter | Run the selected action, or Open all |
-| Tab / Shift+Tab | Cycle All, Files, Apps, Links, Workspaces |
-| Ctrl+K | Result actions |
-| Ctrl+Alt+Space | Preview a file |
-| Ctrl+P | Pin or unpin |
-| Ctrl+R | Reveal in Explorer |
-| Ctrl+Shift+C | Copy path, URL or calculation |
-| Ctrl+Shift+Space | Add or remove a group member |
-| Ctrl+, | Settings |
-| Escape | Close the current overlay, then the panel |
+| <kbd>Ctrl</kbd> + <kbd>Space</kbd> | Open or hide Scout |
+| <kbd>↑</kbd> / <kbd>↓</kbd> | Select a result |
+| <kbd>Enter</kbd> | Run the selected action, open a group, or copy a calculation |
+| <kbd>Tab</kbd> / <kbd>Shift</kbd> + <kbd>Tab</kbd> | Cycle All, Files, Apps, Links and Workspaces |
+| <kbd>Ctrl</kbd> + <kbd>K</kbd> | Open result actions |
+| <kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>Space</kbd> | Preview a file |
+| <kbd>Escape</kbd> | Close the current overlay, then the panel |
 
-The [user guide](docs/USER_GUIDE.md) covers folder restrictions, slash filters,
-time evidence, workspaces, system actions and indexing rules in detail.
+<details>
+<summary>More shortcuts</summary>
 
-## Local AI
+| Shortcut | Action |
+|---|---|
+| <kbd>Ctrl</kbd> + <kbd>P</kbd> | Pin or unpin |
+| <kbd>Ctrl</kbd> + <kbd>R</kbd> | Reveal in Explorer |
+| <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>C</kbd> | Copy a path, URL or calculation |
+| <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>Space</kbd> | Add or remove a group member |
+| <kbd>Ctrl</kbd> + <kbd>,</kbd> | Open Settings |
+| <kbd>Ctrl</kbd> + <kbd>Q</kbd> | Quit Scout |
 
-Local AI is opt-in and off by default. In **Settings**, choose **cpu** or
-**cuda** (NVIDIA GPUs) and click **Set up local AI**. Setup downloads an isolated
-Python runtime and pinned model weights (several GB). It never touches your
-system Python. Inference is fully offline after setup.
+</details>
 
-Local results always appear first; Laya can refine them. Its model services
-listen only on random `127.0.0.1` ports with per-session bearer tokens, and are
-released after the panel has been hidden for a minute. CPU mode works, but it's
-slow on typical laptops; see the [measurements](docs/research/LIGHTWEIGHT_BASELINE.md).
+## Privacy and control
 
-The experimental **Settings → Multimodal** add-on uses
-[EmbeddingGemma 2](https://huggingface.co/google/embeddinggemma-2) to index the contents of
-folders you opt in, including documents, spreadsheets, presentations, code,
-images, audio and video. See the [user guide](docs/USER_GUIDE.md#local-ai).
+- **Local search, no telemetry.** Your data stays in `%LOCALAPPDATA%\Scout`.
+  Network access is limited to downloads for optional AI components and web
+  searches or links you choose to open.
+- **Choose what Scout can search.** Browser history, content indexing and AI
+  are separately opt-in. Incognito data, cookies and open tabs are never read.
+- **Keep document text out of ranking.** Laya receives query text, candidate
+  titles and limited context such as recent app names and the clipboard's
+  *kind*, never its contents. The separate embedding worker handles content
+  only from folders you select.
+- **You confirm every launch.** Nothing launches without **Enter** or an
+  explicit **Open** action. Models select known candidate IDs and cannot
+  create commands.
+- **Control your index.** Turning keyword content search off clears its index.
+  Folder restrictions and exclusions remain enforced during retrieval and
+  model ranking.
 
-## Privacy
-
-- Search runs locally and Scout has no telemetry. Data is stored in
-  `%LOCALAPPDATA%\Scout`. Network access is limited to opening web searches you
-  choose and downloading optional AI components from their publishers.
-- Chrome and Edge history and file-content search are separately opt-in.
-  Incognito data, cookies and open tabs are never read.
-- Laya receives query text, candidate titles and limited context such as recent
-  app names and the clipboard's *kind*, never its contents. It never receives
-  document bodies.
-- Turning content search off clears its index.
+Read the [user guide](docs/USER_GUIDE.md) for indexing rules, evidence sources,
+folder restrictions and data controls.
 
 ## Build from source
 
-Prerequisites: Windows 11 x64 and the .NET SDK version pinned in
-[`global.json`](global.json). Python is only needed for the optional AI runtime,
-and setup installs its own. The installer build also needs
-[Inno Setup 7](https://jrsoftware.org/isinfo.php).
+You need Windows 11 x64 and the .NET SDK pinned in [`global.json`](global.json).
+Python is needed only for optional AI; setup installs its own runtime. Building
+the installer also requires [Inno Setup 7](https://jrsoftware.org/isinfo.php).
 
 ```powershell
+git clone https://github.com/adilzubair/scout.git
+cd scout
 dotnet run --project src/Scout.App
 ```
 
 Build, test and package:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build.ps1             # build + regression checks
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build.ps1 -Publish    # + portable ZIP
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build.ps1 -Installer  # + Scout-Setup.exe
+# Release build, native regression suite and packaging contract checks
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build.ps1
+
+# Also produce a portable ZIP or a per-user installer
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build.ps1 -Publish
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build.ps1 -Installer
 ```
 
-Outputs go to `artifacts/`. For the optional AI runtime, run
-`scripts/setup-laya.ps1` (add `-Cuda` for NVIDIA GPUs), then the Python checks:
+Outputs go to `artifacts/`. Diagnostic app modes must use a throwaway
+`SCOUT_DATA_DIR` to keep your real profile untouched. See
+[CONTRIBUTING.md](CONTRIBUTING.md) and the
+[end-to-end test guide](tests/Scout.E2E/README.md).
+
+<details>
+<summary>Optional AI setup and Python checks</summary>
 
 ```powershell
+# Omit -Cuda to use CPU
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/setup-laya.ps1 -Cuda
+
 .runtime/.venv/Scripts/python.exe runtime/test_runtime.py
 .runtime/.venv/Scripts/python.exe runtime/test_http.py
 ```
 
-`Scout.exe` also has isolated diagnostic modes for UI and integration testing.
-Point `SCOUT_DATA_DIR` at a throwaway directory first. See
-[CONTRIBUTING.md](CONTRIBUTING.md) and the
-[end-to-end test guide](tests/Scout.E2E/README.md).
+</details>
 
-## Project layout
+<details>
+<summary>Project layout</summary>
 
 | Path | Contents |
 |---|---|
-| `src/Scout.Core` | Search engine, query parsing, ranking policy, indexing and storage (SQLite) |
-| `src/Scout.App` | WPF launcher, settings, previews, Windows integration, model hosts |
-| `runtime/` | Python sidecars: Laya ranking server and the multimodal embedding worker |
-| `tests/Scout.Tests` | Native regression checks (console runner) |
+| `src/Scout.Core` | Search engine, query parsing, ranking policy, indexing and SQLite storage |
+| `src/Scout.App` | WPF launcher, settings, previews, Windows integration and model hosts |
+| `runtime/` | Local AI sidecars, model manifests and the multimodal embedding worker |
+| `tests/Scout.Tests` | Native regression checks |
 | `tests/Scout.E2E` | Windows end-to-end runner |
-| `scripts/` | Build, packaging, setup and evaluation tooling ([index](scripts/README.md)) |
-| `installer/` | Inno Setup script |
+| `scripts/` | Build, packaging, setup and evaluation tooling |
+| `installer/` | Inno Setup installer |
 | `evaluation/` | Frozen evaluation protocols |
-| `docs/` | User and contributor docs; `docs/research/` holds development notes |
+| `docs/` | User, contributor and research documentation |
 | `website/` | Static project website |
 
-## Documentation
+</details>
 
-- [User guide](docs/USER_GUIDE.md): detailed behavior and settings
-- [Release notes](docs/RELEASE_NOTES.md)
-- [Installer](docs/INSTALLER.md): packaging and verification
-- [Interface](docs/UI.md): visual system and UI test modes
-- [Parity](docs/PARITY.md): how Intern's behavior maps to Windows
-- [Third-party components](docs/THIRD_PARTY.md): licenses and attributions
-- [Research notes](docs/research/README.md): evaluations, benchmarks and model screens
+## Explore the docs
+
+| Start here | Go deeper |
+|---|---|
+| [User guide](docs/USER_GUIDE.md) — settings, search and actions | [Interface](docs/UI.md) — visual system and UI checks |
+| [Release notes](docs/RELEASE_NOTES.md) — published and upcoming changes | [Research notes](docs/research/README.md) — evaluations and model experiments |
+| [Installer guide](docs/INSTALLER.md) — packaging and verification | [Tooling index](scripts/README.md) — development scripts |
+| [Contributing](CONTRIBUTING.md) — build, test and PR guidance | [Third-party components](docs/THIRD_PARTY.md) — licenses and attributions |
+| [Security policy](SECURITY.md) — report a security issue | [Behavior parity](docs/PARITY.md) — mapping Intern's behavior to Windows |
 
 ## Contributing
 
-Issues and pull requests are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md)
-first, and report security issues as described in [SECURITY.md](SECURITY.md).
+Bug reports, ideas and pull requests are welcome. Read
+[CONTRIBUTING.md](CONTRIBUTING.md) before making changes, and use the
+[security policy](SECURITY.md) to report security issues.
 
 ## Acknowledgements
 
@@ -197,4 +289,5 @@ from [fsearch](https://github.com/noahdunnagan/fsearch). See
 
 ## License
 
-[MIT](LICENSE) © Muhamed Adil
+[MIT](LICENSE) © Muhamed Adil. Optional models and dependencies retain their
+respective upstream licenses.
