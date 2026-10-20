@@ -28,9 +28,9 @@ The product illustrations use self-hosted Inter from the official `rsms/inter`
 project, with its license in `dist/fonts/LICENSE.txt`.
 
 The public site and beta downloads are published from
-[`adilzubair/scout-site`](https://github.com/adilzubair/scout-site). The
-application source remains in the private `adilzubair/scout` repository. The
-public repository contains only these static site files and release assets.
+[`adilzubair/scout-site`](https://github.com/adilzubair/scout-site), which
+contains only these static site files and release assets. The application
+source lives in this repository.
 Vercel deploys its `main` branch root to
 [`scout.muhamedadil.com`](https://scout.muhamedadil.com/). GitHub Pages also serves
 the same files at `https://adilzubair.github.io/scout-site/`. Preserve the public

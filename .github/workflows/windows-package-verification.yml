@@ -92,7 +92,7 @@ jobs:
           $baselineIncluded = $LASTEXITCODE -eq 0
           $global:LASTEXITCODE = 0
           [ordered]@{commit=$env:GITHUB_SHA;publishedBeta2Included=$baselineIncluded;packagingSourceSha256=$pins;releaseApproved=$false} | ConvertTo-Json -Depth 4 | Set-Content artifacts/ci/source.json
-          'Verification artifacts only. This job does not approve release, resolve local Bitdefender compatibility, or establish clean Windows 11 installation.' | Set-Content artifacts/ci/DEVELOPMENT-ONLY.txt
+          'Verification artifacts only. This job does not approve a release or establish a clean Windows 11 installation.' | Set-Content artifacts/ci/DEVELOPMENT-ONLY.txt
           if (-not $baselineIncluded) { Write-Output '::warning::Published beta 2 commits are not integrated; these artifacts must not replace the published beta.' }
 
       - name: Install the pinned official Inno Setup compiler

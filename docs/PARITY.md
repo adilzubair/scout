@@ -1,6 +1,6 @@
-# Intern on Windows
+# Behavior parity with Intern
 
-Behavioral reference: `dabit3/intern` commit `c0bedee4b374b5f177b670016f5ff2b8e5bcf7eb`, cloned under `.reference/intern`. Reference code/assets are not included in Scout's package. Scout is independently implemented in C#/WPF and Python.
+Scout brings the behavior of [Intern](https://github.com/dabit3/intern), a macOS launcher, to Windows. Behavioral reference: `dabit3/intern` commit `c0bedee4b374b5f177b670016f5ff2b8e5bcf7eb`. Intern's code and assets are not included in Scout. Intern ranks candidates with Jev, a hosted model; Scout uses local models instead. Scout is independently implemented in C#/WPF and Python.
 
 Implemented behavior:
 
@@ -12,16 +12,12 @@ Implemented behavior:
 - Suggested Open all rows with editable membership; confidence/readiness that cannot activate a stale result.
 - Local Laya evaluated on realistic distractors, paraphrases, temporal queries and ambiguity, including GPU latency. A compatible API is not evidence of Jev-level accuracy.
 
-Verification is documented in `VALIDATION.md`. Readiness uses clear local evidence, while raw model readiness is retained internally pending broader calibration. Semantic groups remain constrained by candidate eligibility and explicit user confirmation. Windows system mutations are implemented but excluded from automated execution tests. Live macOS/Jev equivalence has not been measured.
+Verification is documented in [VALIDATION](research/VALIDATION.md). Readiness uses clear local evidence, while raw model readiness is retained internally pending broader calibration. Semantic groups remain constrained by candidate eligibility and explicit user confirmation. Windows system mutations are implemented but excluded from automated execution tests. Live macOS/Jev equivalence has not been measured.
 
-The [ordinary-laptop baseline](LIGHTWEIGHT_BASELINE.md) records why Scout's
-current CPU Laya stack cannot be treated as an Intern-quality default. The
-standard Settings flow no longer offers the 4B helper, which improves the
-authored semantic suite but exceeds the target footprint. We will test public
-Intern workflows and Scout's Windows search outcomes offline, without a Jev
-API key. This can establish behavioral coverage and Scout quality against our
-own targets; it cannot establish equal Jev model accuracy. A new independently
-labeled holdout is required before a compact model becomes a default.
+The [ordinary-laptop baseline](research/LIGHTWEIGHT_BASELINE.md) records why
+Scout's current CPU Laya stack cannot be treated as an Intern-quality default.
+Offline tests can establish behavioral coverage and Scout quality against its own
+targets; they cannot establish equal Jev model accuracy.
 
 Windows mappings: Spotlight → Windows Search and local file watchers; Finder recent use → Windows Recent Items and Scout launches; Chrome history → Chrome/Edge visits and completed downloads; Quick Look → bounded built-in previews; Shortcuts → user-selected Windows shortcuts/Power Automate links; Focus → Windows notification settings; Trash → Recycle Bin.
 

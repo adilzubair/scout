@@ -1,12 +1,11 @@
 # Optional multimodal add-on: physical-PC validation
 
-Scheduling update, 2026-10-19: the user can run the physical 16 GB PC only after
-release. Track that run as post-release validation, not a prerequisite to merging
+The physical 16 GB PC run is post-release work. Track that run as post-release validation, not a prerequisite to merging
 or publishing the beta. Minimum-hardware support remains unverified until its
 results are reviewed; do not advertise a validated 16 GB minimum in the meantime.
 The procedures and historical measurements below retain their original scope.
 
-This internal validation bundle uses the exact published Scout application and
+This validation bundle uses the exact published Scout application and
 its bundled .NET runtime. No .NET SDK, Python installation, Office or LibreOffice
 is needed. It downloads pinned CPython, CPU dependencies and model weights from
 their publishers. Allow at least 12 GiB of free space as a test reserve; this is

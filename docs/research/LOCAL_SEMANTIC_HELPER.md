@@ -65,7 +65,7 @@ indexed files. Four new checks exercise receipt, schema, architecture and
 security descriptions through the live UI with the helper enabled. Local
 results render in **66 ms median / 109 ms p95**. Those four descriptive searches
 settle in **666–1,194 ms** including UI scheduling, refinement and the diagnostic's
-settling wait. Edited groups, manual selection, rapid typing, Telegram searches
+settling wait. Edited groups, manual selection, rapid typing, folder-scoped searches
 and native folder validation pass. No personal documents are launched.
 The packaged UI smoke test also passes rendering, scopes, settings navigation,
 validation focus, editable groups and retained manual selection.

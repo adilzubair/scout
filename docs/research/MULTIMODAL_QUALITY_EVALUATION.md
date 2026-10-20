@@ -4,10 +4,9 @@ The release protocol is `evaluation/multimodal/protocol.json`. Keep its frozen
 admission floor and existing dataset receipts intact. Engineering fixtures, the
 authored pilot and the natural-audio diagnostic below are development evidence.
 The independent 400-task, seven-family holdout remains a general-release gate.
-On 2026-10-19 the user selected an experimental beta merge with that study
-deferred. This changes the beta acceptance scope, not the protocol or quality
-results. Keep the add-on experimental and avoid general accuracy claims. See
-[beta merge readiness](BETA_MERGE_READINESS.md).
+The beta ships the add-on as experimental with that study deferred. This changes
+the beta acceptance scope, not the protocol or quality results. Keep the add-on
+experimental and avoid general accuracy claims.
 
 ## Natural-audio development diagnostic
 
@@ -454,8 +453,8 @@ The earlier authored pilot admitted every negative query at the provisional
 0.35 floor; that failure remains open. Do not infer a fix from positive-only audio.
 
 Physical 16 GB Windows validation, remaining lifecycle/resource checks and runtime
-distribution clearance remain separate release gates. The user will run the
-physical hardware bundle later. This diagnostic cannot make the add-on release ready.
+distribution clearance remain separate release gates. The physical hardware
+bundle run is still pending. This diagnostic cannot make the add-on release ready.
 
 ## Natural-code development intake
 

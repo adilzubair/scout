@@ -14,7 +14,7 @@ internal static class ExclusionChecks
     {
         test("Default exclusions skip temp tmp dot folders and generated pytest trees without name overreach", () =>
         {
-            foreach (var name in new[] { "temp", "TEMP", "tmp", "Tmp", ".private", ".git", ".anything", "pytest-of-adil", "PYTEST-OF-username" })
+            foreach (var name in new[] { "temp", "TEMP", "tmp", "Tmp", ".private", ".git", ".anything", "pytest-of-alex", "PYTEST-OF-username" })
             {
                 Check(IndexPolicy.Excluded(@"C:\Docs\" + name), "Excluded directory not recognized: " + name);
                 Check(IndexPolicy.Excluded(@"C:\Docs\" + name + @"\Nested\Report.pdf"), "Excluded subtree not recognized: " + name);

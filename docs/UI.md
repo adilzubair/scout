@@ -9,7 +9,7 @@ The panel keeps up to six results visible before scrolling and stays within the
 current monitor's work area. Existing launch, preview, group, and action
 shortcuts work in both states.
 
-The `ui/digup-inspired` branch tries the split search panel from
+The split search panel is inspired by
 [DigUp](https://github.com/ARahim3/DigUp): a 330 px result column beside a
 selected-item preview, an amber magnifier, compact rows, neutral surfaces and
 a quiet footer. This is an original WPF implementation; no DigUp source or assets
@@ -99,36 +99,13 @@ text extraction, cancellation on selection/query changes and hide/reopen. It
 saves `inline-note.png` and `inline-note-dark.png` alongside its control report.
 Fallback previews are checked in light, dark and high-contrast themes to keep
 the footer and action buttons inside the panel.
-To build this trial while another Scout copy holds the normal output directory:
+
+To build while another Scout copy holds the normal output directory, use a
+separate output path:
 
 ```powershell
-dotnet build Scout.slnx -c Release -m:1 -p:OutputPath="$PWD/artifacts/digup-ui-corners/"
+dotnet build Scout.slnx -c Release -m:1 -p:OutputPath="$PWD/artifacts/ui-build/"
 ```
 
-Trial validation on 20 October 2026: the build completed without warnings and
-all 431 regression checks passed. The final native control run passed 22 of 23
-checks, including the new inline readers and cancellation/layout checks. The
-existing clipboard test could not read the current clipboard object
-(`CLIPBRD_E_CANT_OPEN`, after its bounded retries). The full UI run completed
-the remaining visual, Office, PDF and media checks using the verified runtime
-under `artifacts/diagnostics/e2e/addon`, then retained that clipboard failure as
-a failing overall exit status. Reports and screenshots stay untracked under
-`artifacts/digup-ui-checks/`.
-
-The unified Settings revision also builds without warnings. Native checks pass
-for saving, reopening, restarting and folder selection; 22 of 23 control checks
-pass, with the same existing clipboard block retained. The updated Settings was
-visually checked in light, dark and high contrast, and its fields and Save button
-stay within the smallest supported window. These reports and screenshots are
-under `artifacts/digup-ui-unified-checks/`.
-
-Corner-fix verification retained actual native captures of the launcher and
-Settings at 150% display scaling in light and dark themes, with controlled white
-and black backdrops. The competing corner outline is removed. The build has no
-warnings; 22 of 23 control checks pass. The existing clipboard check still fails
-its copied-value assertion on this host and retains a failing overall exit
-status. Evidence is under `artifacts/digup-ui-corner-checks/`.
-
-Quit the current Scout instance before opening `artifacts/digup-ui-corners/Scout.exe`
-to try the branch; the normal single-instance launcher otherwise reopens the
-already running copy.
+Quit the running Scout instance before opening the separately built `Scout.exe`;
+the single-instance launcher otherwise reopens the already running copy.

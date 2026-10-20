@@ -1,9 +1,8 @@
 # Scout search index redesign — 2026-10-09
 
-Implemented on `feat/fsearch-index-redesign`, starting from the complete baseline
-`fd800451624bb7fa1d64751f917e9e36056385dc`. The branch is available for review;
-the comparison was completed locally before beta 2 release preparation. Unrelated
-`.omo/` work was preserved. See [release notes](RELEASE_NOTES.md) for the beta.
+Implemented starting from baseline `fd800451624bb7fa1d64751f917e9e36056385dc`;
+the comparison was completed locally before beta 2 release preparation. See
+[release notes](../RELEASE_NOTES.md) for the beta.
 
 The design takes ideas from [fsearch](https://github.com/noahdunnagan/fsearch)
 and adapts them to Scout's C# application, existing ranking and SQLite stores.

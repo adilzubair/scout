@@ -101,5 +101,5 @@ and source requirements in the final optional-distribution review.
 [uv source and licenses](https://github.com/astral-sh/uv/tree/0.11.27),
 [managed Python distributions](https://docs.astral.sh/uv/concepts/python-versions/).
 
-See [the multimodal runtime screen](MULTIMODAL_RUNTIME_SCREEN.md) for versions,
+See [the multimodal runtime screen](research/MULTIMODAL_RUNTIME_SCREEN.md) for versions,
 measurements and remaining distribution work.

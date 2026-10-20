@@ -1,18 +1,14 @@
 # Validation
 
-Current experimental beta candidate: **0.1.0-beta.3**. The 2026-10-19 follow-up
-passes 431 native checks on the combined beta 2 integration. Earlier PDF
-contention/navigation recovery and background indexing/search/Laya isolation
-checks remain recorded below. Protected Windows CI passes 431 native checks,
-24 unchanged packaging contracts, installer compilation and a Defender scan
-with zero new detections on the combined integration at `af2cf90` (run 39296885807).
-Combined settings/restart/native-picker and TesterArmy control CI also pass.
-The local Bitdefender compatibility finding, final installer lifecycle and
-optional native add-on distribution review remain open. The user
-deferred the independent 400-task quality study for this beta and physical
-16 GB testing until after release. See the [current E2E evidence](E2E_TESTING_2026_10_19.md)
-and [beta readiness decision](BETA_MERGE_READINESS.md); earlier results below
-retain their original dates, packages and limits.
+This is a chronological log of measured results and their limits. Earlier
+entries keep their original dates, packages and scope.
+
+Current experimental beta candidate: **0.1.0-beta.3**. It passes 431 native
+checks locally and in Windows CI, along with the packaging contracts, installer
+compilation and a Defender scan with zero new detections. Clean-machine installer
+lifecycle checks, a review of the optional native add-on's distribution, the
+independent 400-task multimodal quality study and 16 GB hardware measurements
+remain open.
 
 Latest optional local helper: **56/64** fresh semantic validation cases versus
 38/64 with Laya alone; **497/504** prior real-metadata regressions versus 484/504.
@@ -43,13 +39,13 @@ Reproduce the hardware check with an isolated `SCOUT_DATA_DIR` and `Scout.exe --
 
 ## Real-file bug audit — 2026-09-24
 
-The reported query `latest file in telegram folder` failed on the original 63,609-file index even though the Telegram files were present. Location words were treated as filename terms, excluding ordinary files inside that folder. The original audit also reproduced failures for Downloads, folder/type combinations, date ordering, counts, and filenames containing action words. The failing baseline is retained locally.
+A reported query of the form `latest file in <app> folder` failed on the original 63,609-file index even though the folder's files were present. Location words were treated as filename terms, excluding ordinary files inside that folder. The original audit also reproduced failures for Downloads, folder/type combinations, date ordering, counts, and filenames containing action words. The failing baseline is retained locally.
 
 After the fixes, 34 filesystem-grounded cases pass with no skips. Expected paths are derived by independently enumerating real folders and reading filesystem timestamps, rather than by asking the parser/ranker for its preferred answer. The checks cover nested/direct children, quoted and absolute locations, latest/oldest/created ordering, today/yesterday, exact counts, PDF/Word/spreadsheet/archive types, Screenshots, folder opening, duplicate filenames, exact file paths and absent matches. No eligible presentation exists in the tested Documents folder: that case correctly requires zero results. Plain duplicate-name queries accept either exact filename while checking that the intended file remains available and the action stays Open.
 
-The packaged Windows app passes all 34 cases before and after background enrichment/refinement, plus a real company-profile query with Laya enabled: **35/35 desktop search checks**. It indexes 63,850 real files after adding Pictures and the Windows Screenshots known folder. The expanded desktop test caught project screenshot folders leaking into a standard Screenshots search; known Windows/configured roots now take precedence. Every displayed hit and every model candidate remains constrained to the requested location.
+The packaged Windows app passes all 34 cases before and after background enrichment/refinement, plus a real scoped query with Laya enabled: **35/35 desktop search checks**. It indexes 63,850 real files after adding Pictures and the Windows Screenshots known folder. The expanded desktop test caught project screenshot folders leaking into a standard Screenshots search; known Windows/configured roots now take precedence. Every displayed hit and every model candidate remains constrained to the requested location.
 
-Time from assigning a query in the actual WPF input to rendered local results: **57 ms median, 78 ms p95**, with a **161 ms first-query maximum**. Search-engine time was generally 16–32 ms; these are different measurements. Explicit chronological results no longer wait for Laya. A scoped company-profile inference completed in 125 ms and retained the correct PDF. The test also verifies editable three-file groups, manual selection surviving refresh, rapid typing cancellation, and valid directory actions without launching personal files.
+Time from assigning a query in the actual WPF input to rendered local results: **57 ms median, 78 ms p95**, with a **161 ms first-query maximum**. Search-engine time was generally 16–32 ms; these are different measurements. Explicit chronological results no longer wait for Laya. A scoped Laya inference completed in 125 ms and retained the correct PDF. The test also verifies editable three-file groups, manual selection surviving refresh, rapid typing cancellation, and valid directory actions without launching personal files.
 
 The full C# suite passes **132 checks**, including new folder, literal-name, action, recency, screenshot and count regressions. Python adapter checks and the authenticated HTTP tests pass, including folder candidates. The final package also passes actual PDF/image/Office/text previews and CUDA model-host checks, installed app selection, Ctrl+Alt+Space hide/show, and file create/modify/delete watching without extra full scans. UI heartbeat gaps were 46 ms p95 and 70 ms maximum in that run. Private snapshots, paths and reports remain under ignored `artifacts/diagnostics`; none are distributed in the application ZIP. These cases substantiate the fixes on this PC, not a general accuracy guarantee or an Intern/Jev comparison.
 
@@ -105,16 +101,15 @@ contracts: 24. The isolated `--folder-picker-smoke-test` passes against both the
 SDK build and the replacement self-contained app. It selects the actual native
 folder dialog, repeats the same selection, cancels, and verifies settings stays
 usable after injected COM/Win32/dialog-state errors. It requires `SCOUT_DATA_DIR`
-and does not change the user's ordinary settings or install model runtimes.
+and does not change ordinary settings or install model runtimes.
 
-Replacement internal delivery: `artifacts/Scout-multimodal-preview.zip`,
+Replacement preview build: `artifacts/Scout-multimodal-preview.zip`,
 85,307,118 bytes, SHA-256
 `f22b559550eab55761592c737eccea576dd4a5b4dc15680cc915483cb44501e6`.
 All 565 ZIP members match inventory/staging, and all 33 runtime files match source
 and the previous bundle. The previous ZIP is unchanged. Expensive model/resource
 workloads were not repeated for this UI-only correction; prior results and open
-quality/hardware/distribution gates retain their original scope. See the
-[internal-preview handoff](MULTIMODAL_INTERNAL_PREVIEW.md) for usage.
+quality/hardware/distribution gates retain their original scope.
 
 ## Settings persistence and full app validation — 2026-10-15
 
@@ -140,5 +135,4 @@ All 566 ZIP members match staging/inventory; all 33 runtime files match source
 and the prior working preview. The final runner report binds the packaged app
 hash to its four clean phase exits:
 `artifacts/diagnostics/multimodal/app-e2e-92fa2a7d/report.json`.
-See [the app test report](APP_END_TO_END_TESTING.md) for coverage and limits.
-The user's running older Scout and personal settings were preserved.
+

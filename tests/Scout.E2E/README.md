@@ -70,7 +70,7 @@ an additional workload comparing 100,000 authored metadata entries alone, during
 It records ordinary-search timings, unchanged result signatures, Laya outcomes,
 observed indexing completion and whole-job peak commit. These are engineering
 measurements; visible WPF/debounce timing, battery and minimum hardware remain
-separate. The user's other desktop workloads may affect the measurements.
+separate. Other desktop workloads may affect the measurements.
 The same workload verifies real Laya reset and watchdog cleanup after abrupt
 owner termination, before closing its enclosing test job. Laya fallback counts
 are retained separately from ordinary-search success; a passing isolation check
@@ -99,7 +99,7 @@ native folder selection, actual readers, model inference and previews have
 separate tests. Control counts are inventories, not proof every possible state
 or hardware configuration was exercised. System lock/sleep/radio/deletion actions
 are covered by selection/dispatch contracts without applying those changes to the
-user's PC. Physical 16 GB validation is post-release work.
+host machine.
 
-See [the current coverage report](../../docs/E2E_TESTING_2026_10_19.md) for measured
-results, retained failures, platform blocks and remaining release checks.
+See [validation](../../docs/research/VALIDATION.md) for measured results and
+remaining release checks.

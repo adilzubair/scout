@@ -64,7 +64,7 @@ they do not establish rejection quality for arbitrary semantic descriptions.
 Production behavior and prompts were locked for the first validation run, which
 scored 259/271. A later check against the existing authored regression suite found
 that independent relevance could displace a stronger comparative choice and
-admit an insurance file for a medical-prescription query. Correcting those issues
+admit an unrelated document for a narrowly described one. Correcting those issues
 and checking app-role/scene parsing restored that suite's 56/56 and 39/40 results.
 The final validation rerun remained 259/271. The rerun is confirmation, not a new
 unseen test set. The reserved cases' remaining misses were not used for tuning.
@@ -112,7 +112,7 @@ The real-file audit includes the newly supported count, location and JSON/CSV
 query forms. Live audits refresh expected metadata separately when user files
 change; they never alter the frozen benchmark.
 The final desktop run passed **41/41 checks** with the warmed sidecar and
-immediate window resize, including the real company-profile inference.
+immediate window resize, including a scoped Laya inference over real files.
 Across its 40 file queries, local results rendered in **58 ms median / 89 ms
 p95**, with a 160 ms first-query maximum, against 75,710 live indexed files.
 

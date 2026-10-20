@@ -97,7 +97,7 @@ static class MultimodalHardwareChecks
         else CopyResourcePack(resourceFixtures,fixtures,destination);
         File.Copy(Path.GetFullPath("scripts/run-multimodal-hardware.ps1"),Path.Combine(destination,"run.ps1"));
         File.Copy(Path.GetFullPath("scripts/collect-multimodal-hardware.ps1"),Path.Combine(destination,"collect-results.ps1"));
-        File.Copy(Path.GetFullPath("docs/MULTIMODAL_HARDWARE_VALIDATION.md"),Path.Combine(destination,"README.md"));
+        File.Copy(Path.GetFullPath("docs/research/MULTIMODAL_HARDWARE_VALIDATION.md"),Path.Combine(destination,"README.md"));
         File.AppendAllText(Path.Combine(destination,"README.md"),"\nThis exact bundle contains "+Directory.GetFiles(fixtures).Length+" authored files. Full production-window fixtures included: "+(resourceFixtures!=null?"yes":"no")+".\n");
         Write(Path.Combine(destination,"inventory.json"),Directory.GetFiles(destination,"*",SearchOption.AllDirectories)
             .Order(StringComparer.Ordinal).ToDictionary(path=>Path.GetRelativePath(destination,path).Replace('\\','/'),Hash));

@@ -2,27 +2,22 @@
 
 Date: 2026-10-15. Branch: `feature/multimodal-semantic-search`.
 
-The approved deliverable is now ready for internal testing. Start with the
-[concise preview handoff](MULTIMODAL_INTERNAL_PREVIEW.md) for the tested ZIP,
-installation steps, commit identities and known issues. The existing seven-
-family package is unchanged. The extensive quality benchmark, physical 16 GB
-run, distribution review and remaining production checks are deferred; autonomous
-work stops after this handoff. Historical evidence and open gates below remain
-available and do not imply production approval.
+This is a development log for the experimental multimodal add-on. The
+extensive quality benchmark, physical 16 GB run, distribution review and
+remaining production checks are still open. Historical evidence and open gates
+below do not imply production approval.
 
 The current settings-persistence preview (`2f5173a`) also fixes folders disappearing
 when Settings is reopened during indexing. Choices are committed before the dialog
 closes. Indexing failures preserve those preferences, and storage-write failures
-keep the user's edits available in Settings. Use the handoff's latest ZIP and see
-[the app end-to-end report](APP_END_TO_END_TESTING.md) for tested flows and limits.
+keep the user's edits available in Settings.
 The latest product commit is `f53e3d6`: PDF rasterization now uses an owned worker
 to keep a native Windows PDF/graphics shutdown failure outside Scout's UI process.
 
 Interactive folder browsing is corrected in `f5f0b9b`: the previous custom COM
 picker used an unregistered class and could terminate Scout. Settings now uses
 WPF's native folder-dialog wrapper and retains manual path entry if the browser
-cannot open. Use the latest `Scout-multimodal-preview-e2e-fixed.zip` from the handoff;
-the older hardware-validation ZIP does not include this fix.
+cannot open. The older hardware-validation ZIP does not include this fix.
 
 Storage maintenance now keeps the selected generation and one recent completed
 rollback generation for the same device, plus two completed generations for the
@@ -55,7 +50,7 @@ directly with trusted venv activation, matching content extraction. Ten maintena
 guards, 333 full regression checks, 24 package contracts and the published WPF
 smoke pass. Clean-account, real exhausted-volume and distribution gates remain open.
 
-The user has a physical Windows 11 16 GB PC and will run validation later. The
+Validation on a physical Windows 11 16 GB PC is still pending. The
 portable procedure is in [hardware validation](MULTIMODAL_HARDWARE_VALIDATION.md).
 Keep the minimum-hardware gate open until those results are reviewed; development
 machine timings do not establish it.
@@ -801,7 +796,7 @@ of a new ready generation and leaves the prior installation marker intact.
 Readiness now tests joint audiovisual input as well as each individual encoder.
 The notice inventory records native reference hashes and outstanding source/codec
 review; it always reports `distributionApproved: false`. See
-[the third-party audit](THIRD_PARTY.md) for the specific unresolved native artifacts.
+[the third-party audit](../THIRD_PARTY.md) for the specific unresolved native artifacts.
 
 ```powershell
 .runtime/semantic-search/cpu-venv/Scripts/python.exe runtime/test_notices.py

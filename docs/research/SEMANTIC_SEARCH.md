@@ -68,7 +68,7 @@ becoming a video request.
 The reserved result is weak: only **10/38 positive descriptions** succeeded,
 including **0/22 real markdown descriptions**, even though those 22 expected
 files reached the shortlist. Seven of eight unsupported requests were rejected;
-one driving-license request incorrectly admitted a passport. Two authored
+one identity-document request admitted the wrong document. Two authored
 positive cases still missed retrieval. This is not evidence of Intern parity or
 reliable general semantic understanding. The larger test set exposes limitations
 that the older high overall pass rate hid.
@@ -110,11 +110,11 @@ folder/type scope leaks occur. These reused cases are regression measurements,
 not unseen tests.
 
 The published Windows app passes **41/41 desktop checks** against 75,714 live
-indexed files, including the real Telegram company-profile inference, edited
+indexed files, including a scoped Laya inference over real files, edited
 groups, retained selection, rapid typing and native folder validation. The 40
 ordinary file queries rendered local results in **67 ms median / 124 ms p95**;
 the scoped Laya inference reported 172 ms. The test used an isolated backup of
-the user's settings/index and independently refreshed expected filesystem
+the local settings/index and independently refreshed expected filesystem
 metadata. It did not open personal documents or change radio states.
 
 ## Reproduction

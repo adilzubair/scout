@@ -10,18 +10,15 @@ Settings save durably before indexing finishes; folder-picker activation and
 failed PDF navigation/retry are fixed. Packaging now checks source membership,
 private-payload exclusions, ZIP inventory and hashes before producing artifacts.
 
-The combined source passes 431 native checks locally and in protected Windows
-CI at `af2cf90` (run 39296885807), alongside 24 unchanged package contracts,
-installer compilation and a Defender scan with zero new detections. Combined
-settings/restart/native-picker and TesterArmy control checks pass. The earlier local Bitdefender PowerShell finding remains
-open; this independent CI result does not clear that vendor finding.
+The combined source passes 431 native checks locally and in Windows CI,
+alongside the packaging contracts, installer compilation and a Defender scan
+with zero new detections.
 
-This is an experimental beta. The independent 400-task quality study is deferred
-at the user's direction, and physical 16 GB measurements are scheduled after
-release. Laya CPU requests can reach their two-second fallback. Final clean
-Windows 11 installer lifecycle and optional native add-on source/notice review
-remain open. See [beta readiness](BETA_MERGE_READINESS.md) for current gates and
-[third-party review](THIRD_PARTY.md) before redistributing native add-on files.
+This is an experimental beta. A larger independent multimodal quality study and
+measurements on 16 GB hardware are still to come. Laya CPU requests can reach
+their two-second fallback. Clean-machine installer lifecycle checks and a review
+of the optional native add-on's source and notices remain open. See
+[third-party components](THIRD_PARTY.md) before redistributing native add-on files.
 No beta 3 release has been published.
 
 # Scout 0.1.0 beta 2 — 2026-10-09
@@ -63,7 +60,7 @@ rebuilds the cache for the new exclusion rules; progress appears while it runs.
 
 For the portable edition, extract all of `Scout-win-x64.zip` into a fresh folder
 and run `Scout.exe` after quitting the old copy. SHA-256 checksum files accompany
-both downloads. Press **Ctrl+Alt+Space** to open Scout; closing its panel leaves it
+both downloads. Press **Ctrl+Alt+Space** to open Scout (beta 3 changes this to **Ctrl+Space**); closing its panel leaves it
 running in the tray.
 
 ## Validation and limitations
