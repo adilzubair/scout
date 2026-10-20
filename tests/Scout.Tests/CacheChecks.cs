@@ -1,5 +1,4 @@
 using Scout.Core;
-using System.Text;
 
 internal static class CacheChecks
 {
@@ -40,10 +39,4 @@ internal static class CacheChecks
         });
     }
     private static void Check(bool condition) { if (!condition) throw new InvalidOperationException("Index redesign assertion failed"); }
-    private static void Fixture(Action<string, ScoutStore> run)
-    {
-        var root = Path.Combine(Path.GetTempPath(), "scout-index-check-" + Guid.NewGuid().ToString("N")); Directory.CreateDirectory(root);
-        try { run(root, new ScoutStore(Path.Combine(root, "scout.db"))); }
-        finally { GC.Collect(); GC.WaitForPendingFinalizers(); try { Directory.Delete(root, true); } catch (IOException) { } }
-    }
 }

@@ -1,4 +1,3 @@
-using Scout.Core;
 
 namespace Scout.App;
 

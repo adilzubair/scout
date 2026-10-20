@@ -488,7 +488,9 @@ dotnet run --project tests/Scout.Tests -c Release --no-build --no-restore
 .runtime/.venv/Scripts/python.exe runtime/test_http.py
 ```
 
-For the paired benchmark, build `tests/Scout.Benchmark` twice into separate ignored
+The paired benchmark used two small harness projects, `tests/Scout.Benchmark` and
+`tests/Scout.Lifecycle`, which have since been removed; restore them from commit
+`a064f94` to reproduce it. Build `tests/Scout.Benchmark` twice into separate ignored
 output directories, setting `ScoutCoreAssembly` to the preserved baseline Core DLL
 and then to the redesigned Release Core DLL. Use the same harness source for both:
 

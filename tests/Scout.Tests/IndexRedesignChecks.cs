@@ -1,5 +1,4 @@
 using Scout.Core;
-using System.Text;
 
 internal static class IndexRedesignChecks
 {

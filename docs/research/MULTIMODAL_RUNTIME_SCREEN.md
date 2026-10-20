@@ -1,5 +1,9 @@
 # EmbeddingGemma 2 Windows runtime screen
 
+> The LibreOffice renderer described here (`runtime/semantic_search/office.py`,
+> `msi.py`, `office_renderer.json` and its fetch/probe scripts) has since been
+> removed. Restore it from Git history to reproduce these results.
+
 Date: 2026-10-14. Branch: `feature/multimodal-semantic-search`.
 
 The full local model runs on Windows CPU and CUDA and produces valid embeddings

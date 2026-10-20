@@ -74,20 +74,9 @@ arrangement remain open. The collector always records `distributionApproved: fal
 - [Publisher configure-classification patch](https://github.com/PyAV-Org/pyav-ffmpeg/blob/bac889417e26be29615cb6a3f38318151fed55cd/patches/ffmpeg.patch)
 - [FFmpeg distribution checklist](https://ffmpeg.org/legal.html)
 
-The historical Office compatibility spike separately downloaded the official LibreOffice
-26.8.1 Windows x64 MSI, pinned by package length and SHA-256 in
-`runtime/office_renderer.json`. Read-only extraction retains the package's
-`LICENSE.html`, `NOTICE`, and component-specific notices. LibreOffice identifies
-MPL-2.0 as its primary license and includes components under other licenses;
-the corresponding source release location is recorded in the manifest.
-The failed PortableApps 26.2.4 experiment is historical and is not used by the
-historical rendering path. Neither renderer package nor extracted runtime is
-included in Git or Scout's base application package. LibreOffice is removed
-from the revised add-on's installation and runtime dependencies; its helper
-and manifest are excluded from application packaging. These records describe
-the earlier development experiment.
-[LibreOffice licensing](https://www.libreoffice.org/licenses/),
-[26.8.1 source releases](https://download.documentfoundation.org/libreoffice/src/26.8.1/).
+An earlier development experiment rendered Office files with LibreOffice
+(MPL-2.0). That experiment has been removed; Scout neither downloads nor
+redistributes LibreOffice.
 
 The dependency locks establish development compatibility;
 they do not complete the distribution review for native/codec dependencies.

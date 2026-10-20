@@ -137,7 +137,7 @@ internal static class QualityEvaluation
                 var effective = result.Hits.FirstOrDefault()?.Score >= 1000 ? result.Hits : RankingPolicy.Refine(result, judgment);
                 var expected = row.GetProperty("expected").Deserialize<string[]>()!;
                 var local = result.Hits.FirstOrDefault()?.Candidate.Id; var hybrid = effective.FirstOrDefault()?.Candidate.Id;
-                var ambiguous = row.GetProperty("ambiguous").GetBoolean(); var ready = RankingPolicy.Ready(result, effective, judgment);
+                var ambiguous = row.GetProperty("ambiguous").GetBoolean(); var ready = RankingPolicy.Ready(result, effective);
                 bool Correct(string? id) => expected.Length == 0 ? id == null : id != null && expected.Contains(id);
                 if (ambiguous) { ambiguousCount++; if (!ready) ambiguousCorrect++; }
                 else { count++; if (Correct(local)) localCorrect++; if (Correct(hybrid)) hybridCorrect++; }

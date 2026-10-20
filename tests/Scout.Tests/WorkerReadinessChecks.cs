@@ -1,7 +1,6 @@
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
-using System.Text.Json;
 using Microsoft.Win32.SafeHandles;
 using Scout.App;
 

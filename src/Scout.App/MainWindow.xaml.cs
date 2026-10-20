@@ -168,7 +168,7 @@ public partial class MainWindow : Window
             shift.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(-5, 0, TimeSpan.FromMilliseconds(130))
             { EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut }, FillBehavior = FillBehavior.Stop });
         }
-        ResizeToResults(Results.Items.Count, (Results.Items.Cast<ResultRow>().FirstOrDefault()?.Candidate.Kind == ItemKind.Calculation));
+        ResizeToResults(Results.Items.Count);
         if (expanded) UpdateInlinePreview();
         else CancelInlinePreview();
     }
@@ -313,7 +313,7 @@ public partial class MainWindow : Window
             var noun = kinds.Length == 1 ? kinds[0] switch { ItemKind.File => "files", ItemKind.App => "apps", ItemKind.Link => "links", _ => "items" } : "items";
             effective.Insert(0, new(new Candidate("group:current", ItemKind.Group, $"Open all {group.Count} {noun}", "") { Detail = string.Join(", ", group.Values.Take(3).Select(c => c.Title)) + (group.Count > 3 ? ", …" : ""), Source = "Group" }, 2000));
         }
-        var ready = current != null && RankingPolicy.Ready(current, effective, judgment);
+        var ready = current != null && RankingPolicy.Ready(current, effective);
         var rows = effective.Select((h, i) => new ResultRow(h.Candidate, h.Pinned, group.ContainsKey(h.Candidate.Id), current?.Intent.Recency ?? RecencyBasis.None, i == 0 && (ready || h.Candidate.Kind == ItemKind.Group), group.Count > 0, h.MatchKind, h.Evidence)).ToArray();
         Results.ItemsSource = rows;
         lastRenderedQuery = Query.Text;
@@ -338,7 +338,7 @@ public partial class MainWindow : Window
         FooterActions.Visibility = rows.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
         DetailPane.Visibility = rows.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
         ActionsButton.IsEnabled = rows.Length > 0;
-        ResizeToResults(rows.Length, rows.FirstOrDefault()?.Candidate.Kind == ItemKind.Calculation);
+        ResizeToResults(rows.Length);
         if (expanded && previousQuery == Query.Text && WindowVisuals.MotionEnabled)
         {
             var arrivals = rows.Where(row => !previousIds.Contains(row.Candidate.Id)).ToArray();
@@ -355,7 +355,7 @@ public partial class MainWindow : Window
             item.BeginAnimation(OpacityProperty, new DoubleAnimation(.68, 1, TimeSpan.FromMilliseconds(110)) { FillBehavior = FillBehavior.Stop });
         }
     }
-    private void ResizeToResults(int count, bool calculation)
+    private void ResizeToResults(int count)
     {
         var target = !expanded ? 64 : count == 0 ? (Examples.Visibility == Visibility.Visible ? 448 : 400)
             : Math.Max(450, 170 + Math.Min(6, count) * 52);
@@ -562,7 +562,7 @@ public partial class MainWindow : Window
         IndexState.Text = progress.LauncherSummary; IndexState.ToolTip = progress.Description;
         IndexBusy.Visibility = progress.IsWorking ? Visibility.Visible : Visibility.Collapsed;
         IndexBusy.IsIndeterminate = progress.IsWorking && WindowVisuals.MotionEnabled;
-        ResizeToResults(Results.Items.Count, Selected?.Kind == ItemKind.Calculation);
+        ResizeToResults(Results.Items.Count);
     }
     private void IndexDetailsClick(object sender, RoutedEventArgs e) => ShowSettings("Folders");
     internal async void ShowSettings(string initialPage = "General") => await ShowSettingsAsync(initialPage);
@@ -623,7 +623,6 @@ public partial class MainWindow : Window
         public Candidate Candidate => candidate;
         public bool Grouped => grouped;
         public Visibility MembershipVisibility => membership && candidate.IsGroupable ? Visibility.Visible : Visibility.Collapsed;
-        public string ReadyMark => ready ? "↵" : "";
         public bool IsReady => ready;
         public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
         private ImageSource? icon;

@@ -2,7 +2,6 @@
 
 import copy
 import hashlib
-import importlib.util
 import json
 from pathlib import Path
 import tempfile
@@ -125,14 +124,6 @@ class MultimodalContracts(unittest.TestCase):
             validate_content(' ')
         validate_content({'audio': np.zeros(100, dtype=np.float32)})
         validate_content({'video': np.zeros((3, 8, 8, 3), dtype=np.uint8)})
-
-    def test_missing_office_renderer_is_not_a_success(self):
-        path = Path(__file__).resolve().parents[1] / 'scripts/probe-office-renderer.py'
-        spec = importlib.util.spec_from_file_location('office_probe', path)
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
-        with self.assertRaises(FileNotFoundError):
-            module.find_renderer(Path('a-renderer-that-does-not-exist.exe'))
 
 
 if __name__ == '__main__':

@@ -1,6 +1,5 @@
 using System.Runtime.InteropServices;
 using System.Threading.Channels;
-using Scout.Core;
 
 namespace Scout.App;
 

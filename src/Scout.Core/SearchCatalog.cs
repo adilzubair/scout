@@ -51,7 +51,7 @@ public sealed class SearchCatalog
     }
     public bool HasTitle(string title, Scope scope) => Base.Titles.TryGetValue(title, out var ids) && ids.Any(i => new SearchEntry(Base, i) is var d && !deleted.Contains(d.Id) && !changes.ContainsKey(d.Id) && Available(d) && d.InScope(scope))
         || overlay.Titles.TryGetValue(title, out var more) && more.Any(i => new SearchEntry(overlay, i) is var d && Available(d) && d.InScope(scope));
-    public SearchCatalog(IEnumerable<Candidate> candidates, SearchCatalog? previous = null, IEnumerable<string>? roots = null)
+    public SearchCatalog(IEnumerable<Candidate> candidates, IEnumerable<string>? roots = null)
         : this(CatalogData.Build(candidates), ImmutableDictionary<string, Candidate>.Empty, ImmutableHashSet<string>.Empty, roots?.ToArray() ?? [], []) { }
     internal SearchCatalog(CatalogData data, string[] roots) : this(data, ImmutableDictionary<string, Candidate>.Empty, ImmutableHashSet<string>.Empty, roots, []) { }
     private SearchCatalog(CatalogData data, ImmutableDictionary<string, Candidate> changes, ImmutableHashSet<string> deleted, string[] roots, string[] offline, ImmutableDictionary<string, int>? changeOrder = null)

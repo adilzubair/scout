@@ -108,30 +108,10 @@ Every launch requires Enter or an explicit Open action. A model can select only 
 
 ## Cleaning a development checkout
 
-Run `pwsh -File scripts/clean.ps1` to preview removable build output, retired test
-packages, old UI builds, and bytecode caches. Use `-Apply` to delete the listed
-files, or `-Apply -WhatIf` to exercise the deletion preview. Close any Scout or
-test processes running from those directories first. Build again with
-`scripts/build.ps1`; publishing uses `scripts/build.ps1 -Installer`.
-
-The cleanup retains the standard release outputs, model weights, Python environments,
-fixtures, evaluation data, diagnostic reports and linked test installations.
-The static website's `dist/` directory is its source and stays in place. Active
-regression tests remain part of the build. Cleanup refuses tracked content, links
-and nested Git repositories; it never touches installed Scout settings under
-`%LOCALAPPDATA%`. Run `pwsh -File scripts/test-clean.ps1` to verify its deletion
-and preservation contracts in a disposable repository.
-
-The retired hard-coded prompt experiment and failed portable LibreOffice
-download spike have been removed. Their history remains in Git; the documented
-MSI renderer experiment remains available for reproducing its research results.
-
-For a separate preview of retired research storage, run
-`pwsh -File scripts/clean.ps1 -RetiredResearch`; add `-Apply` to delete it.
-This removes the obsolete Qwen 1.7B weights, downloaded LibreOffice renderer,
-and diagnostic database copies, generated search-index binaries and ZIP archives.
-Directories named for fixtures, diagnostic reports, current release packages,
-current build output and active AI models/environments are retained. Old database
-snapshots cannot be replayed after removal, and archived inputs require rebuilding
-or downloading again. The documented LibreOffice research setup can reinstall
-that optional renderer.
+Run `pwsh -File scripts/clean.ps1` to preview removable build output (`bin/`,
+`obj/`) and Python bytecode caches, then add `-Apply` to delete them (or
+`-Apply -WhatIf` to rehearse). Close any Scout or test processes running from
+those directories first. The cleaner never touches `artifacts/`, `.runtime/`,
+tracked files, linked directories, nested Git repositories or your installed
+Scout data in `%LOCALAPPDATA%`. `pwsh -File scripts/test-clean.ps1` verifies
+those guarantees in a disposable repository.

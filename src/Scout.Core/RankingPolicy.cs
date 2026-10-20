@@ -39,7 +39,7 @@ public static class RankingPolicy
             .Select(x => x.Hit).ToArray();
         return local.Intent.Count is { } count ? ordered.Take(count).ToArray() : ordered;
     }
-    public static bool Ready(SearchResult local, IReadOnlyList<SearchHit> shown, RankResult? judgment = null)
+    public static bool Ready(SearchResult local, IReadOnlyList<SearchHit> shown)
     {
         if (shown.Count == 0 || string.IsNullOrWhiteSpace(local.Query)) return false;
         if (local.Locations.Length > 1) return false;
