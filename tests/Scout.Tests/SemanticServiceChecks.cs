@@ -264,6 +264,15 @@ static class SemanticServiceChecks
             try{await Wait(condition);}
             catch(TimeoutException error){throw new TimeoutException($"{stage}: {System.Text.Json.JsonSerializer.Serialize(Service.Activity)}; calls={Calls}; files={System.Text.Json.JsonSerializer.Serialize(Service.Index?.Files())}",error);}
         }
-        public void Dispose(){Metadata.Dispose();Host.Dispose();SemanticExtractor.DeleteJob(Path.GetDirectoryName(Root)!,Root);}
+        public void Dispose()
+        {
+            Metadata.Dispose();Host.Dispose();
+            // Antivirus or the Windows indexer can briefly hold a fresh scout.db; retry sharing violations.
+            for(var attempt=0;!SemanticExtractor.TryDeleteJob(Path.GetDirectoryName(Root)!,Root);attempt++)
+            {
+                if(attempt==50)SemanticExtractor.DeleteJob(Path.GetDirectoryName(Root)!,Root);
+                Thread.Sleep(100);
+            }
+        }
     }
 }

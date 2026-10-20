@@ -78,7 +78,7 @@ void Test(string name, Action test)
 {
     total++;
     try { test(); Console.WriteLine("PASS " + name); }
-    catch (Exception e) { failures.Add(name + ": " + e.Message); Console.WriteLine("FAIL " + failures[^1]); }
+    catch (Exception e) { failures.Add(name + ": " + e); Console.WriteLine("FAIL " + failures[^1]); }
 }
 void Assert(bool condition, string message = "Assertion failed") { if (!condition) throw new Exception(message); }
 void Throws<T>(Action action) where T : Exception { try { action(); } catch (T) { return; } throw new Exception("Expected " + typeof(T).Name); }

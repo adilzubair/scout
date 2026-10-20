@@ -146,9 +146,15 @@ internal static class MultimodalChecks
                 try
                 {
                     var deadline = DateTime.UtcNow.AddSeconds(10);
-                    while (!File.Exists(pidFile) && DateTime.UtcNow < deadline) Thread.Sleep(50);
-                    Check(File.Exists(pidFile));
-                    var childPid = int.Parse(File.ReadAllText(pidFile));
+                    var childPid = 0;
+                    while (DateTime.UtcNow < deadline)
+                    {
+                        // The parent may still be writing the file when it first appears.
+                        try { if (File.Exists(pidFile) && int.TryParse(File.ReadAllText(pidFile), out childPid)) break; }
+                        catch (IOException) { }
+                        Thread.Sleep(50);
+                    }
+                    Check(childPid > 0);
                     using var child = Process.GetProcessById(childPid);
                     job.Dispose();
                     Check(parent.WaitForExit(10000) && child.WaitForExit(10000));
@@ -167,7 +173,7 @@ internal static class MultimodalChecks
     public static int JobParent(string pidFile)
     {
         using var child = Process.Start(new ProcessStartInfo("cmd.exe", "/c ping 127.0.0.1 -n 61 > nul") { UseShellExecute = false, CreateNoWindow = true })!;
-        File.WriteAllText(pidFile, child.Id.ToString());
+        File.WriteAllText(pidFile + ".tmp", child.Id.ToString()); File.Move(pidFile + ".tmp", pidFile);
         Thread.Sleep(TimeSpan.FromMinutes(1));
         return 0;
     }
