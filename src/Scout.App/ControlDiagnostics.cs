@@ -236,6 +236,11 @@ public partial class MainWindow
                         {
                             WindowVisuals.SetTestTheme(dark, contrast);
                             await UiDiagnostics.Snapshot(dialog, name);
+                            if (!contrast)
+                            {
+                                await UiDiagnostics.CaptureBackdrop(dialog, name + "-native-white", System.Windows.Media.Colors.White);
+                                await UiDiagnostics.CaptureBackdrop(dialog, name + "-native-black", System.Windows.Media.Colors.Black);
+                            }
                         }
                         WindowVisuals.SetTestTheme(null);
                         dialog.Width = dialog.MinWidth; dialog.Height = dialog.MinHeight; dialog.UpdateLayout();

@@ -51,7 +51,7 @@ internal static class WindowVisuals
         window.WindowStyle = WindowStyle.None;
         WindowChrome.SetWindowChrome(window, new WindowChrome
         {
-            CaptionHeight = 0, CornerRadius = WindowCorners, GlassFrameThickness = new Thickness(0),
+            CaptionHeight = 0, CornerRadius = OperatingSystem.IsWindowsVersionAtLeast(10, 0, 22000) ? new CornerRadius(0) : WindowCorners, GlassFrameThickness = new Thickness(0),
             ResizeBorderThickness = new Thickness(window.ResizeMode == ResizeMode.NoResize ? 0 : 5), UseAeroCaptionButtons = false
         });
         window.SourceInitialized += (_, _) =>
@@ -59,8 +59,6 @@ internal static class WindowVisuals
             var handle = new WindowInteropHelper(window).Handle;
             var rounded = 2;
             _ = DwmSetWindowAttribute(handle, 33, ref rounded, sizeof(int));
-            var border = unchecked((int)0xFFFFFFFE); // Let the fine inner rim define the edge.
-            _ = DwmSetWindowAttribute(handle, 34, ref border, sizeof(int));
             // Keep the compositor's native shadow without a layered/software-rendered window.
             var margins = new Margins { Left = 1, Right = 1, Top = 1, Bottom = 1 };
             _ = DwmExtendFrameIntoClientArea(handle, ref margins);
@@ -183,6 +181,9 @@ internal static class WindowVisuals
         {
             var dark = darkPalette == true ? 1 : 0;
             _ = DwmSetWindowAttribute(handle, 20, ref dark, sizeof(int));
+            var rim = ((SolidColorBrush)Brush("Rim")).Color;
+            var border = rim.R | rim.G << 8 | rim.B << 16;
+            _ = DwmSetWindowAttribute(handle, 34, ref border, sizeof(int));
         }
         var transparent = testTransparency ?? (Microsoft.Win32.Registry.GetValue(
             @"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize", "EnableTransparency", 1) is not 0);
@@ -192,12 +193,21 @@ internal static class WindowVisuals
             var kind = backdrop ? surface == WindowSurface.Document ? 2 : 3 : 1;
             backdrop = DwmSetWindowAttribute(handle, 38, ref kind, sizeof(int)) == 0 && backdrop;
         }
-        WindowChrome.GetWindowChrome(window).GlassFrameThickness = backdrop ? new Thickness(-1) : new Thickness(0);
-        window.Background = backdrop ? Brushes.Transparent : Brush("Canvas");
+        // DWM owns the rounded outline on Windows 11. Painting a second rounded
+        // border over a fully extended transparent client area exposes dark
+        // backing pixels between the two curves, especially at scaled DPI.
+        var nativeFrame = OperatingSystem.IsWindowsVersionAtLeast(10, 0, 22000);
+        WindowChrome.GetWindowChrome(window).GlassFrameThickness = nativeFrame ? new Thickness(1) : new Thickness(0);
+        window.Background = Brush("Canvas");
         if (HwndSource.FromHwnd(handle)?.CompositionTarget is { } target)
-            target.BackgroundColor = backdrop ? Colors.Transparent : ((SolidColorBrush)Brush("Canvas")).Color;
+            target.BackgroundColor = ((SolidColorBrush)Brush("Canvas")).Color;
         if (window.Content is Border frame)
-            frame.Background = Brush(backdrop ? surface == WindowSurface.Document ? "DocumentGlass" : "Glass" : "Canvas");
+        {
+            frame.Background = Brush("Canvas");
+            frame.CornerRadius = nativeFrame ? new CornerRadius(0) : WindowCorners;
+            frame.BorderThickness = new Thickness(nativeFrame ? 0 : 1);
+            frame.Padding = new Thickness(nativeFrame ? 1 : 0);
+        }
     }
 
     internal static Rect WorkArea(Window window)
@@ -225,7 +235,10 @@ internal static class WindowVisuals
 
     private static void Reveal(Window window)
     {
-        if (!MotionEnabled || window.Content is not FrameworkElement content) return;
+        // The HWND and its painted frame must keep the same outline throughout
+        // opening. Moving/fading the frame exposes the native backdrop behind it.
+        var content = window.Content is Border frame ? frame.Child as FrameworkElement : window.Content as FrameworkElement;
+        if (!MotionEnabled || content == null) return;
         content.BeginAnimation(UIElement.OpacityProperty, new DoubleAnimation(.78, 1, TimeSpan.FromMilliseconds(160)) { FillBehavior = FillBehavior.Stop });
         var transform = new TranslateTransform();
         content.RenderTransform = transform;

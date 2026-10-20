@@ -3,7 +3,8 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              ShutdownMode="OnExplicitShutdown">
   <Application.Resources>
-    <CornerRadius x:Key="WindowCorners">18</CornerRadius>
+    <!-- Fallback geometry when native Windows 11 window corners are unavailable. -->
+    <CornerRadius x:Key="WindowCorners">8</CornerRadius>
     <SolidColorBrush x:Key="BrandAmber" Color="#B8660B"/>
     <SolidColorBrush x:Key="Tertiary" Color="#85858C"/>
     <SolidColorBrush x:Key="PreviewSurface" Color="#F3F3F4"/>

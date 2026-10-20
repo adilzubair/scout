@@ -42,19 +42,24 @@ fallback preview symbols a quiet accent.
 | Search accent | `#B8660B` | `#F2A22A` |
 | Selected result | `#CEE5FC` | `#233F60` |
 
-Windows 11 draws native acrylic behind the transient launcher and short-lived
-dialogs, including Settings, and Mica behind Quick look. The tinted panel, rim, and
-native shadow keep the launcher defined over both bright and dark apps.
-Windows 10, disabled transparency, and high-contrast mode use a solid themed
-surface. All motion follows the Windows client-area animation preference.
+Windows 11 owns the outer rounded outline, fine border and shadow. Client
+surfaces are painted with the solid theme color so no transparent cutout can
+expose a darker backing surface. Windows 10 uses the matching themed WPF frame.
+High contrast follows Windows system colors. All motion follows the Windows
+client-area animation preference.
 
 Settings uses the launcher's 780 px width, amber header icon, 22 px display
-title, Escape keycap, 18 px window corners and native acrylic surface. Its
+title, Escape keycap, native window corners and themed surface. Its
 navigation and content meet at a full-height divider, and its Save/Cancel row
 uses the same bordered footer as search. Pages no longer sit inside a separate
 rounded card. Shared 13 px body text, 12 px buttons and compact form fields also
-apply to workspace dialogs and Quick look; window corners come from one shared
-resource so these surfaces stay aligned.
+apply to workspace dialogs and Quick look. All windows use the same outer frame
+policy; the shared 8 px corner resource supplies the Windows 10 fallback.
+
+Windows 11 uses a single native outline instead of nesting a rounded WPF border
+inside the compositor's curve. The two shapes could leave a dark crescent at
+scaled DPI. Opening animation moves and fades only the inner content, keeping
+the painted frame stationary and fully visible throughout the transition.
 
 The 160 ms opening fade and slight translation show the launcher without
 delaying input. Expansion changes the HWND height immediately, then reveals
@@ -80,6 +85,10 @@ If the test host has no interactive desktop capture handle, it writes
 `desktop-capture-unavailable.txt`; the WPF screenshots still run, but they
 cannot prove the appearance of acrylic or its native shadow. Review those
 compositor captures manually on an interactive Windows desktop before release.
+Native captures also require the intended window to be foreground and the
+controlled background to be visible; a lock-screen image is never retained as
+evidence of the application's appearance. Control checks capture the launcher
+and Settings against controlled backgrounds to inspect their native corners.
 
 Run `--smoke-test` separately for PDF, image, Office, and text previews. Both
 modes write `smoke-result.txt` in the isolated data directory and leave the
@@ -93,7 +102,7 @@ the footer and action buttons inside the panel.
 To build this trial while another Scout copy holds the normal output directory:
 
 ```powershell
-dotnet build Scout.slnx -c Release -m:1 -p:OutputPath="$PWD/artifacts/digup-ui-unified/"
+dotnet build Scout.slnx -c Release -m:1 -p:OutputPath="$PWD/artifacts/digup-ui-corners/"
 ```
 
 Trial validation on 20 October 2026: the build completed without warnings and
@@ -113,6 +122,13 @@ visually checked in light, dark and high contrast, and its fields and Save butto
 stay within the smallest supported window. These reports and screenshots are
 under `artifacts/digup-ui-unified-checks/`.
 
-Quit the current Scout instance before opening `artifacts/digup-ui-unified/Scout.exe`
+Corner-fix verification retained actual native captures of the launcher and
+Settings at 150% display scaling in light and dark themes, with controlled white
+and black backdrops. The competing corner outline is removed. The build has no
+warnings; 22 of 23 control checks pass. The existing clipboard check still fails
+its copied-value assertion on this host and retains a failing overall exit
+status. Evidence is under `artifacts/digup-ui-corner-checks/`.
+
+Quit the current Scout instance before opening `artifacts/digup-ui-corners/Scout.exe`
 to try the branch; the normal single-instance launcher otherwise reopens the
 already running copy.

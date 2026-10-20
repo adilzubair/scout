@@ -29,7 +29,10 @@ public partial class MainWindow
             if (DetailPane.ActualWidth < 300 || Results.ActualWidth < 280 || DetailPane.TranslatePoint(new System.Windows.Point(), this).X <= Results.TranslatePoint(new System.Windows.Point(), this).X)
                 throw new InvalidOperationException("Results and preview were not laid out side by side.");
             WindowVisuals.SetTestTheme(false); await UiDiagnostics.Snapshot(this, "inline-note");
-            WindowVisuals.SetTestTheme(true); await UiDiagnostics.Snapshot(this, "inline-note-dark"); WindowVisuals.SetTestTheme(null);
+            await UiDiagnostics.CaptureBackdrop(this, "launcher-frame-light-native", System.Windows.Media.Colors.White);
+            WindowVisuals.SetTestTheme(true); await UiDiagnostics.Snapshot(this, "inline-note-dark");
+            await UiDiagnostics.CaptureBackdrop(this, "launcher-frame-dark-native", System.Windows.Media.Colors.White);
+            WindowVisuals.SetTestTheme(null);
             // A late reader cannot overwrite the next selected result.
             Results.SelectedIndex = 1; Results.SelectedIndex = 0; var pending = inlinePreviewTask;
             Results.SelectedIndex = 1; await pending; await inlinePreviewTask;
@@ -38,9 +41,12 @@ public partial class MainWindow
             foreach (var (dark, contrast, name) in new[] { (false, false, "inline-symbol"), (true, false, "inline-symbol-dark"), (false, true, "inline-symbol-contrast") })
             {
                 WindowVisuals.SetTestTheme(dark, contrast); UpdateLayout();
-                if (FooterBar.TranslatePoint(new System.Windows.Point(0, FooterBar.ActualHeight), this).Y > ActualHeight - 1 ||
-                    DetailOpen.TranslatePoint(new System.Windows.Point(0, DetailOpen.ActualHeight), this).Y >= FooterBar.TranslatePoint(new System.Windows.Point(), this).Y)
-                    throw new InvalidOperationException("The fallback preview clipped the footer or its actions.");
+                var footerBottom = FooterBar.TranslatePoint(new System.Windows.Point(0, FooterBar.ActualHeight), this).Y;
+                var actionBottom = DetailOpen.TranslatePoint(new System.Windows.Point(0, DetailOpen.ActualHeight), this).Y;
+                var footerTop = FooterBar.TranslatePoint(new System.Windows.Point(), this).Y;
+                // Native frame insets can round to a fractional DIP at scaled DPI.
+                if (footerBottom > ActualHeight + .5 || actionBottom >= footerTop)
+                    throw new InvalidOperationException($"The fallback preview clipped the footer or its actions: footer {footerBottom:F2}/{ActualHeight:F2}, action {actionBottom:F2}/{footerTop:F2}.");
                 await UiDiagnostics.Snapshot(this, name);
             }
             WindowVisuals.SetTestTheme(null);
@@ -430,7 +436,7 @@ internal static class UiDiagnostics
         using var output = File.Create(Path.Combine(App.DataDirectory, name + ".png")); encoder.Save(output);
     }
 
-    internal static async Task CaptureBackdrop(Window window, string name, System.Windows.Media.Color background)
+    internal static async Task<bool> CaptureBackdrop(Window window, string name, System.Windows.Media.Color background)
     {
         // Capture the real compositor output with a controlled backdrop. RenderTargetBitmap
         // cannot include DWM acrylic, shadows, or the application behind the launcher.
@@ -443,7 +449,15 @@ internal static class UiDiagnostics
         try
         {
             fixture.Show(); window.Activate();
+            WindowsIntegration.SetForegroundWindow(new System.Windows.Interop.WindowInteropHelper(window).Handle);
             await Task.Delay(180);
+            // A locked/noninteractive desktop can otherwise return the lock
+            // screen instead of this window and look like a successful capture.
+            if (GetForegroundWindow() != new System.Windows.Interop.WindowInteropHelper(window).Handle)
+            {
+                File.AppendAllText(Path.Combine(App.DataDirectory, "desktop-capture-unavailable.txt"), name + ": the test window is not foreground.\n");
+                return false;
+            }
             var origin = window.PointToScreen(new System.Windows.Point(0, 0));
             var scale = PresentationSource.FromVisual(window)?.CompositionTarget?.TransformToDevice ?? Matrix.Identity;
             var width = Math.Max(1, (int)Math.Round(window.ActualWidth * scale.M11));
@@ -453,14 +467,28 @@ internal static class UiDiagnostics
             using (var graphics = System.Drawing.Graphics.FromImage(bitmap))
                 graphics.CopyFromScreen((int)Math.Round(origin.X) - shadowMargin,
                     (int)Math.Round(origin.Y) - shadowMargin, 0, 0, bitmap.Size);
+            foreach (var point in new[] { new System.Drawing.Point(2, 2), new System.Drawing.Point(bitmap.Width - 3, 2), new System.Drawing.Point(2, bitmap.Height - 3), new System.Drawing.Point(bitmap.Width - 3, bitmap.Height - 3) })
+            {
+                var pixel = bitmap.GetPixel(point.X, point.Y);
+                if (Math.Abs(pixel.R - background.R) > 24 || Math.Abs(pixel.G - background.G) > 24 || Math.Abs(pixel.B - background.B) > 24)
+                {
+                    File.AppendAllText(Path.Combine(App.DataDirectory, "desktop-capture-unavailable.txt"), name + ": the controlled backdrop is not visible.\n");
+                    return false;
+                }
+            }
             bitmap.Save(Path.Combine(App.DataDirectory, name + ".png"), System.Drawing.Imaging.ImageFormat.Png);
+            return true;
         }
         catch (System.ComponentModel.Win32Exception error) when (error.NativeErrorCode == 6)
         {
             // Some test hosts have no interactive desktop capture handle. Keep the
             // deterministic WPF checks running and record why this capture is absent.
             File.WriteAllText(Path.Combine(App.DataDirectory, "desktop-capture-unavailable.txt"), error.Message);
+            return false;
         }
         finally { fixture.Close(); window.Activate(); }
     }
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern nint GetForegroundWindow();
 }
