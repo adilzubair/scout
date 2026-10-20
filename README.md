@@ -35,9 +35,7 @@
 </p>
 
 > [!NOTE]
-> This README describes **beta 3 development**. Public downloads are **beta 2**,
-> which uses **Ctrl+Alt+Space** and does not include the multimodal add-on.
-> Scout is experimental: accuracy and minimum hardware requirements are still
+> Scout is an experimental beta: accuracy and minimum hardware requirements are still
 > being evaluated, the installer is unsigned, and updates are manual.
 
 <p align="center">
@@ -97,7 +95,7 @@ downloading a model. Local AI is optional and off by default.
 | Model | What it does in Scout | Availability |
 |---|---|---|
 | **[Laya](https://huggingface.co/convaiinnovations/laya)** | Decision models for candidate ranking, action intent, readiness and group membership. Available checkpoints: **English**, **multilingual** and **typed-decisions**. | Optional local AI. English is the recommended checkpoint in the current evaluation. |
-| **[Google EmbeddingGemma 2](https://huggingface.co/google/embeddinggemma-2)** | Embeds text, images, audio and video for content retrieval. Indexes selected folders and returns matched evidence in previews. | Experimental **Settings → Multimodal** add-on in the current source; installed separately from Laya. |
+| **[Google EmbeddingGemma 2](https://huggingface.co/google/embeddinggemma-2)** | Embeds text, images, audio and video for content retrieval. Indexes selected folders and returns matched evidence in previews. | Experimental **Settings → Multimodal** add-on; installed separately from Laya. |
 | **[Qwen3-4B-Instruct-2507](https://huggingface.co/Qwen/Qwen3-4B-Instruct-2507)** | An experimental helper for descriptive file ranking, using a pinned Q4_K_M GGUF conversion through llama.cpp. | **Research-only**; hidden from standard Settings. [Evaluation and limitations.](docs/research/LOCAL_SEMANTIC_HELPER.md) |
 
 Laya chooses among known candidates and supported actions; it never generates
@@ -110,7 +108,7 @@ local worker. Document bodies are never sent to Laya or the Qwen helper.
    **Set up local AI**.
 2. Enable local AI and save Settings. Start with the default **English**
    checkpoint.
-3. For multimodal content search in the current source, configure the separate
+3. For multimodal content search, configure the separate
    add-on under **Settings → Multimodal** and choose the folders to index.
 
 Setup downloads isolated runtimes and pinned model weights, requiring several
@@ -140,8 +138,7 @@ and [multimodal development status](docs/research/MULTIMODAL_ADDON.md).
 1. Download **`Scout-Setup.exe`** from the
    [public beta releases](https://github.com/adilzubair/scout-site/releases)
    and run it. Setup installs for your account without admin rights.
-2. Open Scout with **Ctrl+Alt+Space** in the published beta 2, or **Ctrl+Space**
-   when running the current source.
+2. Open Scout with **Ctrl+Space**.
 3. Type an app name or a query, review the result, and press **Enter** to open it.
 
 Prefer a portable copy? Extract the entire **`Scout-win-x64.zip`** archive and
@@ -154,9 +151,6 @@ To update, quit Scout and run the newer installer. To uninstall, use
 remain in `%LOCALAPPDATA%\Scout` for a later reinstall.
 
 ## Keyboard shortcuts
-
-These shortcuts apply to the current source. The published beta 2 uses
-**Ctrl+Alt+Space** to open the launcher.
 
 | Shortcut | Action |
 |---|---|
