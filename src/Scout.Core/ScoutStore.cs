@@ -36,6 +36,9 @@ public sealed partial class ScoutStore
             return 0;
         });
         settingsCache = Read<ScoutSettings>("settings").FirstOrDefault() ?? new();
+        // Before beta 3 the launch default was Ctrl+Alt+Space, which now previews
+        // a file inside the panel. Move profiles still using it to the new default.
+        if (settingsCache.Hotkey == ScoutSettings.LegacyHotkey) settingsCache.Hotkey = ScoutSettings.DefaultHotkey;
         libraryCache = Read<LibraryItem>("library").ToDictionary(x => x.Candidate.Id);
         workspaceCache = Read<Workspace>("workspaces");
         ContentIndex = new(path + ".content");

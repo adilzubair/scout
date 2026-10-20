@@ -44,6 +44,6 @@ repository's `vercel.json` and copy only the contents of `dist/` when publishing
 
 The Windows 11 x64 beta offers a per-user installer as the primary download and
 a portable ZIP as a secondary option. It is unsigned and has no automatic updater.
-Download links currently target `v0.1.0-beta.2`, including both SHA-256 checksum
+Download links currently target `v0.1.0-beta.3`, including both SHA-256 checksum
 files. Update every installer, ZIP, checksum, version label, and release-note link
 together when publishing a later beta.

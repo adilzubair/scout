@@ -1,25 +1,48 @@
-# Scout 0.1.0 beta 3 — experimental candidate, unreleased
+# Scout 0.1.0 beta 3 — 2026-10-20
 
-This candidate preserves beta 2's saved index, folder/type filters and explicit
-content queries while adding an optional local multimodal content index. The
-add-on searches selected documents, presentations, spreadsheets, code, images,
-audio and video, with matched evidence in previews. It is off by default and
-uses a separate private runtime/model download. Laya remains independent.
+This beta redesigns the search panel, changes the launch shortcut to
+**Ctrl+Space**, and adds an optional, experimental multimodal content index.
 
-Settings save durably before indexing finishes; folder-picker activation and
-failed PDF navigation/retry are fixed. Packaging now checks source membership,
-private-payload exclusions, ZIP inventory and hashes before producing artifacts.
+## Changes
 
-The combined source passes 431 native checks locally and in Windows CI,
-alongside the packaging contracts, installer compilation and a Defender scan
-with zero new detections.
+- **New shortcut.** Press **Ctrl+Space** to open Scout. **Ctrl+Alt+Space** now
+  previews the selected file. Profiles still using the old default move to
+  Ctrl+Space automatically; custom shortcuts are kept.
+- **Split search panel.** Results sit beside a preview of the selected item,
+  with its path, evidence and Open / Quick look / Reveal actions. Text, source,
+  PDF, image and Office previews appear inline.
+- **Refreshed Settings and dialogs** that match the search panel, in light, dark
+  and high-contrast themes.
+- **Multimodal add-on (experimental, off by default).** Under **Settings →
+  Multimodal**, Scout can install a separate local runtime and the EmbeddingGemma 2
+  model to index the contents of folders you choose: documents, presentations,
+  spreadsheets, code, images (with Windows OCR), audio and video. Matching
+  evidence appears in previews. Content is processed only by the local worker;
+  Laya never receives document bodies.
+- Settings now save before indexing changes are applied, so folders no longer
+  disappear when Settings is reopened during indexing.
+- Fixed a crash when activating the folder picker, PDF previews that failed after
+  a transient lock or failed navigation, and a launcher footer that could be cut
+  off.
+- Packaging verifies source membership, excludes private data, and checks the
+  ZIP inventory and hashes before producing downloads.
 
-This is an experimental beta. A larger independent multimodal quality study and
-measurements on 16 GB hardware are still to come. Laya CPU requests can reach
-their two-second fallback. Clean-machine installer lifecycle checks and a review
-of the optional native add-on's source and notices remain open. See
-[third-party components](THIRD_PARTY.md) before redistributing native add-on files.
-No beta 3 release has been published.
+## Install or upgrade
+
+Quit the running Scout, then run `Scout-Setup.exe`. It installs for your Windows
+account without elevation and keeps your settings, pins, history and
+workspaces. For the portable edition, extract all of `Scout-win-x64.zip` into a
+fresh folder and run `Scout.exe`. SHA-256 checksum files accompany both
+downloads.
+
+## Limitations
+
+This is an unsigned, experimental beta with manual updates. Windows may show a
+SmartScreen warning. A clean-machine install and uninstall test is still
+outstanding. The multimodal add-on downloads several GB, has not passed an
+independent retrieval-quality study, and has not been measured on 16 GB
+hardware. Laya CPU ranking can exceed its two-second budget and fall back to
+local results. See [third-party components](THIRD_PARTY.md) for licenses.
 
 # Scout 0.1.0 beta 2 — 2026-10-09
 

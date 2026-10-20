@@ -256,6 +256,14 @@ try
         store.SaveSettings(new() { ChromeHistory = true, ContentSearchEnabled = true, ContentFolders = ["C:\\Documents"], SemanticHelper = true, ExtraFolders = ["C:\\Project"] });
         Assert(store.Settings.ChromeHistory && store.Settings.ContentSearchEnabled && store.Settings.ContentFolders.Length == 1 && store.Settings.SemanticHelper && store.Settings.ExtraFolders.Length == 1);
     });
+    Test("Legacy launch shortcut migrates while custom shortcuts persist", () =>
+    {
+        var path = Path.Combine(tempRoot, "hotkey.db");
+        new ScoutStore(path).SaveSettings(new() { Hotkey = ScoutSettings.LegacyHotkey });
+        Assert(new ScoutStore(path).Settings.Hotkey == ScoutSettings.DefaultHotkey);
+        new ScoutStore(path).SaveSettings(new() { Hotkey = "Ctrl+Alt+S" });
+        Assert(new ScoutStore(path).Settings.Hotkey == "Ctrl+Alt+S");
+    });
     Test("Index replacement is persistent", () =>
     {
         store.ReplaceIndex([recent, old]); store.ReplaceIndex([old]); Assert(store.Candidates.Single().Id == old.Id);
