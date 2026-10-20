@@ -1,6 +1,6 @@
 # Scout interface
 
-Scout opens as a 720 × 76 px search field when the query is empty. Typing opens
+Scout opens as a 780 × 64 px search field when the query is empty. Typing opens
 the results panel; Down or Tab opens suggestions and scope filters. Clearing the
 query returns to the compact field unless a group or workspace edit is active.
 The search field opens near the upper third of the screen and keeps room below for
@@ -9,21 +9,38 @@ The panel keeps up to six results visible before scrolling and stays within the
 current monitor's work area. Existing launch, preview, group, and action
 shortcuts work in both states.
 
+The `ui/digup-inspired` branch tries the split search panel from
+[DigUp](https://github.com/ARahim3/DigUp): a 330 px result column beside a
+selected-item preview, an amber magnifier, compact rows, neutral surfaces and
+a quiet footer. This is an original WPF implementation; no DigUp source or assets
+ship with Scout. Scout retains its scope filters, launcher actions and workspace
+controls.
+
+Selecting a result shows its name, type, path and available search evidence.
+Local images, PDF pages, bounded document/source text and current multimodal
+extracts load automatically after a short selection delay. Audio/video and
+unsupported formats show a type symbol; Quick look opens the existing dedicated
+preview, including playback. Open, Quick look and Reveal use the same validated
+actions as the keyboard shortcuts. Moving selection, changing the query or
+hiding Scout cancels the previous preview. Remote paths and cloud placeholders
+are not fetched for automatic previews.
+
 ## Visual system
 
 Shared brushes in `src/Scout.App/App.xaml` use dynamic resources for XAML and
 mutable brushes for controls created in code. Scout follows the Windows app
 light/dark setting, including changes while it runs. Segoe UI Variable Text and
-Display, Fluent icons, and restrained blue accents keep the interface native
-to Windows. A slim accent edge identifies the selected result.
+Display and Fluent icons keep the interface native to Windows. Amber identifies
+search; blue selection fills identify the current result; moss green gives
+fallback preview symbols a quiet accent.
 
 | Role | Light | Dark |
 | --- | --- | --- |
-| Panel | `#F7F9FC` | `#1B2028` |
-| Primary text | `#202733` | `#F3F5F8` |
-| Secondary text | `#626C7A` | `#AAB4C2` |
-| Accent | `#4568D4` | `#91A8FF` |
-| Selected result | `#E8EEFC` | `#2A3650` |
+| Panel | `#FBFBFB` | `#1F1F21` |
+| Primary text | `#1D1D1F` | `#F2F2F7` |
+| Secondary text | `#6E6E73` | `#A1A1A6` |
+| Search accent | `#B8660B` | `#F2A22A` |
+| Selected result | `#CEE5FC` | `#233F60` |
 
 Windows 11 draws native acrylic behind the transient launcher and short-lived
 dialogs, and Mica behind settings and Quick look. The tinted panel, rim, and
@@ -59,3 +76,28 @@ compositor captures manually on an interactive Windows desktop before release.
 Run `--smoke-test` separately for PDF, image, Office, and text previews. Both
 modes write `smoke-result.txt` in the isolated data directory and leave the
 user's normal settings alone.
+
+The narrower `--controls-smoke-test` also checks the split layout, actual inline
+text extraction, cancellation on selection/query changes and hide/reopen. It
+saves `inline-note.png` and `inline-note-dark.png` alongside its control report.
+Fallback previews are checked in light, dark and high-contrast themes to keep
+the footer and action buttons inside the panel.
+To build this trial while another Scout copy holds the normal output directory:
+
+```powershell
+dotnet build Scout.slnx -c Release -m:1 -p:OutputPath="$PWD/artifacts/digup-ui/"
+```
+
+Trial validation on 20 October 2026: the build completed without warnings and
+all 431 regression checks passed. The final native control run passed 22 of 23
+checks, including the new inline readers and cancellation/layout checks. The
+existing clipboard test could not read the current clipboard object
+(`CLIPBRD_E_CANT_OPEN`, after its bounded retries). The full UI run completed
+the remaining visual, Office, PDF and media checks using the verified runtime
+under `artifacts/diagnostics/e2e/addon`, then retained that clipboard failure as
+a failing overall exit status. Reports and screenshots stay untracked under
+`artifacts/digup-ui-checks/`.
+
+Quit the current Scout instance before opening `artifacts/digup-ui/Scout.exe`
+to try the branch; the normal single-instance launcher otherwise reopens the
+already running copy.

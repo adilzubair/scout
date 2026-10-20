@@ -74,6 +74,7 @@ public partial class MainWindow
             {Click(button);await WaitForSearch();Require((int)scope==int.Parse((string)button.Tag),"Wrong scope after click.");}
             scope=Scope.All;UpdateScopes();RefreshLocal();await WaitForSearch();Inventory(this,"launcher");
         });
+        await Check("launcher: split preview, file readers and cancellation", CaptureInlinePreviewChecks);
         await Check("launcher: example buttons and clear search",async()=>
         {
             foreach(var button in UiDiagnostics.Descendants<Button>(this).Where(button=>button.Tag is string text && !int.TryParse(text,out _)).ToArray())

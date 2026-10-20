@@ -3,36 +3,39 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              ShutdownMode="OnExplicitShutdown">
   <Application.Resources>
+    <SolidColorBrush x:Key="BrandAmber" Color="#B8660B"/>
+    <SolidColorBrush x:Key="Tertiary" Color="#85858C"/>
+    <SolidColorBrush x:Key="PreviewSurface" Color="#F3F3F4"/>
     <!-- Shared mutable brushes are recolored when the Windows app theme changes. -->
-    <SolidColorBrush x:Key="Ink" Color="#202733"/>
-    <SolidColorBrush x:Key="Muted" Color="#626C7A"/>
-    <SolidColorBrush x:Key="Accent" Color="#4568D4"/>
+    <SolidColorBrush x:Key="Ink" Color="#1D1D1F"/>
+    <SolidColorBrush x:Key="Muted" Color="#6E6E73"/>
+    <SolidColorBrush x:Key="Accent" Color="#0A6FD8"/>
     <SolidColorBrush x:Key="OnAccent" Color="#FFFFFF"/>
-    <SolidColorBrush x:Key="Canvas" Color="#F7F9FC"/>
-    <SolidColorBrush x:Key="Glass" Color="#EEF7F9FC"/>
-    <SolidColorBrush x:Key="DocumentGlass" Color="#DFF7F9FC"/>
-    <SolidColorBrush x:Key="Rim" Color="#D5DCE8"/>
-    <SolidColorBrush x:Key="Divider" Color="#DDE3ED"/>
-    <SolidColorBrush x:Key="PageSurface" Color="#F0F3F8"/>
+    <SolidColorBrush x:Key="Canvas" Color="#FBFBFB"/>
+    <SolidColorBrush x:Key="Glass" Color="#F2FBFBFB"/>
+    <SolidColorBrush x:Key="DocumentGlass" Color="#EBFBFBFB"/>
+    <SolidColorBrush x:Key="Rim" Color="#D8D8DC"/>
+    <SolidColorBrush x:Key="Divider" Color="#E4E4E7"/>
+    <SolidColorBrush x:Key="PageSurface" Color="#F3F3F4"/>
     <SolidColorBrush x:Key="Surface" Color="#FFFFFF"/>
-    <SolidColorBrush x:Key="Line" Color="#DDE3ED"/>
-    <SolidColorBrush x:Key="Hover" Color="#E9EEF6"/>
-    <SolidColorBrush x:Key="Selection" Color="#E8EEFC"/>
-    <SolidColorBrush x:Key="SelectionLine" Color="#A9BDED"/>
-    <SolidColorBrush x:Key="IconSurface" Color="#EEF3FA"/>
-    <SolidColorBrush x:Key="IconGreenSurface" Color="#EAF5EE"/>
-    <SolidColorBrush x:Key="IconInk" Color="#3970AC"/>
-    <SolidColorBrush x:Key="IconGreenInk" Color="#237548"/>
-    <SolidColorBrush x:Key="TextSelection" Color="#C9DAFF"/>
+    <SolidColorBrush x:Key="Line" Color="#DCDCE0"/>
+    <SolidColorBrush x:Key="Hover" Color="#F0F0F2"/>
+    <SolidColorBrush x:Key="Selection" Color="#CEE5FC"/>
+    <SolidColorBrush x:Key="SelectionLine" Color="#86B9ED"/>
+    <SolidColorBrush x:Key="IconSurface" Color="#ECECEE"/>
+    <SolidColorBrush x:Key="IconGreenSurface" Color="#E8F0E9"/>
+    <SolidColorBrush x:Key="IconInk" Color="#6E6E73"/>
+    <SolidColorBrush x:Key="IconGreenInk" Color="#356652"/>
+    <SolidColorBrush x:Key="TextSelection" Color="#C9E3FC"/>
     <SolidColorBrush x:Key="SwitchKnob" Color="#FFFFFF"/>
-    <SolidColorBrush x:Key="Success" Color="#237548"/>
+    <SolidColorBrush x:Key="Success" Color="#356652"/>
     <SolidColorBrush x:Key="Error" Color="#A8303A"/>
-    <SolidColorBrush x:Key="KeycapFill" Color="#ECF0F6"/>
+    <SolidColorBrush x:Key="KeycapFill" Color="#F0F0F2"/>
     <SolidColorBrush x:Key="CheckSurface" Color="#FFFFFF"/>
-    <SolidColorBrush x:Key="CheckBorder" Color="#AEB9CA"/>
-    <SolidColorBrush x:Key="SwitchTrack" Color="#C8D1DE"/>
-    <SolidColorBrush x:Key="ScrollThumb" Color="#ADB9C9"/>
-    <SolidColorBrush x:Key="ScrollThumbHover" Color="#8292A7"/>
+    <SolidColorBrush x:Key="CheckBorder" Color="#AEAEB4"/>
+    <SolidColorBrush x:Key="SwitchTrack" Color="#C8C8CE"/>
+    <SolidColorBrush x:Key="ScrollThumb" Color="#B8B8BF"/>
+    <SolidColorBrush x:Key="ScrollThumbHover" Color="#92929B"/>
     <Style TargetType="Window">
       <Setter Property="FontFamily" Value="Segoe UI Variable Text, Segoe UI"/>
       <Setter Property="FontSize" Value="14"/>
@@ -89,9 +92,9 @@
       <Setter Property="Foreground" Value="{DynamicResource Muted}"/>
     </Style>
     <Style x:Key="ScopeButton" TargetType="Button" BasedOn="{StaticResource QuietButton}">
-      <Setter Property="Padding" Value="13,6"/>
+      <Setter Property="Padding" Value="12,5"/>
       <Setter Property="Margin" Value="0,0,3,0"/>
-      <Setter Property="FontSize" Value="13"/>
+      <Setter Property="FontSize" Value="12"/>
     </Style>
     <Style x:Key="Keycap" TargetType="Border">
       <Setter Property="Background" Value="{DynamicResource KeycapFill}"/>

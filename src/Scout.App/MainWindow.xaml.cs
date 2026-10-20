@@ -48,7 +48,7 @@ public partial class MainWindow : Window
     private long observedSemanticEpoch=-1,observedSemanticVersion=-1;
     private readonly Dictionary<string,SemanticContentMatch> semanticProvenance=[];
     private long appliedRevision, observedIndexVersion = -1;
-    private double requestedHeight = 76;
+    private double requestedHeight = 64;
     private bool suggestionsRevealed, expanded;
     private string lastRenderedQuery = "";
     private HashSet<string> lastRenderedIds = [];
@@ -100,7 +100,7 @@ public partial class MainWindow : Window
         indexRefresh = new DispatcherTimer { Interval = TimeSpan.FromSeconds(30) };
         indexRefresh.Tick += async (_, _) => await index.RefreshAsync(); indexRefresh.Start();
         wait = ThreadPool.RegisterWaitForSingleObject(showEvent, (_, _) => Dispatcher.BeginInvoke(() => Toggle(true)), null, -1, false);
-        Application.Current.Exit += (_, _) => { search.Cancel(); wait.Unregister(null); showEvent.Dispose(); WindowsIntegration.ReleaseHotkey(this); };
+        Application.Current.Exit += (_, _) => { CancelInlinePreview(); search.Cancel(); wait.Unregister(null); showEvent.Dispose(); WindowsIntegration.ReleaseHotkey(this); };
     }
     private nint WindowMessage(nint hwnd, int msg, nint wParam, nint lParam, ref bool handled)
     { if (msg == 0x0312 && wParam == 42) { Toggle(); handled = true; } return 0; }
@@ -120,7 +120,7 @@ public partial class MainWindow : Window
         Show(); Activate(); WindowsIntegration.SetForegroundWindow(new WindowInteropHelper(this).Handle); Query.Focus(); Query.SelectAll();
         _ = index.RefreshAsync(forceHistory: true); ScheduleSearch(false);
     }
-    private void HidePanel() { search.Cancel(); revision++; suggestionsRevealed = false; UpdateExpansion(); Hide(); modelIdle.Stop(); modelIdle.Start(); }
+    private void HidePanel() { CancelInlinePreview(); search.Cancel(); revision++; suggestionsRevealed = false; UpdateExpansion(); Hide(); modelIdle.Stop(); modelIdle.Start(); }
     private void DragHeader(object sender, MouseButtonEventArgs e)
     {
         if (e.ChangedButton != MouseButton.Left) return;
@@ -169,6 +169,8 @@ public partial class MainWindow : Window
             { EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut }, FillBehavior = FillBehavior.Stop });
         }
         ResizeToResults(Results.Items.Count, (Results.Items.Cast<ResultRow>().FirstOrDefault()?.Candidate.Kind == ItemKind.Calculation));
+        if (expanded) UpdateInlinePreview();
+        else CancelInlinePreview();
     }
     private void UpdateScopes()
     {
@@ -184,6 +186,7 @@ public partial class MainWindow : Window
     }
     private void ScheduleSearch(bool enrich)
     {
+        CancelInlinePreview();
         search.Cancel(); search = new CancellationTokenSource(); var token = search.Token; var generation = ++revision;
         // Keep showing the current rows while the next search runs: Enter and
         // double-click already ignore stale generations through Selected, so
@@ -333,6 +336,7 @@ public partial class MainWindow : Window
         Examples.Visibility = Query.Text.Length == 0 && scope == Scope.All ? Visibility.Visible : Visibility.Collapsed;
         ResultHints.Visibility = rows.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
         FooterActions.Visibility = rows.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
+        DetailPane.Visibility = rows.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
         ActionsButton.IsEnabled = rows.Length > 0;
         ResizeToResults(rows.Length, rows.FirstOrDefault()?.Candidate.Kind == ItemKind.Calculation);
         if (expanded && previousQuery == Query.Text && WindowVisuals.MotionEnabled)
@@ -353,8 +357,8 @@ public partial class MainWindow : Window
     }
     private void ResizeToResults(int count, bool calculation)
     {
-        var target = !expanded ? 76 : count == 0 ? (Examples.Visibility == Visibility.Visible ? 448 : 370)
-            : Math.Max(370, 250 + Math.Min(6, count) * 60 + (calculation ? 22 : 0));
+        var target = !expanded ? 64 : count == 0 ? (Examples.Visibility == Visibility.Visible ? 448 : 400)
+            : Math.Max(450, 170 + Math.Min(6, count) * 52);
         if (IndexIndicator.Visibility == Visibility.Visible) target += 28;
         if (GroupBar.Visibility == Visibility.Visible) target += 56;
         var height = Math.Min(target, MaxHeight);
@@ -377,6 +381,7 @@ public partial class MainWindow : Window
             PrimaryActionHint.Text = Selected?.Kind == ItemKind.Calculation || current?.Intent.Action == ItemAction.Copy ? "Copy"
                 : current?.Intent.Action == ItemAction.Preview && Selected?.Kind == ItemKind.File ? "Preview"
                 : current?.Intent.Action == ItemAction.Reveal && Selected?.Kind is ItemKind.File or ItemKind.App or ItemKind.Folder ? "Reveal" : "Open";
+        UpdateInlinePreview();
     }
     private void AnimateSelection(System.Collections.IList changed, bool selected)
     {

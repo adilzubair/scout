@@ -1,7 +1,7 @@
 <Window x:Class="Scout.App.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Scout" Width="720" Height="76" WindowStyle="None" ResizeMode="NoResize"
+        Title="Scout" Width="780" Height="64" WindowStyle="None" ResizeMode="NoResize"
         ShowInTaskbar="False" Topmost="True" WindowStartupLocation="CenterScreen"
         PreviewKeyDown="OnKeyDown" Background="{DynamicResource Canvas}">
   <Window.Resources>
@@ -13,19 +13,19 @@
       <Setter Property="Margin" Value="0,2"/>
     </Style>
   </Window.Resources>
-  <Border x:Name="PanelShell" Background="{DynamicResource Canvas}" BorderBrush="{DynamicResource Rim}" BorderThickness="1" CornerRadius="12">
+  <Border x:Name="PanelShell" Background="{DynamicResource Canvas}" BorderBrush="{DynamicResource Rim}" BorderThickness="1" CornerRadius="18">
     <Grid x:Name="PanelContent">
       <Grid.RowDefinitions>
         <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/>
         <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
       </Grid.RowDefinitions>
-      <Grid Margin="25,14,21,14" Background="Transparent" MouseLeftButtonDown="DragHeader">
+      <Grid Margin="18,9,14,9" Background="Transparent" MouseLeftButtonDown="DragHeader">
         <Grid.ColumnDefinitions><ColumnDefinition Width="37"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-        <Path Data="M 16,9 A 7,7 0 1 1 2,9 A 7,7 0 1 1 16,9 M 14,14 L 21,21" Stroke="{DynamicResource Muted}" StrokeThickness="1.7" StrokeStartLineCap="Round" StrokeEndLineCap="Round" VerticalAlignment="Center" Width="24" Height="24"/>
+        <Path Data="M 16,9 A 7,7 0 1 1 2,9 A 7,7 0 1 1 16,9 M 14,14 L 21,21" Stroke="{DynamicResource BrandAmber}" StrokeThickness="2.3" StrokeStartLineCap="Round" StrokeEndLineCap="Round" VerticalAlignment="Center" Width="24" Height="24"/>
         <Grid Grid.Column="1">
           <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-          <TextBox x:Name="Query" FontFamily="Segoe UI Variable Display, Segoe UI" FontSize="23" BorderThickness="0" Background="Transparent" Padding="0,5" TextChanged="QueryChanged" AutomationProperties.Name="Search apps, files and links"/>
-          <TextBlock x:Name="Placeholder" Text="Search apps, files, and more" FontFamily="Segoe UI Variable Display, Segoe UI" Foreground="{DynamicResource Muted}" FontSize="23" Margin="0,5" IsHitTestVisible="False"/>
+          <TextBox x:Name="Query" FontFamily="Segoe UI Variable Display, Segoe UI" FontSize="22" BorderThickness="0" Background="Transparent" Padding="0,5" TextChanged="QueryChanged" AutomationProperties.Name="Search apps, files and links"/>
+          <TextBlock x:Name="Placeholder" Text="Find a file, open an app, describe it…" FontFamily="Segoe UI Variable Display, Segoe UI" Foreground="{DynamicResource Tertiary}" FontSize="22" Margin="0,5" IsHitTestVisible="False" TextTrimming="CharacterEllipsis"/>
           <Button x:Name="IndexIndicator" Grid.Row="1" Visibility="Collapsed" Style="{StaticResource QuietButton}" Padding="0,2" HorizontalAlignment="Left" Click="IndexDetailsClick" AutomationProperties.Name="Show indexing details">
             <StackPanel Orientation="Horizontal">
               <ProgressBar x:Name="IndexBusy" Width="16" Height="3" Margin="0,0,7,0" VerticalAlignment="Center" Visibility="Collapsed"/>
@@ -37,7 +37,7 @@
         <Button Grid.Column="3" Style="{StaticResource QuietButton}" Padding="8,6" VerticalAlignment="Center" Click="SettingsClick" ToolTip="Settings (Ctrl+,)" AutomationProperties.Name="Open settings"><TextBlock Text="&#xE713;" FontFamily="Segoe Fluent Icons" FontSize="15"/></Button>
         <Button Grid.Column="4" Style="{StaticResource QuietButton}" Padding="0" VerticalAlignment="Center" Click="DismissClick" ToolTip="Dismiss Scout (Escape)" AutomationProperties.Name="Dismiss Scout"><Border Style="{StaticResource Keycap}" Padding="6,3"><TextBlock Text="esc"/></Border></Button>
       </Grid>
-      <Grid x:Name="ScopesRow" Grid.Row="1" Margin="20,0,20,10" Visibility="Collapsed">
+      <Grid x:Name="ScopesRow" Grid.Row="1" Margin="18,2,18,9" Visibility="Collapsed">
         <StackPanel x:Name="Scopes" Orientation="Horizontal">
           <Button Style="{StaticResource ScopeButton}" Content="All" Tag="0" Click="ScopeClick"/>
           <Button Style="{StaticResource ScopeButton}" Content="Files" Tag="1" Click="ScopeClick"/>
@@ -47,34 +47,35 @@
         </StackPanel>
       </Grid>
       <Grid x:Name="ResultsRegion" Grid.Row="2" Visibility="Collapsed">
+        <Grid.ColumnDefinitions><ColumnDefinition Width="330"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
         <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-        <Grid Margin="28,5,28,9">
-          <TextBlock x:Name="ResultsHeading" Text="Suggestions" Foreground="{DynamicResource Muted}" FontSize="12"/>
-          <TextBlock x:Name="ResultCount" Foreground="{DynamicResource Muted}" FontSize="12" HorizontalAlignment="Right" Visibility="Collapsed"/>
+        <Border Grid.ColumnSpan="2" BorderBrush="{DynamicResource Divider}" BorderThickness="0,1,0,0" IsHitTestVisible="False"/>
+        <Grid Margin="18,11,18,6">
+          <TextBlock x:Name="ResultsHeading" Text="Suggestions" Foreground="{DynamicResource Muted}" FontSize="11" FontWeight="SemiBold"/>
+          <TextBlock x:Name="ResultCount" Foreground="{DynamicResource Muted}" FontSize="11" HorizontalAlignment="Right"/>
         </Grid>
-        <ListBox Grid.Row="1" x:Name="Results" Background="Transparent" BorderThickness="0" Padding="0" Margin="12,0,12,12"
+        <ListBox Grid.Row="1" x:Name="Results" Background="Transparent" BorderThickness="0" Padding="0" Margin="8,0,8,8"
                  Foreground="{DynamicResource Ink}"
                  ScrollViewer.HorizontalScrollBarVisibility="Disabled" ScrollViewer.VerticalScrollBarVisibility="Auto"
                  ScrollViewer.CanContentScroll="True" VirtualizingPanel.ScrollUnit="Pixel"
                  SelectionChanged="SelectionChanged" PreviewMouseLeftButtonDown="ResultMouseDown" MouseDoubleClick="OpenDoubleClick" AutomationProperties.Name="Search results">
           <ListBox.ItemContainerStyle>
             <Style TargetType="ListBoxItem">
-              <Setter Property="HorizontalContentAlignment" Value="Stretch"/><Setter Property="Padding" Value="14,9"/>
+              <Setter Property="HorizontalContentAlignment" Value="Stretch"/><Setter Property="Padding" Value="8,7"/>
               <Setter Property="Margin" Value="0,1"/><Setter Property="FocusVisualStyle" Value="{StaticResource KeyboardFocus}"/>
               <Setter Property="AutomationProperties.Name" Value="{Binding Title}"/>
               <Setter Property="Template">
                 <Setter.Value>
                   <ControlTemplate TargetType="ListBoxItem">
-                    <Border x:Name="Row" CornerRadius="9" Background="Transparent" Padding="{TemplateBinding Padding}">
+                    <Border x:Name="Row" CornerRadius="8" Background="Transparent" Padding="{TemplateBinding Padding}">
                       <Grid>
-                        <Border x:Name="SelectionFill" Background="{DynamicResource Selection}" CornerRadius="9" Margin="-14,-9" Opacity="0"/>
-                        <Border x:Name="SelectionEdge" Width="2" HorizontalAlignment="Left" Margin="-10,5,0,5" CornerRadius="2" Background="{DynamicResource Accent}" Visibility="Collapsed"/>
+                        <Border x:Name="SelectionFill" Background="{DynamicResource Selection}" CornerRadius="8" Margin="-8,-7" Opacity="0"/>
                         <ContentPresenter/>
                       </Grid>
                     </Border>
                     <ControlTemplate.Triggers>
                       <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Row" Property="Background" Value="{DynamicResource Hover}"/></Trigger>
-                      <Trigger Property="IsSelected" Value="True"><Setter TargetName="SelectionFill" Property="Opacity" Value="1"/><Setter TargetName="SelectionEdge" Property="Visibility" Value="Visible"/></Trigger>
+                      <Trigger Property="IsSelected" Value="True"><Setter TargetName="SelectionFill" Property="Opacity" Value="1"/></Trigger>
                     </ControlTemplate.Triggers>
                   </ControlTemplate>
                 </Setter.Value>
@@ -84,28 +85,46 @@
           <ListBox.ItemTemplate>
             <DataTemplate>
               <Grid ToolTip="{Binding Evidence}">
-                <Grid.ColumnDefinitions><ColumnDefinition Width="50"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="32"/></Grid.ColumnDefinitions>
-                <Border Width="38" Height="38" CornerRadius="10" Background="{Binding IconBackground}" HorizontalAlignment="Left" VerticalAlignment="Center">
-                  <Grid><TextBlock Text="{Binding Glyph}" Visibility="{Binding GlyphVisibility}" FontFamily="Segoe Fluent Icons" Foreground="{Binding IconForeground}" FontSize="21" HorizontalAlignment="Center" VerticalAlignment="Center"/><Image Source="{Binding Icon}" Width="30" Height="30" RenderOptions.BitmapScalingMode="HighQuality"/></Grid>
+                <Grid.ColumnDefinitions><ColumnDefinition Width="46"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                <Border Width="36" Height="36" CornerRadius="6" Background="{Binding IconBackground}" HorizontalAlignment="Left" VerticalAlignment="Center">
+                  <Grid><TextBlock Text="{Binding Glyph}" Visibility="{Binding GlyphVisibility}" FontFamily="Segoe Fluent Icons" Foreground="{Binding IconForeground}" FontSize="20" HorizontalAlignment="Center" VerticalAlignment="Center"/><Image Source="{Binding Icon}" Width="28" Height="28" RenderOptions.BitmapScalingMode="HighQuality"/></Grid>
                 </Border>
                 <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                  <TextBlock x:Name="ResultTitle" Text="{Binding Title}" Foreground="{DynamicResource Ink}" FontSize="15" TextTrimming="CharacterEllipsis"/>
-                  <TextBlock Text="{Binding Detail}" Foreground="{DynamicResource Muted}" FontSize="12" TextTrimming="CharacterEllipsis" Margin="0,3,0,0"/>
+                  <TextBlock x:Name="ResultTitle" Text="{Binding Title}" Foreground="{DynamicResource Ink}" FontSize="13" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                  <TextBlock Text="{Binding Detail}" Foreground="{DynamicResource Muted}" FontSize="11" TextTrimming="CharacterEllipsis" Margin="0,2,0,0"/>
                 </StackPanel>
                 <TextBlock Grid.Column="2" Text="{Binding Marker}" FontFamily="Segoe Fluent Icons" FontSize="12" Margin="10,0,0,0" Foreground="{DynamicResource Muted}" VerticalAlignment="Center" ToolTip="Pinned"/>
-                <TextBlock Grid.Column="3" Text="{Binding KindLabel}" Margin="16,0,12,0" FontSize="11" Foreground="{DynamicResource Muted}" VerticalAlignment="Center"/>
-                <CheckBox Grid.Column="4" Visibility="{Binding MembershipVisibility}" IsChecked="{Binding Grouped, Mode=OneWay}" Click="MemberClick" VerticalAlignment="Center" Margin="0,0,8,0" AutomationProperties.Name="Include in group"/>
-                <Border Grid.Column="5" x:Name="ReturnKey" Style="{StaticResource Keycap}" HorizontalAlignment="Right" Padding="6,2" Visibility="Hidden" ToolTip="Press Enter to use this result"><TextBlock x:Name="ReturnGlyph" Text="↵" Foreground="{DynamicResource Muted}" FontSize="14"/></Border>
+                <CheckBox Grid.Column="3" Visibility="{Binding MembershipVisibility}" IsChecked="{Binding Grouped, Mode=OneWay}" Click="MemberClick" VerticalAlignment="Center" Margin="6,0,0,0" AutomationProperties.Name="Include in group"/>
+                <Border Grid.Column="4" x:Name="ReturnKey" HorizontalAlignment="Right" Padding="6,2,0,2" Visibility="Hidden" ToolTip="Press Enter to use this result"><TextBlock x:Name="ReturnGlyph" Text="↵" Foreground="{DynamicResource Muted}" FontSize="14"/></Border>
               </Grid>
               <DataTemplate.Triggers>
                 <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Value="True"><Setter TargetName="ReturnKey" Property="Visibility" Value="Visible"/></DataTrigger>
                 <DataTrigger Binding="{Binding IsReady}" Value="True"><Setter TargetName="ReturnGlyph" Property="Foreground" Value="{DynamicResource Accent}"/></DataTrigger>
-                <DataTrigger Binding="{Binding KindLabel}" Value="Calculator"><Setter TargetName="ResultTitle" Property="FontSize" Value="30"/><Setter TargetName="ResultTitle" Property="FontWeight" Value="Medium"/></DataTrigger>
+                <DataTrigger Binding="{Binding KindLabel}" Value="Calculator"><Setter TargetName="ResultTitle" Property="FontSize" Value="22"/><Setter TargetName="ResultTitle" Property="FontWeight" Value="Medium"/></DataTrigger>
               </DataTemplate.Triggers>
             </DataTemplate>
           </ListBox.ItemTemplate>
         </ListBox>
-        <StackPanel Grid.Row="1" x:Name="Empty" VerticalAlignment="Center" Margin="26,5,26,18">
+        <Border x:Name="DetailPane" Grid.Column="1" Grid.RowSpan="2" BorderBrush="{DynamicResource Divider}" BorderThickness="1,1,0,0" Padding="18,16" Visibility="Collapsed" AutomationProperties.Name="Selected result preview">
+          <Grid>
+            <Grid.RowDefinitions><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+            <Border Background="{DynamicResource PreviewSurface}" CornerRadius="8" Padding="12" Margin="0,0,0,14" MinHeight="100">
+              <ContentControl x:Name="InlinePreview" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" Focusable="False"/>
+            </Border>
+            <StackPanel Grid.Row="1">
+              <TextBlock x:Name="DetailTitle" FontSize="15" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+              <TextBlock x:Name="DetailKind" FontSize="11" Foreground="{DynamicResource Muted}" Margin="0,4,0,0"/>
+              <TextBlock x:Name="DetailPath" FontSize="11" Foreground="{DynamicResource Muted}" TextTrimming="CharacterEllipsis" Margin="0,4,0,0"/>
+              <TextBlock x:Name="DetailEvidence" FontSize="12" Foreground="{DynamicResource Muted}" TextWrapping="Wrap" MaxHeight="36" Margin="0,10,0,0"/>
+              <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+                <Button x:Name="DetailOpen" Content="{Binding Text, ElementName=PrimaryActionHint}" Click="DetailOpenClick" Padding="12,6" FontSize="12" Margin="0,0,6,0"/>
+                <Button x:Name="DetailQuickLook" Content="Quick look" Click="DetailQuickLookClick" Padding="12,6" FontSize="12" Margin="0,0,6,0" ToolTip="Quick look (Ctrl+Alt+Space)"/>
+                <Button x:Name="DetailReveal" Content="Reveal" Click="DetailRevealClick" Style="{StaticResource QuietButton}" Padding="10,6" FontSize="12" ToolTip="Reveal in Explorer (Ctrl+R)"/>
+              </StackPanel>
+            </StackPanel>
+          </Grid>
+        </Border>
+        <StackPanel Grid.Row="1" Grid.ColumnSpan="2" x:Name="Empty" VerticalAlignment="Center" HorizontalAlignment="Center" MaxWidth="440" Margin="26,5,26,18">
           <TextBlock x:Name="EmptyTitle" Text="What can we help you find?" Foreground="{DynamicResource Ink}" FontSize="19" FontWeight="Medium" Margin="0,0,0,6"/>
           <TextBlock x:Name="EmptyDetail" Text="An app, a file, or a few words to get started." Foreground="{DynamicResource Muted}" FontSize="13" TextWrapping="Wrap" LineHeight="21" Margin="0,0,0,15"/>
           <StackPanel x:Name="Examples" Margin="-12,0,-8,0">
@@ -118,11 +137,10 @@
       <Border Grid.Row="3" x:Name="GroupBar" Visibility="Collapsed" BorderBrush="{DynamicResource Divider}" BorderThickness="0,1,0,0" Padding="24,10">
         <DockPanel><TextBlock x:Name="GroupLabel" VerticalAlignment="Center" FontSize="12" Foreground="{DynamicResource Muted}"/><StackPanel Orientation="Horizontal" HorizontalAlignment="Right"><Button Content="Review group" Click="ReviewGroupClick" Style="{StaticResource QuietButton}" FontSize="12"/><Button Content="Save workspace" Click="SaveWorkspaceClick" Style="{StaticResource QuietButton}" Margin="4,0,8,0" FontSize="12"/><Button Content="Open group" Click="OpenGroupClick" Style="{StaticResource PrimaryButton}" FontSize="12"/></StackPanel></DockPanel>
       </Border>
-      <Border x:Name="FooterBar" Grid.Row="4" BorderBrush="{DynamicResource Divider}" BorderThickness="0,1,0,0" Padding="24,10,19,10" Visibility="Collapsed">
+      <Border x:Name="FooterBar" Grid.Row="4" BorderBrush="{DynamicResource Divider}" BorderThickness="0,1,0,0" Padding="16,6" Visibility="Collapsed">
         <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
           <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,12,0">
-            <Path Data="M 14,2 L 10,12 L 2,16 L 6,6 Z M 6,6 L 10,12" Stroke="{DynamicResource Muted}" StrokeThickness="1.2" StrokeLineJoin="Round" Width="17" Height="18" Margin="0,0,8,0" VerticalAlignment="Center"/>
-            <TextBlock x:Name="Status" Text="Scout" Foreground="{DynamicResource Muted}" FontSize="12" TextTrimming="CharacterEllipsis" MaxWidth="330" VerticalAlignment="Center" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
+            <TextBlock x:Name="Status" Text="Scout" Foreground="{DynamicResource Muted}" FontSize="11" TextTrimming="CharacterEllipsis" MaxWidth="400" VerticalAlignment="Center" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
           </StackPanel>
           <StackPanel x:Name="FooterActions" Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
             <StackPanel x:Name="ResultHints" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,13,0">

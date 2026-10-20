@@ -10,6 +10,15 @@ internal static class PreviewDiagnostics
 {
     public static async Task CheckAsync(string root)
     {
+        CreateFixtures(root);
+        foreach (var name in new[] { "Note.txt", "Image.png", "Slides.pptx", "Document.pdf" })
+        {
+            var window = new PreviewWindow(new(name, ItemKind.File, name, Path.Combine(root, name)));
+            try { await window.CheckAsync(); } finally { window.Close(); }
+        }
+    }
+    internal static void CreateFixtures(string root)
+    {
         Directory.CreateDirectory(root);
         File.WriteAllText(Path.Combine(root, "Note.txt"), "Scout preview fixture");
         var image = BitmapSource.Create(2, 2, 96, 96, PixelFormats.Bgr24, null, new byte[12], 6);
@@ -27,10 +36,5 @@ internal static class PreviewDiagnostics
         foreach (var offset in offsets) pdf.Append($"{offset:0000000000} 00000 n \n");
         pdf.Append($"trailer\n<< /Size {objects.Length + 1} /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF\n");
         File.WriteAllText(Path.Combine(root, "Document.pdf"), pdf.ToString(), Encoding.ASCII);
-        foreach (var name in new[] { "Note.txt", "Image.png", "Slides.pptx", "Document.pdf" })
-        {
-            var window = new PreviewWindow(new(name, ItemKind.File, name, Path.Combine(root, name)));
-            try { await window.CheckAsync(); } finally { window.Close(); }
-        }
     }
 }

@@ -10,13 +10,84 @@ namespace Scout.App;
 
 public partial class MainWindow
 {
+    private async Task CaptureInlinePreviewChecks()
+    {
+        var textPath = Path.Combine(App.DataDirectory, "Preview note.txt");
+        const string canary = "The launch review is on Thursday.\nBring the revised roadmap and the updated budget.";
+        await File.WriteAllTextAsync(textPath, canary);
+        var note = new Candidate("ui:inline-note", ItemKind.File, "Preview note.txt", textPath) { Detail = "Launch review notes" };
+        var other = new Candidate("ui:inline-other", ItemKind.App, "Another selection", "another.exe");
+        Query.Text = "launch review notes"; await WaitForSearch();
+        await refinementTask; await Task.WhenAll(enrichmentTask, semanticTask); ClearGroup();
+        uiRefresh.Stop(); indexRefresh.Stop();
+        try
+        {
+            ApplyRows([new(note, 100), new(other, 90)]);
+            await inlinePreviewTask; UpdateLayout();
+            if (InlinePreview.Content is not ScrollViewer { Content: TextBlock passage } || passage.Text != canary || DetailTitle.Text != note.Title)
+                throw new InvalidOperationException("Selected text file did not show its actual contents.");
+            if (DetailPane.ActualWidth < 300 || Results.ActualWidth < 280 || DetailPane.TranslatePoint(new System.Windows.Point(), this).X <= Results.TranslatePoint(new System.Windows.Point(), this).X)
+                throw new InvalidOperationException("Results and preview were not laid out side by side.");
+            WindowVisuals.SetTestTheme(false); await UiDiagnostics.Snapshot(this, "inline-note");
+            WindowVisuals.SetTestTheme(true); await UiDiagnostics.Snapshot(this, "inline-note-dark"); WindowVisuals.SetTestTheme(null);
+            // A late reader cannot overwrite the next selected result.
+            Results.SelectedIndex = 1; Results.SelectedIndex = 0; var pending = inlinePreviewTask;
+            Results.SelectedIndex = 1; await pending; await inlinePreviewTask;
+            if (DetailTitle.Text != other.Title || UiDiagnostics.Descendants<TextBlock>(InlinePreview).Any(text => text.Text.Contains(canary)))
+                throw new InvalidOperationException("A cancelled file preview replaced the current selection.");
+            foreach (var (dark, contrast, name) in new[] { (false, false, "inline-symbol"), (true, false, "inline-symbol-dark"), (false, true, "inline-symbol-contrast") })
+            {
+                WindowVisuals.SetTestTheme(dark, contrast); UpdateLayout();
+                if (FooterBar.TranslatePoint(new System.Windows.Point(0, FooterBar.ActualHeight), this).Y > ActualHeight - 1 ||
+                    DetailOpen.TranslatePoint(new System.Windows.Point(0, DetailOpen.ActualHeight), this).Y >= FooterBar.TranslatePoint(new System.Windows.Point(), this).Y)
+                    throw new InvalidOperationException("The fallback preview clipped the footer or its actions.");
+                await UiDiagnostics.Snapshot(this, name);
+            }
+            WindowVisuals.SetTestTheme(null);
+            Results.SelectedIndex = 0; pending = inlinePreviewTask; Query.Text = "different query";
+            await pending;
+            if (InlinePreview.Content != null || DetailOpen.IsEnabled)
+                throw new InvalidOperationException("Changing the query left the old preview actionable.");
+            await WaitForSearch();
+            ApplyRows([new(note, 100)]); pending = inlinePreviewTask; HidePanel(); await pending;
+            if (InlinePreview.Content != null) throw new InvalidOperationException("Hiding Scout retained an automatic file preview.");
+            Toggle(true); await WaitForSearch();
+            await refinementTask; await Task.WhenAll(enrichmentTask, semanticTask);
+            ApplyRows([new(note, 100)]); await inlinePreviewTask;
+            if (InlinePreview.Content is not ScrollViewer) throw new InvalidOperationException("Reopening Scout did not restore previews.");
+            var fixtureRoot = Path.Combine(App.DataDirectory, "inline-fixtures");
+            PreviewDiagnostics.CreateFixtures(fixtureRoot);
+            foreach (var name in new[] { "Image.png", "Document.pdf", "Slides.pptx" })
+            {
+                var item = new Candidate("ui:inline:" + name, ItemKind.File, name, Path.Combine(fixtureRoot, name));
+                ApplyRows([new(item, 100)]); await inlinePreviewTask;
+                if (name.EndsWith(".pptx", StringComparison.Ordinal) ? InlinePreview.Content is not ScrollViewer : InlinePreview.Content is not System.Windows.Controls.Image { Source: not null })
+                    throw new InvalidOperationException($"Inline preview did not read {name}: {DetailTitle.Text}; {DetailEvidence.Text}; {DetailEvidence.ToolTip}");
+                if (name.EndsWith(".pdf", StringComparison.Ordinal) && !DetailKind.Text.Contains("Page 1 of 1"))
+                    throw new InvalidOperationException("Inline PDF page information was missing.");
+                await UiDiagnostics.Snapshot(this, "inline-" + name.Replace('.', '-'));
+            }
+        }
+        finally
+        {
+            WindowVisuals.SetTestTheme(null); manualSelection = false;
+            uiRefresh.Start(); indexRefresh.Start();
+            if (!IsVisible) Toggle(true);
+            Query.Clear(); RefreshLocal(); await WaitForSearch();
+        }
+    }
+
     // Runs only in the isolated --ui-smoke-test flow; no user settings are saved.
     private async Task CaptureUiChecks()
     {
         if(App.PdfSmokeOnly){await CapturePdfNavigationChecks(3);return;}
         if(App.PreviewSmokeExtension is {} extension){await CaptureMediaPreviews(extension=="all"?null:extension);return;}
-        await CaptureControlChecks();
-        if(App.ControlsSmokeOnly)return;
+        // Retain control failures, but still capture and validate the remaining
+        // interface when a desktop service (such as the clipboard) is busy.
+        IOException? controlFailure = null;
+        try { await CaptureControlChecks(); }
+        catch (IOException error) { controlFailure = error; }
+        if(App.ControlsSmokeOnly) { if(controlFailure != null) throw controlFailure; return; }
         async Task SearchView(string text, Scope filter, string name, int pixelScale = 1)
         {
             scope = filter; UpdateScopes(); Query.Text = text; RefreshLocal(); await WaitForSearch();
@@ -232,6 +303,7 @@ public partial class MainWindow
         catch(IOException){}
         manualSelection=false;RefreshLocal();await WaitForSearch();
         await CaptureMediaPreviews();
+        if (controlFailure != null) throw controlFailure;
     }
     private async Task CapturePdfNavigationChecks(int repetitions=1)
     {

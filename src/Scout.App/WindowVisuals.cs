@@ -50,7 +50,7 @@ internal static class WindowVisuals
         window.WindowStyle = WindowStyle.None;
         WindowChrome.SetWindowChrome(window, new WindowChrome
         {
-            CaptionHeight = 0, CornerRadius = new CornerRadius(12), GlassFrameThickness = new Thickness(0),
+            CaptionHeight = 0, CornerRadius = new CornerRadius(window is MainWindow ? 18 : 12), GlassFrameThickness = new Thickness(0),
             ResizeBorderThickness = new Thickness(window.ResizeMode == ResizeMode.NoResize ? 0 : 5), UseAeroCaptionButtons = false
         });
         window.SourceInitialized += (_, _) =>
@@ -105,7 +105,9 @@ internal static class WindowVisuals
                 ["Error"] = SystemColors.WindowTextColor, ["IconSurface"] = SystemColors.WindowColor,
                 ["IconGreenSurface"] = SystemColors.WindowColor, ["IconInk"] = SystemColors.WindowTextColor,
                 ["IconGreenInk"] = SystemColors.WindowTextColor, ["TextSelection"] = SystemColors.HighlightColor,
-                ["SwitchKnob"] = SystemColors.WindowTextColor
+                ["SwitchKnob"] = SystemColors.WindowTextColor,
+                ["BrandAmber"] = SystemColors.WindowTextColor, ["Tertiary"] = SystemColors.WindowTextColor,
+                ["PreviewSurface"] = SystemColors.WindowColor
             } : Palette(dark);
             foreach (var (key, color) in colors)
                 Application.Current.Resources[key] = new SolidColorBrush(color);
@@ -135,35 +137,38 @@ internal static class WindowVisuals
     {
         var colors = new Dictionary<string, (string Light, string Dark)>
         {
-            ["Ink"] = ("#202733", "#F3F5F8"),
-            ["Muted"] = ("#626C7A", "#AAB4C2"),
-            ["Accent"] = ("#4568D4", "#91A8FF"),
-            ["OnAccent"] = ("#FFFFFF", "#101827"),
-            ["Canvas"] = ("#F7F9FC", "#1B2028"),
-            ["Glass"] = ("#EEF7F9FC", "#EE1B2028"),
-            ["DocumentGlass"] = ("#DFF7F9FC", "#D91B2028"),
-            ["Rim"] = ("#D5DCE8", "#536070"),
-            ["Divider"] = ("#DDE3ED", "#39414F"),
-            ["PageSurface"] = ("#F0F3F8", "#252C37"),
-            ["Surface"] = ("#FFFFFF", "#252C37"),
-            ["Line"] = ("#DDE3ED", "#414A59"),
-            ["Hover"] = ("#E9EEF6", "#303B4B"),
-            ["Selection"] = ("#E8EEFC", "#2A3650"),
-            ["SelectionLine"] = ("#A9BDED", "#6684B9"),
-            ["Success"] = ("#237548", "#7ACAA0"),
+            ["BrandAmber"] = ("#B8660B", "#F2A22A"),
+            ["Tertiary"] = ("#85858C", "#94949E"),
+            ["PreviewSurface"] = ("#F3F3F4", "#262629"),
+            ["Ink"] = ("#1D1D1F", "#F2F2F7"),
+            ["Muted"] = ("#6E6E73", "#A1A1A6"),
+            ["Accent"] = ("#0A6FD8", "#70B5FF"),
+            ["OnAccent"] = ("#FFFFFF", "#132234"),
+            ["Canvas"] = ("#FBFBFB", "#1F1F21"),
+            ["Glass"] = ("#F2FBFBFB", "#F21F1F21"),
+            ["DocumentGlass"] = ("#EBFBFBFB", "#E61F1F21"),
+            ["Rim"] = ("#D8D8DC", "#4A4A4E"),
+            ["Divider"] = ("#E4E4E7", "#38383C"),
+            ["PageSurface"] = ("#F3F3F4", "#27272A"),
+            ["Surface"] = ("#FFFFFF", "#2C2C2E"),
+            ["Line"] = ("#DCDCE0", "#454549"),
+            ["Hover"] = ("#F0F0F2", "#303034"),
+            ["Selection"] = ("#CEE5FC", "#233F60"),
+            ["SelectionLine"] = ("#86B9ED", "#568BC0"),
+            ["Success"] = ("#356652", "#A2C78E"),
             ["Error"] = ("#A8303A", "#FF9B9B"),
-            ["KeycapFill"] = ("#ECF0F6", "#303A49"),
-            ["CheckSurface"] = ("#FFFFFF", "#252C37"),
-            ["CheckBorder"] = ("#AEB9CA", "#78869B"),
-            ["SwitchTrack"] = ("#C8D1DE", "#536174"),
-            ["ScrollThumb"] = ("#ADB9C9", "#69798E"),
-            ["ScrollThumbHover"] = ("#8292A7", "#91A2B8"),
-            ["IconSurface"] = ("#EEF3FA", "#2B3647"),
-            ["IconGreenSurface"] = ("#EAF5EE", "#263C33"),
-            ["IconInk"] = ("#3970AC", "#A9C5FF"),
-            ["IconGreenInk"] = ("#237548", "#7ACAA0"),
-            ["TextSelection"] = ("#C9DAFF", "#486091"),
-            ["SwitchKnob"] = ("#FFFFFF", "#F3F5F8")
+            ["KeycapFill"] = ("#F0F0F2", "#303034"),
+            ["CheckSurface"] = ("#FFFFFF", "#2C2C2E"),
+            ["CheckBorder"] = ("#AEAEB4", "#787880"),
+            ["SwitchTrack"] = ("#C8C8CE", "#53535C"),
+            ["ScrollThumb"] = ("#B8B8BF", "#62626A"),
+            ["ScrollThumbHover"] = ("#92929B", "#8E8E97"),
+            ["IconSurface"] = ("#ECECEE", "#303034"),
+            ["IconGreenSurface"] = ("#E8F0E9", "#2A3930"),
+            ["IconInk"] = ("#6E6E73", "#B4B4BD"),
+            ["IconGreenInk"] = ("#356652", "#A2C78E"),
+            ["TextSelection"] = ("#C9E3FC", "#385E85"),
+            ["SwitchKnob"] = ("#FFFFFF", "#F2F2F7")
         };
         return colors.ToDictionary(pair => pair.Key,
             pair => (Color)ColorConverter.ConvertFromString(dark ? pair.Value.Dark : pair.Value.Light)!);
